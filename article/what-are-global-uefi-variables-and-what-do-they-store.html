@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What Are Global UEFI Variables and What Do They Store? - uefi</title>
+    <meta name="description" content="Unified Extensible Firmware Interface (UEFI) global variables are standardized, non-volatile data structures that enable seamless communication between system firmware and the operating system. Defined by the official UEFI specification, these variables r">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/what-are-global-uefi-variables-and-what-do-they-store">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="What Are Global UEFI Variables and What Do They Store? - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/what-are-global-uefi-variables-and-what-do-they-store" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Unified Extensible Firmware Interface (UEFI) global variables are standardized, non-volatile data structures that enable seamless communication between system firmware and the operating system. Defined by the official UEFI specification, these variables r" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="what-are-global-uefi-variables-and-what-do-they-store">What Are
+Global UEFI Variables and What Do They Store?</h1>
+<p>Unified Extensible Firmware Interface (UEFI) global variables are
+standardized, non-volatile data structures that enable seamless
+communication between system firmware and the operating system. Defined
+by the official UEFI specification, these variables reside in
+non-volatile memory (NVRAM) and persist across system reboots and power
+cycles. This article explains the technical definition of global UEFI
+variables and details the critical boot configurations, security keys,
+and hardware states they typically store.</p>
+<h3 id="defining-global-uefi-variables">Defining Global UEFI
+Variables</h3>
+<p>Global UEFI variables are distinguished by a standardized globally
+unique identifier (GUID) defined in the UEFI Specification: the
+<code>EFI_GLOBAL_VARIABLE</code> vendor GUID
+(<code>8BE4DF61-93CA-11D2-AA0D-00E098032B8C</code>). While hardware
+vendors can define proprietary variables using their own GUIDs, global
+variables follow a universal naming convention and structure that any
+UEFI-compliant operating system or bootloader can access and
+interpret.</p>
+<p>These variables are managed by UEFI Runtime Services using standard
+API functions such as <code>GetVariable</code> and
+<code>SetVariable</code>. They possess specific attributes that
+determine their access levels, such as whether they are accessible only
+during the boot phase (Boot Services) or continue to be accessible after
+the operating system loads (Runtime Services), and whether they are
+read-only or read/write.</p>
+<h3 id="key-categories-of-data-stored-in-global-uefi-variables">Key
+Categories of Data Stored in Global UEFI Variables</h3>
+<p>Global UEFI variables store several categories of low-level
+configuration and operational data required for platform
+initialization:</p>
+<h4 id="1-boot-configuration-and-management">1. Boot Configuration and
+Management</h4>
+<p>The primary function of global UEFI variables is to control how the
+system initializes and selects an operating system. Key variables
+include:</p>
+<ul>
+<li><strong><code>BootOrder</code></strong>: An ordered array of 16-bit
+integers specifying the priority order in which firmware attempts to
+execute available boot options.</li>
+<li><strong><code>Boot####</code></strong> (e.g., <code>Boot0001</code>,
+<code>Boot0002</code>): Individual configuration profiles containing the
+display label, device path, and optional command-line arguments needed
+to locate and execute an OS bootloader like GRUB or the Windows Boot
+Manager.</li>
+<li><strong><code>BootNext</code></strong>: A single boot option index
+that forces the system to boot into a specific option on the next
+restart only, reverting to <code>BootOrder</code> afterward.</li>
+<li><strong><code>BootCurrent</code></strong>: A read-only value
+indicating which <code>Boot####</code> entry the firmware launched
+during the active session.</li>
+</ul>
+<h4 id="2-system-and-hardware-console-configuration">2. System and
+Hardware Console Configuration</h4>
+<p>Variables in this category define the paths and mechanisms used for
+early system input and output:</p>
+<ul>
+<li><strong><code>ConIn</code></strong>,
+<strong><code>ConOut</code></strong>, and
+<strong><code>ErrOut</code></strong>: Device paths pointing to the
+active input device (such as a keyboard), standard display console, and
+standard error stream during the pre-boot phase.</li>
+<li><strong><code>Timeout</code></strong>: The duration (in seconds) the
+firmware waits for user interaction before proceeding to load the first
+entry in <code>BootOrder</code>.</li>
+</ul>
+<h4 id="3-platform-localization">3. Platform Localization</h4>
+<p>To ensure interface consistency across the pre-boot environment,
+firmware stores localization settings as global variables:</p>
+<ul>
+<li><strong><code>PlatformLang</code></strong>: The current language
+code the platform uses (such as <code>en-US</code>).</li>
+<li><strong><code>PlatformLangCodes</code></strong>: A read-only list of
+RFC 4646 language codes supported by the platform's firmware.</li>
+</ul>
+<h4 id="4-os-to-firmware-signaling">4. OS-to-Firmware Signaling</h4>
+<p>Global variables allow the running operating system to request
+actions from the firmware upon the subsequent reboot:</p>
+<ul>
+<li><strong><code>OsIndications</code></strong>: A bitmask written by
+the operating system to request actions such as entering the UEFI setup
+utility, initiating capsule firmware updates, or resetting platform
+hierarchy keys.</li>
+<li><strong><code>OsIndicationsSupported</code></strong>: A read-only
+bitmask provided by the firmware indicating which OS-requested actions
+it supports.</li>
+</ul>
+<h4 id="5-security-and-state-data">5. Security and State Data</h4>
+<p>While cryptographic databases typically reside under dedicated
+security GUIDs, the state of platform security mechanisms is exposed via
+global variables:</p>
+<ul>
+<li><strong><code>SecureBoot</code></strong>: A read-only flag
+indicating whether UEFI Secure Boot verification is currently active
+(value <code>1</code>) or inactive (value <code>0</code>).</li>
+<li><strong><code>SetupMode</code></strong>: Indicates whether the
+platform is in user mode (enforcing Secure Boot policy) or setup mode
+(allowing platform keys to be provisioned without authentication).</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/what-are-global-uefi-variables-and-what-do-they-store';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

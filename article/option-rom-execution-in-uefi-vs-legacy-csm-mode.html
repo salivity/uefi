@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Option ROM Execution in UEFI vs Legacy CSM Mode - uefi</title>
+    <meta name="description" content="Option Read-Only Memories (Option ROMs or OpROMs) provide device-specific firmware to initialize add-in hardware, such as storage controllers and graphics cards, during system startup. The execution of these ROMs differs significantly depending on whether">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/option-rom-execution-in-uefi-vs-legacy-csm-mode">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Option ROM Execution in UEFI vs Legacy CSM Mode - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/option-rom-execution-in-uefi-vs-legacy-csm-mode" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Option Read-Only Memories (Option ROMs or OpROMs) provide device-specific firmware to initialize add-in hardware, such as storage controllers and graphics cards, during system startup. The execution of these ROMs differs significantly depending on whether" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="option-rom-execution-in-uefi-vs-legacy-csm-mode">Option ROM
+Execution in UEFI vs Legacy CSM Mode</h1>
+<p>Option Read-Only Memories (Option ROMs or OpROMs) provide
+device-specific firmware to initialize add-in hardware, such as storage
+controllers and graphics cards, during system startup. The execution of
+these ROMs differs significantly depending on whether the system runs in
+a native UEFI environment or uses the Compatibility Support Module (CSM)
+to emulate a legacy BIOS. While native UEFI executes OpROMs as modern,
+modular drivers in 32-bit, 64-bit, or processor-independent formats
+within a protected memory map, CSM executes them as legacy 16-bit
+real-mode binaries subject to strict physical memory limitations and
+dated interrupt handling.</p>
+<h3 id="binary-formats-and-architecture">Binary Formats and
+Architecture</h3>
+<p>In a legacy or CSM-enabled environment, an Option ROM consists of raw
+16-bit x86 machine code. It begins with the standard legacy signature
+(<code>0x55AA</code>), followed by a single-byte length indicator and
+entry-point vectors. The processor must drop into 16-bit real mode (or
+Virtual 8086 mode) to execute this code, limiting instructions to
+standard x86 real-mode operations.</p>
+<p>In a native UEFI environment, Option ROMs contain EFI drivers
+compiled as standard PE32+ (Portable Executable) binaries or EFI Byte
+Code (EBC). These drivers run natively in the system's target
+architecture—typically 64-bit long mode (<code>x86_64</code> or
+<code>AArch64</code>)—without requiring processor state downgrades. UEFI
+drivers adhere to the UEFI Driver Model, producing protocols that attach
+cleanly to device handles managed by the UEFI core.</p>
+<h3 id="memory-allocation-and-execution-space">Memory Allocation and
+Execution Space</h3>
+<p>Legacy Option ROM execution is constrained by the historical PC
+memory architecture:</p>
+<ul>
+<li><strong>The 1MB Memory Hole:</strong> Legacy BIOS allocates OpROMs
+to the upper memory area between <code>C0000h</code> and
+<code>EFFFFh</code> (the Option ROM memory space). All expansion cards
+must compete for this narrow memory window, which rarely exceeds 128 KB
+to 192 KB in total usable space.</li>
+<li><strong>Size Limitations:</strong> If a card’s legacy OpROM exceeds
+available space within this window, it fails to initialize, often
+causing system hangs or non-bootable states.</li>
+</ul>
+<p>Native UEFI eliminates these memory barriers:</p>
+<ul>
+<li><strong>Flat Memory Model:</strong> UEFI runs in flat,
+identity-mapped physical or virtual memory.</li>
+<li><strong>Dynamic Allocation:</strong> UEFI drivers inside the OpROM
+are loaded into standard system RAM through the
+<code>AllocatePages()</code> or <code>AllocatePool()</code> boot
+services. They can occupy megabytes of storage if required, easily
+accommodating advanced setup utilities, graphical configuration tools,
+and complex network stacks.</li>
+</ul>
+<h3 id="discovery-and-dispatching-mechanics">Discovery and Dispatching
+Mechanics</h3>
+<p>The execution sequence varies substantially between the two
+environments:</p>
+<ol type="1">
+<li><strong>CSM (Legacy) Discovery:</strong>
+<ul>
+<li>During the Power-On Self-Test (POST), the BIOS PCI enumerator
+identifies devices requiring an OpROM via their PCI configuration
+spaces.</li>
+<li>The BIOS copies the ROM from the device into the
+<code>C0000h–EFFFFh</code> segment.</li>
+<li>The BIOS invokes the ROM's initialization vector via a 16-bit
+<code>FAR CALL</code>.</li>
+<li>The OpROM hooks the Interrupt Vector Table (IVT)—typically hijacking
+<code>INT 10h</code> for video, <code>INT 13h</code> for disk
+operations, or <code>INT 19h</code> for bootstrap routing according to
+the BIOS Boot Specification (BBS).</li>
+</ul></li>
+<li><strong>UEFI Discovery:</strong>
+<ul>
+<li>The UEFI PCI Bus Driver scans the PCI bus and discovers the PCI
+Expansion ROM Base Address Register (BAR).</li>
+<li>The driver parses the PCI Expansion ROM header to find a
+UEFI-compatible image (a single physical OpROM may contain both legacy
+and UEFI images via a linked-list PCI Data Structure).</li>
+<li>The UEFI Security Architectural Protocol validates the binary's
+cryptographic signature if Secure Boot is enabled.</li>
+<li>If verified, the DXE (Driver Execution Environment) dispatcher loads
+the PE32+ image into RAM and calls its entry point
+(<code>EFI_IMAGE_ENTRY_POINT</code>).</li>
+<li>The driver installs <code>EFI_DRIVER_BINDING_PROTOCOL</code>,
+allowing the system to bind the driver to the device handle and access
+hardware resources through standard UEFI protocols rather than software
+interrupts.</li>
+</ul></li>
+</ol>
+<h3 id="security-and-validation">Security and Validation</h3>
+<p>Under CSM, Option ROM execution provides no native integrity checking
+or cryptographic validation. Any arbitrary code embedded in the ROM is
+executed with full hardware privileges in real mode, making legacy
+OpROMs vulnerable to firmware-level rootkits and boot-path
+modifications.</p>
+<p>Native UEFI integrates Option ROM execution directly into the Secure
+Boot chain of trust. Before the system executes an OpROM driver, the
+firmware validates the driver’s digital signature against authorized
+keys in the <code>db</code> (Signature Database) and ensures it is not
+listed in the <code>dbx</code> (Forbidden Signatures Database). If
+validation fails, execution is blocked, preventing unauthorized or
+tampered expansion firmware from compromising system initialization.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/option-rom-execution-in-uefi-vs-legacy-csm-mode';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

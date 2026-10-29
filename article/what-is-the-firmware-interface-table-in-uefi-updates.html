@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What Is the Firmware Interface Table in UEFI Updates? - uefi</title>
+    <meta name="description" content="The Firmware Interface Table (FIT) is an architectural data structure embedded within the system flash memory that provides early hardware-level pointers to critical startup components before standard UEFI execution begins. This article explores the archi">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/what-is-the-firmware-interface-table-in-uefi-updates">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="What Is the Firmware Interface Table in UEFI Updates? - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/what-is-the-firmware-interface-table-in-uefi-updates" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Firmware Interface Table (FIT) is an architectural data structure embedded within the system flash memory that provides early hardware-level pointers to critical startup components before standard UEFI execution begins. This article explores the archi" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="what-is-the-firmware-interface-table-in-uefi-updates">What Is
+the Firmware Interface Table in UEFI Updates?</h1>
+<p>The Firmware Interface Table (FIT) is an architectural data structure
+embedded within the system flash memory that provides early
+hardware-level pointers to critical startup components before standard
+UEFI execution begins. This article explores the architecture of the
+FIT, its role in the pre-boot environment, and how it enables firmware
+update mechanisms—such as UEFI Capsule updates—to locate, relocate, and
+validate essential assets like processor microcode and security modules
+without hardcoded memory offsets.</p>
+<h3 id="what-is-the-firmware-interface-table">What Is the Firmware
+Interface Table?</h3>
+<p>The Firmware Interface Table is a structured data table defined
+primarily by Intel for modern x86 architectures. It resides inside the
+SPI flash memory and is referenced by a fixed pointer located at memory
+address <code>0xFFFFFFC0</code> (16 bytes below the 4 GB boundary, just
+below the traditional x86 reset vector).</p>
+<p>When the processor comes out of reset, hardware logic automatically
+checks this address. If a valid FIT pointer is present, the processor's
+microcode parses the table prior to executing the first instruction at
+the reset vector.</p>
+<p>The FIT consists of a series of 16-byte entries, each defining:</p>
+<ul>
+<li><strong>Address:</strong> The physical base address of the component
+in memory/flash.</li>
+<li><strong>Size:</strong> The size of the component (encoded in 16-byte
+chunks).</li>
+<li><strong>Version:</strong> The component or entry version.</li>
+<li><strong>Type:</strong> The identifier for the component type (e.g.,
+Microcode Update, Startup Authenticated Code Module [ACM], BIOS Boot
+Guard policy, TPM configuration).</li>
+</ul>
+<h3
+id="how-the-fit-assists-in-locating-components-during-uefi-updates">How
+the FIT Assists in Locating Components During UEFI Updates</h3>
+<p>Firmware updates are complex operations because firmware volumes,
+microcode patches, and security modules vary in size across releases.
+The FIT serves as an abstraction layer between the hardware execution
+engine and the physical flash layout, streamlining updates in several
+key ways.</p>
+<h4 id="1-decoupling-code-locations-from-fixed-offsets">1. Decoupling
+Code Locations from Fixed Offsets</h4>
+<p>Without the FIT, the system architecture would require microcode,
+authenticated code modules, and security manifests to reside at rigid,
+unchangeable memory locations. During a UEFI update (such as a Capsule
+Update), an updated microcode patch or security binary might exceed the
+allocated space of its previous version.</p>
+<p>Because the CPU relies on the FIT rather than hardcoded flash
+addresses, the UEFI update utility can write newer, larger binaries to
+different areas in the flash memory and simply update the corresponding
+address and size fields in the FIT.</p>
+<h4 id="2-synchronizing-microcode-and-acm-discovery">2. Synchronizing
+Microcode and ACM Discovery</h4>
+<p>Modern security frameworks, such as Intel Boot Guard, require the
+processor to locate and execute an Authenticated Code Module (ACM)
+before running UEFI initialization code (the SEC phase). During a
+firmware update:</p>
+<ul>
+<li>The flasher writes the updated ACM and microcode patches into the
+SPI flash.</li>
+<li>The flasher writes the new FIT table containing the updated physical
+pointers.</li>
+<li>Upon the subsequent reboot, the hardware reads the FIT to instantly
+identify where the updated ACM and microcode reside, ensuring that early
+security validation happens seamlessly on the new code base.</li>
+</ul>
+<h4 id="3-facilitating-multi-microcode-matching">3. Facilitating
+Multi-Microcode Matching</h4>
+<p>A single UEFI firmware image often supports multiple processor
+steppings or models. During an update, multiple microcode updates are
+loaded into flash. The FIT allows firmware creators to register multiple
+microcode entries (Type 0x01). During early boot post-update, the
+processor iterates through the FIT entries to locate, match, and apply
+the specific microcode patch that matches its internal CPUID and
+platform ID without relying on full UEFI driver execution.</p>
+<h4 id="4-atomic-updates-and-flash-layout-reorganization">4. Atomic
+Updates and Flash Layout Reorganization</h4>
+<p>When performing an update, flash tools often stage new images into
+alternative or backup banks (A/B layout). Because the FIT pointer at
+<code>0xFFFFFFC0</code> is the single source of truth for early boot
+assets, switching active banks or modifying layout structures during an
+update only requires pointing the top-level vector or FIT base to the
+new partition. The system avoids scanning through megabytes of unmapped
+flash to find needed runtime and boot components.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/what-is-the-firmware-interface-table-in-uefi-updates';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

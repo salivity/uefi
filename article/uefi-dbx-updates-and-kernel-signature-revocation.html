@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI dbx Updates and Kernel Signature Revocation - uefi</title>
+    <meta name="description" content="This article explores what occurs when an operating system update or firmware change causes a kernel or bootloader to conflict with the UEFI Forbidden Signature Database (dbx). It details the Secure Boot verification mechanism, the resulting boot sequence">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-dbx-updates-and-kernel-signature-revocation">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI dbx Updates and Kernel Signature Revocation - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-dbx-updates-and-kernel-signature-revocation" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article explores what occurs when an operating system update or firmware change causes a kernel or bootloader to conflict with the UEFI Forbidden Signature Database (dbx). It details the Secure Boot verification mechanism, the resulting boot sequence" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-dbx-updates-and-kernel-signature-revocation">UEFI dbx
+Updates and Kernel Signature Revocation</h1>
+<p>This article explores what occurs when an operating system update or
+firmware change causes a kernel or bootloader to conflict with the UEFI
+Forbidden Signature Database (<code>dbx</code>). It details the Secure
+Boot verification mechanism, the resulting boot sequence failures,
+typical error messages encountered by users, and how operating systems
+manage revoked cryptographic signatures.</p>
+<h3 id="understanding-the-uefi-dbx-database">Understanding the UEFI dbx
+Database</h3>
+<p>UEFI Secure Boot relies on cryptographic databases stored in
+non-volatile memory (NVRAM) to ensure that only trusted software
+executes during the pre-boot environment. While the <code>db</code>
+(Authorized Signature Database) contains approved keys, certificates,
+and binary hashes, the <code>dbx</code> (Forbidden Signature Database)
+serves as a revocation list. If a cryptographic key, certificate, or
+individual hash of an OS kernel or bootloader is present in the
+<code>dbx</code>, the UEFI firmware will strictly prohibit that binary
+from executing, even if it is signed by a certificate present in the
+<code>db</code>.</p>
+<h3 id="what-happens-during-the-boot-sequence">What Happens During the
+Boot Sequence</h3>
+<p>When the machine powers on, the UEFI firmware initiates the boot
+chain. If a kernel or its intermediate loader (such as the Linux
+<code>shim</code> or Windows Boot Manager) matches a revoked signature
+in the <code>dbx</code>, the following sequence occurs:</p>
+<ol type="1">
+<li><strong>Hash and Signature Evaluation:</strong> The firmware
+computes the hash of the executable and checks the signature against
+both <code>db</code> and <code>dbx</code>.</li>
+<li><strong>Revocation Match:</strong> The firmware identifies the
+kernel’s signature or hash within the <code>dbx</code> table.</li>
+<li><strong>Execution Block:</strong> The firmware refuses to load the
+binary into memory or transfer execution control to it.</li>
+<li><strong>Boot Halt:</strong> The boot process stops immediately.
+Depending on the manufacturer's implementation, the system will display
+a hardware-level error (such as "Secure Boot Violation" or "Invalid
+Image"), attempt to fall back to the next boot target in the boot order,
+or boot directly into the UEFI/BIOS settings interface.</li>
+</ol>
+<h3 id="scenarios-where-conflicts-occur">Scenarios Where Conflicts
+Occur</h3>
+<p>A mismatch typically happens under two primary conditions:</p>
+<ul>
+<li><strong>Applying Revocations Before Binary Updates:</strong> If an
+operating system updates the system's <code>dbx</code> via runtime
+services before installing a newly signed, non-vulnerable kernel, the
+existing kernel will be instantly invalidated for future boots.</li>
+<li><strong>Rolling Back to Previous Versions:</strong> When a user
+attempts to boot an older kernel, use recovery media, or roll back an
+update after a security flaw (like BootHole or similar GRUB/shim
+vulnerabilities) has been patched and added to the <code>dbx</code>, the
+older binary will no longer be permitted to launch.</li>
+</ul>
+<h3 id="operating-system-and-dual-boot-impact">Operating System and
+Dual-Boot Impact</h3>
+<p>In environments running Windows, a blocked bootloader or kernel
+typically halts with a blue screen bearing an error code such as
+<code>0xc0000428</code> (The digital signature for this file couldn't be
+verified) or <code>0xc000000f</code>.</p>
+<p>In Linux environments, the failure often surfaces before the kernel
+even decompresses. If the <code>shim</code> detects that the secondary
+loader or kernel has been revoked by either the UEFI <code>dbx</code> or
+the system's Machine Owner Key (MOK) list, it terminates execution and
+prompts the user with a security violation message. In dual-boot
+environments, updating the <code>dbx</code> through one OS can
+inadvertently render the other unbootable if the second OS relies on
+older, revoked boot components.</p>
+<h3 id="resolution-and-recovery">Resolution and Recovery</h3>
+<p>When a signature conflict blocks system startup, recovery generally
+requires either:</p>
+<ul>
+<li><strong>Replacing the Revoked Binary:</strong> Booting from
+up-to-date installation media to install a newly signed kernel or
+bootloader whose signature is not revoked.</li>
+<li><strong>Temporarily Disabling Secure Boot:</strong> Disabling Secure
+Boot in the UEFI firmware settings allows the invalidated kernel to
+load, giving administrators access to apply the necessary OS patches
+before re-enabling Secure Boot.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-dbx-updates-and-kernel-signature-revocation';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

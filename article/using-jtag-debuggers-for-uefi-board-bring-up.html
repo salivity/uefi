@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Using JTAG Debuggers for UEFI Board Bring-Up - uefi</title>
+    <meta name="description" content="UEFI firmware engineers rely on Joint Test Action Group (JTAG) debuggers as essential tools during the initial board bring-up phase of new hardware platforms. Before the board can reliably boot, display output, or even transmit serial logs via UART, JTAG">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/using-jtag-debuggers-for-uefi-board-bring-up">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Using JTAG Debuggers for UEFI Board Bring-Up - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/using-jtag-debuggers-for-uefi-board-bring-up" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI firmware engineers rely on Joint Test Action Group (JTAG) debuggers as essential tools during the initial board bring-up phase of new hardware platforms. Before the board can reliably boot, display output, or even transmit serial logs via UART, JTAG" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="using-jtag-debuggers-for-uefi-board-bring-up">Using JTAG
+Debuggers for UEFI Board Bring-Up</h1>
+<p>UEFI firmware engineers rely on Joint Test Action Group (JTAG)
+debuggers as essential tools during the initial board bring-up phase of
+new hardware platforms. Before the board can reliably boot, display
+output, or even transmit serial logs via UART, JTAG provides
+non-intrusive, hardware-level visibility directly into the central
+processing unit (CPU) and system-on-chip (SoC). This article explores
+how engineers leverage JTAG emulators to halt execution at the reset
+vector, troubleshoot Cache-as-RAM (CAR) setups, debug memory training,
+and step through the earliest phases of the UEFI initialization
+pipeline.</p>
+<h3 id="pre-boot-verification-and-the-reset-vector">Pre-Boot
+Verification and the Reset Vector</h3>
+<p>When a custom printed circuit board (PCB) arrives from fabrication,
+there is no guarantee that the power rails, clock generators, or flash
+interfaces are functioning properly. A JTAG probe interfaces directly
+with the CPU's internal debug registers through standard boundary-scan
+and on-chip debug protocols (such as ARM CoreSight or Intel Direct
+Connect Interface).</p>
+<p>The engineer's first objective is to halt the processor immediately
+at the reset vector—the very first instruction executed out of SPI flash
+memory (e.g., <code>0xFFFFFFF0</code> on x86 architectures). By reading
+instruction pointers and core status registers through JTAG, the
+engineer can confirm that:</p>
+<ul>
+<li>The CPU is receiving stable power, valid clocks, and de-asserted
+reset signals.</li>
+<li>The SPI flash bus is active and correctly returning the reset vector
+instructions.</li>
+<li>Microcode updates are applying properly before system memory is
+initialized.</li>
+</ul>
+<h3 id="debugging-the-security-sec-phase-and-cache-as-ram-car">Debugging
+the Security (SEC) Phase and Cache-as-RAM (CAR)</h3>
+<p>Modern processors cannot execute UEFI code directly from volatile RAM
+until the memory controller has been programmed. Consequently, the UEFI
+Security (SEC) phase configures the CPU's internal L1/L2 caches to serve
+as temporary execution space and stack storage, known as Cache-as-RAM
+(CAR) or No-Eviction Mode (NEM).</p>
+<p>Configuring CAR involves sensitive Model-Specific Register (MSR)
+programming and low-level assembly routines. If a configuration error
+occurs, the processor will trigger a machine check exception (MCE) or
+hang silently without any software-accessible log. With JTAG, firmware
+engineers can:</p>
+<ul>
+<li>Step line-by-line through the raw assembly code configuring
+MSRs.</li>
+<li>Inspect the stack pointer to confirm it resides within the valid
+cache-mapped range.</li>
+<li>Detect memory faults, page faults, or triple-fault conditions that
+reset the CPU.</li>
+</ul>
+<h3
+id="memory-initialization-in-the-pre-efi-initialization-pei-phase">Memory
+Initialization in the Pre-EFI Initialization (PEI) Phase</h3>
+<p>The transition from the SEC phase to the Pre-EFI Initialization (PEI)
+phase marks the point where the Memory Reference Code (MRC) executes.
+Memory training—calibrating timing, reference voltages, and impedance
+for high-speed DDR or LPDDR interfaces—is notoriously prone to failures
+on new board revisions due to signal integrity issues or incorrect trace
+routing.</p>
+<p>Engineers use JTAG during this phase to:</p>
+<ul>
+<li>Monitor progress codes written to memory-mapped I/O (MMIO) registers
+or virtual I/O ports.</li>
+<li>Identify where the MRC algorithm hangs during read/write leveling or
+Vref training loops.</li>
+<li>Overwrite register values on the fly to test marginal timing
+adjustments without recompiling the UEFI binary.</li>
+<li>Verify the handoff of execution from the temporary CAR stack to
+physical DRAM once initialization finishes.</li>
+</ul>
+<h3 id="hardware-level-peripheral-and-bus-triage">Hardware-Level
+Peripheral and Bus Triage</h3>
+<p>Once system RAM is functional, UEFI engineers must initialize
+critical interconnects, including PCIe, I2C, SPI, and USB controllers.
+JTAG tools provide real-time bus access and memory access without
+halting processor execution (run-control debugging). Engineers routinely
+perform read and write cycles to memory-mapped configuration spaces to
+verify that:</p>
+<ul>
+<li>Host bridges and root complexes enumerate downstream devices
+correctly.</li>
+<li>Power Management ICs (PMICs) and clock synthesizers respond across
+I2C/SMBus interfaces.</li>
+<li>GPIO pin muxing correctly reflects the schematic allocations for
+interrupt lines and device enables.</li>
+</ul>
+<h3 id="trace-and-exception-analysis">Trace and Exception Analysis</h3>
+<p>When firmware crashes before initializing a display or UART console,
+engineers use JTAG hardware trace capabilities, such as Intel Processor
+Trace (Intel PT) or ARM Embedded Trace Macrocell (ETM). These features
+stream execution history continuously into a trace buffer. When an
+unhandled exception or silent reboot occurs, the engineer can inspect
+the trace log backwards from the crash point to pinpoint null-pointer
+dereferences, misaligned memory accesses, or broken function calls
+inside early PEI modules.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/using-jtag-debuggers-for-uefi-board-bring-up';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

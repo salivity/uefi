@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intel TXT and UEFI Boot Security Explained - uefi</title>
+    <meta name="description" content="Modern system security relies on validating system integrity from the moment power is applied until the operating system takes control. Intel Trusted Execution Technology (TXT) and Unified Extensible Firmware Interface (UEFI) boot security features work t">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/intel-txt-and-uefi-boot-security-explained">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Intel TXT and UEFI Boot Security Explained - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/intel-txt-and-uefi-boot-security-explained" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Modern system security relies on validating system integrity from the moment power is applied until the operating system takes control. Intel Trusted Execution Technology (TXT) and Unified Extensible Firmware Interface (UEFI) boot security features work t" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="intel-txt-and-uefi-boot-security-explained">Intel TXT and UEFI
+Boot Security Explained</h1>
+<p>Modern system security relies on validating system integrity from the
+moment power is applied until the operating system takes control. Intel
+Trusted Execution Technology (TXT) and Unified Extensible Firmware
+Interface (UEFI) boot security features work together to create an
+end-to-end, hardware-enforced chain of trust. While UEFI security
+mechanisms—primarily Secure Boot and Measured Boot—verify and record the
+boot stages from power-on, Intel TXT introduces a dynamic, isolated
+environment to guarantee that critical software, like hypervisors and
+operating system kernels, launches into a verified and uncompromised
+state.</p>
+<h2 id="uefi-boot-security-establishing-the-static-chain">UEFI Boot
+Security: Establishing the Static Chain</h2>
+<p>UEFI security features protect the pre-boot environment primarily
+through two mechanisms:</p>
+<ul>
+<li><strong>UEFI Secure Boot:</strong> This feature enforces
+cryptographic signature verification on all pre-boot binaries, including
+UEFI drivers, option ROMs, and bootloaders. If a binary is unsigned or
+its key is revoked, the system halts execution. This prevents
+unauthorized bootkits and rootkits from embedding themselves into the
+platform before the operating system initializes.</li>
+<li><strong>UEFI Measured Boot:</strong> Rather than blocking execution,
+Measured Boot calculates cryptographic hashes of each component in the
+boot path—firmware, boot settings, and OS loaders—and stores them in the
+Platform Configuration Registers (PCRs) of a Trusted Platform Module
+(TPM). This creates an immutable log that external systems can evaluate
+through remote attestation.</li>
+</ul>
+<p>Because UEFI boot security begins executing at platform reset and
+follows a linear, sequential path, it is known as a <strong>Static Root
+of Trust for Measurement (SRTM)</strong>.</p>
+<h2 id="the-role-of-intel-trusted-execution-technology-txt">The Role of
+Intel Trusted Execution Technology (TXT)</h2>
+<p>While UEFI boot security provides strong baseline protection, an SRTM
+relies on a massive codebase. If any component in the complex firmware
+chain contains a vulnerability, the integrity of the entire chain is
+compromised. Intel TXT addresses this limitation by implementing a
+<strong>Dynamic Root of Trust for Measurement (DRTM)</strong>.</p>
+<p>Intel TXT uses hardware extensions and microcode instructions (such
+as <code>GETSEC[SENTER]</code>) to reset the platform state at will,
+independent of when the computer was turned on. When initiated, TXT:</p>
+<ol type="1">
+<li><strong>Halts Other Processors:</strong> Temporarily suspends
+execution across all CPU cores to prevent race conditions or memory
+snooping.</li>
+<li><strong>Loads an Authenticated Code Module (ACM):</strong> Executes
+a digitally signed Intel module directly inside the processor cache,
+bypassing external RAM.</li>
+<li><strong>Establishes a Clean Slate:</strong> Measures the target
+hypervisor or operating system kernel and logs these measurements into
+dedicated, dynamic TPM registers (PCRs 17–22).</li>
+<li><strong>Enforces Memory Protection:</strong> Sets up
+hardware-enforced memory protections to shield the newly launched
+environment from unauthorized direct memory access (DMA) attacks and
+unauthorized reads.</li>
+</ol>
+<h2 id="how-txt-complements-uefi-security">How TXT Complements UEFI
+Security</h2>
+<p>Instead of competing, Intel TXT and UEFI security features address
+distinct threat vectors across different stages of execution:</p>
+<h3 id="1-eliminating-firmware-as-a-single-point-of-failure">1.
+Eliminating Firmware as a Single Point of Failure</h3>
+<p>UEFI Secure Boot trusts the motherboard vendor, the firmware
+implementation, and the platform keys. If an attacker exploits a
+zero-day vulnerability in the UEFI runtime services, Secure Boot can be
+bypassed. Intel TXT neutralizes this risk because its DRTM process
+blind-resets the execution environment without relying on the integrity
+of the prior UEFI execution.</p>
+<h3 id="2-protecting-advanced-virtualization-and-cloud-workloads">2.
+Protecting Advanced Virtualization and Cloud Workloads</h3>
+<p>UEFI validates the components required to start an operating system,
+but enterprise platforms often require ongoing guarantees. Intel TXT
+allows hypervisors and virtualized infrastructure to re-measure and
+verify security parameters on the fly, ensuring that workload migration
+and cloud isolation policies are enforced by silicon rather than
+software assumptions.</p>
+<h3 id="3-layered-verification-and-attestation">3. Layered Verification
+and Attestation</h3>
+<p>By pairing UEFI Measured Boot with Intel TXT, administrators gain a
+complete, layered audit trail:</p>
+<ul>
+<li><strong>PCRs 0–7 (SRTM):</strong> Track the state of the motherboard
+firmware, platform configuration, and initial bootloader.</li>
+<li><strong>PCRs 17–22 (DRTM):</strong> Track the exact state of the
+hypervisor or OS kernel launched via Intel TXT.</li>
+</ul>
+<p>This dual-layer attestation allows network policy engines to
+determine not only if the hardware booted correctly via UEFI, but also
+whether the operational software was launched securely and isolated from
+firmware-level tampering.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/intel-txt-and-uefi-boot-security-explained';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

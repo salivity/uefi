@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repair Corrupted EFI System Partition in UEFI - uefi</title>
+    <meta name="description" content="A corrupted EFI System Partition (ESP) prevents UEFI-based computers from locating the bootloader and loading the operating system. This guide provides a step-by-step procedure to access a live recovery environment, identify the damaged FAT32 partition, a">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/repair-corrupted-efi-system-partition-in-uefi">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Repair Corrupted EFI System Partition in UEFI - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/repair-corrupted-efi-system-partition-in-uefi" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="A corrupted EFI System Partition (ESP) prevents UEFI-based computers from locating the bootloader and loading the operating system. This guide provides a step-by-step procedure to access a live recovery environment, identify the damaged FAT32 partition, a" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="repair-corrupted-efi-system-partition-in-uefi">Repair Corrupted
+EFI System Partition in UEFI</h1>
+<p>A corrupted EFI System Partition (ESP) prevents UEFI-based computers
+from locating the bootloader and loading the operating system. This
+guide provides a step-by-step procedure to access a live recovery
+environment, identify the damaged FAT32 partition, and rebuild the boot
+files for both Windows and Linux installations.</p>
+<h3 id="prerequisites">Prerequisites</h3>
+<ol type="1">
+<li>A bootable USB drive containing either official Windows installation
+media or a live Linux distribution (such as Ubuntu).</li>
+<li>The motherboard UEFI/BIOS configured to boot the USB drive in native
+<strong>UEFI Mode</strong> (disable Legacy/CSM mode to ensure EFI boot
+paths are registered correctly).</li>
+</ol>
+<hr />
+<h3 id="repairing-the-efi-partition-on-windows">Repairing the EFI
+Partition on Windows</h3>
+<h4 id="1-boot-and-access-the-command-prompt">1. Boot and Access the
+Command Prompt</h4>
+<ol type="1">
+<li>Insert the Windows installation media and boot your system.</li>
+<li>Select your language preferences, click <strong>Next</strong>, and
+then select <strong>Repair your computer</strong> in the bottom-left
+corner.</li>
+<li>Navigate to <strong>Troubleshoot</strong> &gt; <strong>Advanced
+options</strong> &gt; <strong>Command Prompt</strong>. Alternatively,
+press <strong>Shift + F10</strong> on the initial setup screen.</li>
+</ol>
+<h4 id="2-identify-the-partitions">2. Identify the Partitions</h4>
+<p>Use the DiskPart utility to locate your Windows volume and the EFI
+partition:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode cmd"><code class="sourceCode dosbat"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>diskpart</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>list disk</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>select disk 0</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>list volume</span></code></pre></div>
+<p><em>(Replace <code>0</code> with the disk number containing your OS
+if multiple drives are installed.)</em></p>
+<p>Look for two key volumes:</p>
+<ul>
+<li>The primary Windows installation volume (note its drive letter,
+usually <code>C:</code> or <code>D:</code> in recovery).</li>
+<li>The EFI volume (formatted as <strong>FAT32</strong>, typically
+between 100 MB and 500 MB, with no drive letter assigned).</li>
+</ul>
+<h4 id="3-assign-a-letter-and-repair">3. Assign a Letter and Repair</h4>
+<p>Assign a drive letter to the EFI volume to make it accessible:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode cmd"><code class="sourceCode dosbat"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>select volume <span class="kw">&lt;</span>volume_number_of_EFI<span class="kw">&gt;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>assign letter=S:</span></code></pre></div>
+<p>If the partition file structure is corrupted beyond standard repair,
+reformat the EFI partition as FAT32:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode cmd"><code class="sourceCode dosbat"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">format</span> fs=fat32 quick</span></code></pre></div>
+<p>Exit the DiskPart utility:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode cmd"><code class="sourceCode dosbat"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="bu">exit</span></span></code></pre></div>
+<h4 id="4-rebuild-the-boot-configuration-data-bcd">4. Rebuild the Boot
+Configuration Data (BCD)</h4>
+<p>Generate fresh UEFI bootloader files on the EFI partition pointing to
+your Windows installation:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode cmd"><code class="sourceCode dosbat"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>bcdboot C:\Windows <span class="at">/s</span> S: <span class="at">/f</span> UEFI</span></code></pre></div>
+<p><em>(Replace <code>C:\Windows</code> with the actual path identified
+in step 2 if different.)</em></p>
+<p>Once the message "Boot files successfully created" appears, close the
+Command Prompt and reboot your system.</p>
+<hr />
+<h3 id="repairing-the-efi-partition-on-linux">Repairing the EFI
+Partition on Linux</h3>
+<h4 id="1-boot-into-the-live-linux-environment">1. Boot into the Live
+Linux Environment</h4>
+<ol type="1">
+<li>Insert your live Linux USB, boot into UEFI mode, and select
+<strong>Try Ubuntu</strong> (or the equivalent live desktop/shell for
+your distribution).</li>
+<li>Open a terminal window.</li>
+</ol>
+<h4 id="2-locate-partitions">2. Locate Partitions</h4>
+<p>List your storage devices to identify the root filesystem and the EFI
+System Partition:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> fdisk <span class="at">-l</span></span></code></pre></div>
+<ul>
+<li>Identify the Linux root partition (e.g., <code>/dev/nvme0n1p2</code>
+or <code>/dev/sda2</code>).</li>
+<li>Identify the EFI System Partition marked as <code>EFI System</code>
+(e.g., <code>/dev/nvme0n1p1</code> or <code>/dev/sda1</code>).</li>
+</ul>
+<h4 id="3-mount-partitions-and-chroot">3. Mount Partitions and
+Chroot</h4>
+<p>Mount the root filesystem, the EFI partition, and necessary virtual
+filesystems to create a chroot environment:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> mount /dev/sdX2 /mnt</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> mount /dev/sdX1 /mnt/boot/efi</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> /dev /dev/pts /proc /sys /run<span class="kw">;</span> <span class="cf">do</span> <span class="fu">sudo</span> mount <span class="at">-B</span> <span class="va">$i</span> /mnt<span class="va">$i</span><span class="kw">;</span> <span class="cf">done</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> chroot /mnt</span></code></pre></div>
+<p><em>(Replace <code>/dev/sdX2</code> with your root partition and
+<code>/dev/sdX1</code> with your EFI partition.)</em></p>
+<h4 id="4-reinstall-and-update-grub">4. Reinstall and Update GRUB</h4>
+<p>Reinstall the GRUB bootloader directly to the EFI partition and
+update its configuration:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">grub-install</span> <span class="at">--target</span><span class="op">=</span>x86_64-efi <span class="at">--efi-directory</span><span class="op">=</span>/boot/efi <span class="at">--bootloader-id</span><span class="op">=</span>GRUB <span class="at">--recheck</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">update-grub</span></span></code></pre></div>
+<h4 id="5-exit-and-reboot">5. Exit and Reboot</h4>
+<p>Exit the chroot environment, unmount the volumes, and restart:</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="bu">exit</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> umount <span class="at">-R</span> /mnt</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> reboot</span></code></pre></div>
+<p>Remove the installation media. The UEFI firmware will now detect the
+regenerated boot entry and boot into the operating system normally.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/repair-corrupted-efi-system-partition-in-uefi';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

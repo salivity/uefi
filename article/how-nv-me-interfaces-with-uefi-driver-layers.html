@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How NVMe Interfaces with UEFI Driver Layers - uefi</title>
+    <meta name="description" content="This article examines how external Non-Volatile Memory Express (NVMe) storage devices communicate with the Unified Extensible Firmware Interface (UEFI) driver stack during the pre-boot environment. External NVMe interfaces—typically operating over protoco">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-nv-me-interfaces-with-uefi-driver-layers">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How NVMe Interfaces with UEFI Driver Layers - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-nv-me-interfaces-with-uefi-driver-layers" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article examines how external Non-Volatile Memory Express (NVMe) storage devices communicate with the Unified Extensible Firmware Interface (UEFI) driver stack during the pre-boot environment. External NVMe interfaces—typically operating over protoco" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-nvme-interfaces-with-uefi-driver-layers">How NVMe Interfaces
+with UEFI Driver Layers</h1>
+<p>This article examines how external Non-Volatile Memory Express (NVMe)
+storage devices communicate with the Unified Extensible Firmware
+Interface (UEFI) driver stack during the pre-boot environment. External
+NVMe interfaces—typically operating over protocols like Thunderbolt or
+USB4 that tunnel native PCI Express (PCIe)—interact with standard UEFI
+bus, controller, and block protocols to initialize hardware, configure
+Direct Memory Access (DMA) queues, and execute low-level storage
+commands before the operating system loads.</p>
+<h3 id="physical-tunneling-and-device-enumeration">Physical Tunneling
+and Device Enumeration</h3>
+<p>External NVMe drives rely on host interfaces such as Thunderbolt 3/4
+or USB4 to encapsulate PCIe traffic across external cabling. When the
+system boots, the UEFI platform firmware initializes the root PCIe
+complex and the external host controller. Because the transport layer
+transparently tunnels PCIe packets, the UEFI firmware treats the
+external NVMe drive virtually identically to an internal M.2 or U.2
+device.</p>
+<p>The UEFI PCI Bus Driver traverses the system’s PCIe topology
+utilizing the <code>EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL</code>. As it scans
+the bus, it reads the Base Address Registers (BARs) and Class Codes of
+connected devices. An NVMe controller exposes a Class Code of
+<code>01h</code> (Mass Storage), Subclass <code>08h</code> (Non-Volatile
+Memory), and Programming Interface <code>02h</code> (NVM Express). Upon
+matching this signature, the UEFI Driver Execution Environment (DXE)
+binds the specialized UEFI NVMe driver to the controller's handle.</p>
+<h3 id="the-nvme-driver-stack-architecture">The NVMe Driver Stack
+Architecture</h3>
+<p>The communication within the UEFI environment is organized into a
+modular protocol stack:</p>
+<ol type="1">
+<li><strong><code>EFI_PCI_IO_PROTOCOL</code></strong>: Produced by the
+PCI Bus Driver, this protocol gives the NVMe driver low-level access to
+Memory-Mapped I/O (MMIO) spaces, device configuration spaces, and DMA
+mapping services.</li>
+<li><strong>NVMe Host Controller Driver</strong>: Consumes the
+<code>EFI_PCI_IO_PROTOCOL</code> to read and write to the controller’s
+MMIO register space. It manages device resets, initializes controller
+capabilities, and configures memory structures.</li>
+<li><strong><code>EFI_BLOCK_IO_PROTOCOL</code> and
+<code>EFI_BLOCK_IO2_PROTOCOL</code></strong>: Produced by the NVMe
+driver, these protocols abstract the underlying NVMe-specific command
+set into generic block-level operations (reading and writing logical
+block addresses) suitable for boot managers and operating system
+bootloaders.</li>
+<li><strong><code>EFI_STORAGE_SECURITY_COMMAND_PROTOCOL</code></strong>:
+Optionally produced to allow Trusted Computing Group (TCG) Opal or
+standard security send/receive commands to pass directly to the drive
+during the pre-boot phase.</li>
+</ol>
+<h3 id="memory-allocation-and-queue-setup">Memory Allocation and Queue
+Setup</h3>
+<p>NVMe architectures rely on paired circular ring buffers known as
+Submission Queues (SQ) and Completion Queues (CQ) placed in system host
+memory. The UEFI NVMe driver uses the DMA mapping mechanisms provided by
+the <code>EFI_PCI_IO_PROTOCOL</code> to allocate physically contiguous
+memory pages for these buffers.</p>
+<p>During initialization, the driver executes the following steps:</p>
+<ul>
+<li>Configures the Admin Submission Queue (ASQ) and Admin Completion
+Queue (ACQ) by writing host physical memory base addresses directly to
+the controller's MMIO registers (<code>AQA</code>, <code>ASQ</code>, and
+<code>ACQ</code>).</li>
+<li>Enables the controller by toggling the enable bit (<code>EN</code>)
+in the Controller Configuration (<code>CC</code>) register.</li>
+<li>Submits standard Admin commands to determine controller attributes
+via the <em>Identify Controller</em> and <em>Identify Namespace</em>
+command structures.</li>
+<li>Creates one or more I/O Submission and Completion Queue pairs
+dedicated to pre-boot data transfer.</li>
+</ul>
+<h3 id="command-execution-and-data-transfer">Command Execution and Data
+Transfer</h3>
+<p>Once initialized, the UEFI firmware communicates with the external
+drive strictly through memory-mapped doorbell registers and host RAM
+buffers:</p>
+<ol type="1">
+<li><strong>Request Translation</strong>: When the UEFI boot manager
+requests a sector read via <code>BlockIo-&gt;ReadBlocks()</code>, the
+UEFI NVMe driver translates the Logical Block Address (LBA) and block
+count into a standard 64-byte NVMe Read command.</li>
+<li><strong>Queue Insertion</strong>: The driver places the NVMe command
+entry into the host memory allocated for the I/O Submission Queue and
+sets up Physical Region Page (PRP) entries pointing to the destination
+memory buffer.</li>
+<li><strong>Doorbell Notification</strong>: The driver writes the new
+Submission Queue Tail pointer to the device's assigned Doorbell Register
+via MMIO over the PCIe/tunnel link.</li>
+<li><strong>Device DMA</strong>: The external NVMe controller fetches
+the command from system memory using inbound PCIe read requests,
+accesses the specified flash cells, and writes the read payload into
+host memory via DMA.</li>
+<li><strong>Completion and Polling</strong>: The controller posts a
+16-byte completion status entry into the host's Completion Queue and
+raises an interrupt or sets the phase bit. Because UEFI largely operates
+in a single-threaded, polling-driven execution environment, the UEFI
+driver typically polls the Completion Queue head pointer rather than
+relying on hardware interrupts.</li>
+<li><strong>Completion Ring</strong>: The driver updates the Completion
+Queue Head Doorbell register, confirming command processing, and returns
+control to the higher-level caller.</li>
+</ol></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-nv-me-interfaces-with-uefi-driver-layers';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

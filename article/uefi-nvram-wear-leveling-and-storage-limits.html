@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI NVRAM Wear Leveling and Storage Limits - uefi</title>
+    <meta name="description" content="UEFI Non-Volatile Random-Access Memory (NVRAM) holds critical configuration data, such as boot paths, Secure Boot keys, and hardware profiles, typically hosted on the system&#39;s Serial Peripheral Interface (SPI) NOR flash chip. Because SPI flash memory exhi">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-nvram-wear-leveling-and-storage-limits">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI NVRAM Wear Leveling and Storage Limits - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-nvram-wear-leveling-and-storage-limits" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI Non-Volatile Random-Access Memory (NVRAM) holds critical configuration data, such as boot paths, Secure Boot keys, and hardware profiles, typically hosted on the system&#39;s Serial Peripheral Interface (SPI) NOR flash chip. Because SPI flash memory exhi" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-nvram-wear-leveling-and-storage-limits">UEFI NVRAM Wear
+Leveling and Storage Limits</h1>
+<p>UEFI Non-Volatile Random-Access Memory (NVRAM) holds critical
+configuration data, such as boot paths, Secure Boot keys, and hardware
+profiles, typically hosted on the system's Serial Peripheral Interface
+(SPI) NOR flash chip. Because SPI flash memory exhibits finite erase
+cycles and constrained space, the UEFI firmware employs low-level
+storage management strategies—such as append-only journaling, automated
+garbage collection, and write mitigation—to maintain system stability,
+prevent chip degradation, and manage limited physical capacity.</p>
+<h3 id="the-underlying-architecture-of-uefi-nvram">The Underlying
+Architecture of UEFI NVRAM</h3>
+<p>In most modern motherboards, UEFI NVRAM shares the primary SPI flash
+chip with the UEFI firmware execution code. Flash memory can be
+programmed at the byte or word level, but it can only be erased in
+entire blocks or sectors (typically 4 KB to 64 KB). Furthermore, NOR
+flash cells tolerate between 10,000 and 100,000 write-erase cycles
+before developing read/write instability.</p>
+<p>To manage this physical limitation, the UEFI specification organizes
+NVRAM as an append-only, variable-length database inside a dedicated
+flash block, known as the Variable Store.</p>
+<h3 id="managing-storage-limits-via-the-append-only-model">Managing
+Storage Limits via the Append-Only Model</h3>
+<p>UEFI firmware does not overwrite an existing variable in place when
+it is updated. Instead, the firmware implements a state-tracked
+journaling system:</p>
+<ol type="1">
+<li><strong>State Flags:</strong> Every variable entry consists of a
+header containing identity metadata (Variable Name, GUID, Attributes,
+and Data Size) along with state indicators such as
+<code>VAR_IN_DELETED_TRANSITION</code>, <code>VAR_DELETED</code>, or
+<code>VAR_ADDED</code>.</li>
+<li><strong>Appending Writes:</strong> When an operating system or
+internal driver calls <code>SetVariable()</code> to modify an existing
+variable, the firmware marks the old variable entry as deleted by
+flipping bits (changing <code>1</code>s to <code>0</code>s, which NOR
+flash allows without a full block erase) and appends the new value to
+the end of the free space in the Variable Store.</li>
+<li><strong>Fragmentation:</strong> Over time, repeated modifications to
+variables—such as boot counter updates or telemetry logs—consume
+available storage without freeing up previously used sectors, causing
+rapid logical fragmentation.</li>
+</ol>
+<h3 id="garbage-collection-and-reclaim-operations">Garbage Collection
+and Reclaim Operations</h3>
+<p>When the free space in the Variable Store falls below a predetermined
+safety threshold, or when a write request fails due to insufficient
+memory, the firmware initiates a "reclaim" (garbage collection)
+process.</p>
+<ol type="1">
+<li><strong>Memory Buffering:</strong> The firmware allocates a
+scratchpad buffer in system RAM and copies all currently valid
+(non-deleted) variables out of the SPI flash block.</li>
+<li><strong>Fault Tolerant Write (FTW):</strong> To prevent corruption
+from a power loss mid-reclaim, the firmware uses an FTW protocol. It
+writes the valid data into a reserved spare flash block or a working
+block that acts as a backup ledger.</li>
+<li><strong>Block Erasure:</strong> The original variable block is
+erased, resetting all flash bits to <code>1</code>.</li>
+<li><strong>Restoration:</strong> The valid variables are written
+sequentially back into the freshly erased block, eliminating all dead
+space left by obsolete entries.</li>
+</ol>
+<h3 id="wear-leveling-strategies-in-firmware">Wear Leveling Strategies
+in Firmware</h3>
+<p>Because the SPI controller on the motherboard usually lacks the
+complex hardware Flash Translation Layer (FTL) found in solid-state
+drives, wear leveling must be orchestrated at the firmware level.</p>
+<ul>
+<li><strong>Write Mitigation and Verification:</strong> UEFI
+implementations (such as EDK II) compare the payload of an incoming
+<code>SetVariable()</code> request with the current data in NVRAM. If
+the content is identical, the firmware exits early, avoiding a redundant
+flash write.</li>
+<li><strong>Separation of Volatile and Non-Volatile Data:</strong>
+Operating systems and UEFI drivers are discouraged from using NVRAM for
+high-frequency logs. The firmware supports volatile variable attributes
+(<code>EFI_VARIABLE_BOOTSERVICE_ACCESS</code> without
+<code>EFI_VARIABLE_NON_VOLATILE</code>), keeping dynamic, ephemeral data
+strictly within volatile RAM.</li>
+<li><strong>Block Rotation:</strong> Advanced firmware implementations
+alternate between multiple physical blocks allocated across different
+regions of the flash chip, rotating the target sector for successive
+reclaim operations to distribute write cycles evenly.</li>
+</ul>
+<h3 id="failure-prevention-and-quota-enforcement">Failure Prevention and
+Quota Enforcement</h3>
+<p>To prevent malicious software or misbehaving operating system
+services from exhausting NVRAM through repeated writes, UEFI firmware
+enforces storage quotas:</p>
+<ul>
+<li><strong>Hardware Reservations:</strong> The firmware reserves a
+protected slice of NVRAM exclusively for system-critical variables,
+including the <code>PlatformLang</code>, <code>BootOrder</code>, and
+Secure Boot cryptographic databases (<code>db</code>, <code>dbx</code>,
+<code>KEK</code>, <code>PK</code>).</li>
+<li><strong>Resource Rejection:</strong> If non-critical writes threaten
+the reserved threshold, <code>SetVariable()</code> returns an error
+status of <code>EFI_OUT_OF_RESOURCES</code>.</li>
+<li><strong>Pruning Dead Entries:</strong> If space remains exhausted
+post-reclaim, certain firmware policies automatically purge
+non-essential, operating-system-defined debugging variables to protect
+the platform's ability to boot.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-nvram-wear-leveling-and-storage-limits';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

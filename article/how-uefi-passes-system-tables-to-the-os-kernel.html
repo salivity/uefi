@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Passes System Tables to the OS Kernel - uefi</title>
+    <meta name="description" content="During the boot process, the Unified Extensible Firmware Interface (UEFI) delivers essential hardware and platform descriptions to the operating system kernel through a central pointer structure called the EFISYSTEMTABLE. This table contains an array of v">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-passes-system-tables-to-the-os-kernel">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Passes System Tables to the OS Kernel - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-passes-system-tables-to-the-os-kernel" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="During the boot process, the Unified Extensible Firmware Interface (UEFI) delivers essential hardware and platform descriptions to the operating system kernel through a central pointer structure called the EFISYSTEMTABLE. This table contains an array of v" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-passes-system-tables-to-the-os-kernel">How UEFI Passes
+System Tables to the OS Kernel</h1>
+<p>During the boot process, the Unified Extensible Firmware Interface
+(UEFI) delivers essential hardware and platform descriptions to the
+operating system kernel through a central pointer structure called the
+<code>EFI_SYSTEM_TABLE</code>. This table contains an array of vendor-
+and standard-defined pointers paired with Globally Unique Identifiers
+(GUIDs), allowing the bootloader or kernel stub to locate critical
+system tables—most notably ACPI (Advanced Configuration and Power
+Interface) and SMBIOS (System Management BIOS). By inspecting these
+structures and capturing the memory map before terminating UEFI boot
+services, the operating system secures the physical addresses required
+to manage hardware after firmware handoff.</p>
+<h2 id="the-role-of-the-efi_system_table">The Role of the
+EFI_SYSTEM_TABLE</h2>
+<p>When the UEFI boot manager loads an operating system's EFI
+application (either a dedicated bootloader like GRUB or a kernel
+compiled with an embedded EFI stub), it invokes the executable's entry
+point using two primary arguments:</p>
+<ol type="1">
+<li><code>EFI_HANDLE ImageHandle</code>: The firmware-assigned handle
+for the loaded image.</li>
+<li><code>EFI_SYSTEM_TABLE *SystemTable</code>: A pointer to the primary
+control structure of the UEFI environment.</li>
+</ol>
+<p>The <code>EFI_SYSTEM_TABLE</code> contains pointers to standard
+console I/O interfaces, runtime service function tables, boot service
+function tables, and an array named <code>ConfigurationTable</code>.</p>
+<h2 id="locating-tables-via-the-configuration-table-array">Locating
+Tables via the Configuration Table Array</h2>
+<p>The configuration table array is the definitive bridge for passing
+system description tables to the operating system. Within the
+<code>EFI_SYSTEM_TABLE</code>, two members govern this interface:</p>
+<ul>
+<li><code>NumberOfTableEntries</code>: An integer specifying the total
+count of registered configuration tables.</li>
+<li><code>ConfigurationTable</code>: A pointer to an array of
+<code>EFI_CONFIGURATION_TABLE</code> structures.</li>
+</ul>
+<p>Each entry in the <code>ConfigurationTable</code> array consists of
+two fields:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">typedef</span> <span class="kw">struct</span> <span class="op">{</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    EFI_GUID VendorGuid<span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    VOID     <span class="op">*</span>VendorTable<span class="op">;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="op">}</span> EFI_CONFIGURATION_TABLE<span class="op">;</span></span></code></pre></div>
+<p>To locate specific system tables, the bootloader or kernel iterates
+through the <code>ConfigurationTable</code> array and compares each
+<code>VendorGuid</code> against known, standardized GUIDs:</p>
+<ul>
+<li><strong>ACPI 2.0 and later:</strong>
+<code>EFI_ACPI_20_TABLE_GUID</code>
+(<code>{8868e871-e4f1-11d3-bc22-0080c73c8881}</code>). The associated
+<code>VendorTable</code> pointer directly references the ACPI Root
+System Description Pointer (RSDP).</li>
+<li><strong>ACPI 1.0:</strong> <code>ACPI_10_TABLE_GUID</code>
+(<code>{eb9d2d30-2d88-11d3-9a16-0090273fc14d}</code>).</li>
+<li><strong>SMBIOS 3.x:</strong> <code>SMBIOS3_TABLE_GUID</code>
+(<code>{f2fd1544-9794-4a2c-992e-e5bbcf20e394}</code>).</li>
+<li><strong>Device Tree (on ARM/RISC-V systems):</strong>
+<code>DEVICE_TREE_GUID</code>
+(<code>{b1b626f4-2e62-47a8-a764-a690e82c5a3d}</code>).</li>
+</ul>
+<p>Once a match is found, the software extracts the
+<code>VendorTable</code> physical address, which points to the base of
+the targeted specification's root table (such as the ACPI RSDP, which
+subsequently links to the XSDT and individual ACPI tables like FADT,
+MADT, and DSDT).</p>
+<h2 id="memory-preservation-and-the-uefi-memory-map">Memory Preservation
+and the UEFI Memory Map</h2>
+<p>System description tables are generated by firmware and stored in
+standard system RAM. To prevent the operating system from overwriting
+these tables when it assumes memory management duties, UEFI classifies
+their memory ranges under specific types:</p>
+<ul>
+<li><strong><code>EfiACPIReclaimMemory</code>:</strong> Holds tables
+such as the RSDP, XSDT, and other static ACPI tables. The OS can reclaim
+this memory after it reads and parses the tables during early boot.</li>
+<li><strong><code>EfiACPIMemoryNVS</code>:</strong> Firmware-reserved
+memory used for ACPI Non-Volatile Storage (such as hardware registers or
+ACPI operational regions), which the OS must never overwrite.</li>
+<li><strong><code>EfiRuntimeServicesData</code> /
+<code>EfiRuntimeServicesCode</code>:</strong> Preserved for OS-firmware
+communication post-handoff (e.g., updating EFI NVRAM variables or
+executing system resets).</li>
+</ul>
+<p>Before transitioning control, the bootloader calls the boot service
+function <code>GetMemoryMap()</code> to obtain the complete layout of
+physical memory, including which regions contain these protected
+descriptor tables.</p>
+<h2 id="the-handoff-transition-exitbootservices">The Handoff Transition:
+ExitBootServices</h2>
+<p>Firmware control ends when the bootloader calls
+<code>ExitBootServices()</code>. This call requires the current memory
+map key to ensure memory layout integrity:</p>
+<ol type="1">
+<li>The bootloader calls <code>GetMemoryMap()</code>.</li>
+<li>The bootloader calls
+<code>ExitBootServices(ImageHandle, MapKey)</code>.</li>
+<li>UEFI invalidates all boot services functions, dismantles memory
+allocation services, and turns over complete control of system hardware
+to the OS.</li>
+</ol>
+<p>Because the UEFI <code>ConfigurationTable</code> array and boot-time
+service functions are no longer guaranteed to exist after
+<code>ExitBootServices()</code>, the OS loader must extract the physical
+pointers to the description tables prior to this call.</p>
+<h2 id="forwarding-pointers-to-the-kernel">Forwarding Pointers to the
+Kernel</h2>
+<p>Modern kernels handle the acquired table pointers in one of two
+ways:</p>
+<ul>
+<li><strong>Direct Boot via EFI Stub:</strong> If the kernel contains an
+EFI stub (common in modern Linux and Windows kernels), the kernel acts
+as its own UEFI application. It parses the <code>EFI_SYSTEM_TABLE</code>
+directly, reads the GUID array, extracts the ACPI RSDP and SMBIOS
+pointers, calls <code>ExitBootServices()</code>, and directly passes the
+physical pointers to its early initialization subsystems.</li>
+<li><strong>Traditional Bootloaders:</strong> If an external bootloader
+(such as GRUB) executes the handoff, it parses the
+<code>ConfigurationTable</code> while boot services are active. It then
+places the extracted physical addresses (e.g., the ACPI RSDP pointer)
+into an architecture-specific boot parameters structure (such as the
+<code>boot_params</code> structure on x86-64 Linux) or passes them as
+kernel command-line arguments. When the OS kernel unpacks these
+parameters, it maps the physical addresses into its virtual address
+space and proceeds to initialize system devices.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-passes-system-tables-to-the-os-kernel';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

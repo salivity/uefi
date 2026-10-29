@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Write Cross-Platform UEFI Applications - uefi</title>
+    <meta name="description" content="Writing platform-independent Unified Extensible Firmware Interface (UEFI) applications requires adhering strictly to the UEFI specification&#39;s hardware abstraction layer while avoiding processor-specific operations. This article covers the fundamental stra">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-to-write-cross-platform-uefi-applications">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How to Write Cross-Platform UEFI Applications - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-to-write-cross-platform-uefi-applications" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Writing platform-independent Unified Extensible Firmware Interface (UEFI) applications requires adhering strictly to the UEFI specification&#39;s hardware abstraction layer while avoiding processor-specific operations. This article covers the fundamental stra" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-to-write-cross-platform-uefi-applications">How to Write
+Cross-Platform UEFI Applications</h1>
+<p>Writing platform-independent Unified Extensible Firmware Interface
+(UEFI) applications requires adhering strictly to the UEFI
+specification's hardware abstraction layer while avoiding
+processor-specific operations. This article covers the fundamental
+strategies for developing portable UEFI software across architectures
+like x86-64, AArch64, ARM, and RISC-V. By leveraging standard UEFI
+protocols, avoiding inline assembly, adhering to portable data types,
+and using build systems like EDK II, developers can maintain a single
+codebase that compiles cleanly for any supported CPU architecture.</p>
+<h2 id="rely-strictly-on-uefi-services-and-protocols">Rely Strictly on
+UEFI Services and Protocols</h2>
+<p>The core philosophy of UEFI is hardware abstraction. To ensure an
+application runs across different processor types, developers must never
+bypass the firmware layer to interact directly with hardware.</p>
+<ul>
+<li><strong>Use Boot Services and Runtime Services:</strong> Never
+access hardware timers, interrupt controllers, or platform registers
+directly. Rely on <code>gBS-&gt;CreateEvent()</code>,
+<code>gBS-&gt;SetTimer()</code>, and memory allocation services like
+<code>gBS-&gt;AllocatePool()</code> instead of custom hardware loops or
+processor-specific instructions.</li>
+<li><strong>Leverage Standard Protocols:</strong> Use standard protocols
+such as <code>EFI_SIMPLE_TEXT_INPUT_PROTOCOL</code>,
+<code>EFI_BLOCK_IO_PROTOCOL</code>, or
+<code>EFI_GRAPHICS_OUTPUT_PROTOCOL</code> (GOP) for I/O and display
+operations. These protocols are implemented by the platform firmware to
+abstract the underlying chipset and GPU differences.</li>
+</ul>
+<h2 id="eliminate-architecture-specific-assembly">Eliminate
+Architecture-Specific Assembly</h2>
+<p>Inline assembly is the primary cause of architectural lock-in. A
+portable UEFI application must be written entirely in standard C.</p>
+<ul>
+<li><strong>Avoid Direct Port I/O:</strong> Standard x86 instructions
+like <code>in</code> and <code>out</code> do not exist on ARM or RISC-V
+architectures. If low-level bus access is required, rely on the
+<code>EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL</code> or
+<code>EFI_CPU_IO2_PROTOCOL</code>, which abstract register reading and
+writing across memory-mapped I/O (MMIO) and port I/O systems.</li>
+<li><strong>Avoid CPU-Specific Feature Probing:</strong> Do not use
+instructions like <code>cpuid</code> on x86 or direct system register
+reads on ARM. If system capabilities must be inspected, query the
+platform configuration tables or device paths provided in the UEFI
+System Table.</li>
+</ul>
+<h2 id="use-standardized-uefi-data-types">Use Standardized UEFI Data
+Types</h2>
+<p>Data width and alignment differ between architectures. Using native C
+types like <code>int</code>, <code>long</code>, or raw pointers without
+abstraction leads to memory faults and undefined behavior.</p>
+<ul>
+<li><strong>Adopt Specification Types:</strong> Always use UEFI-defined
+fixed-width integer types such as <code>UINT8</code>,
+<code>UINT16</code>, <code>UINT32</code>, and <code>UINT64</code>.</li>
+<li><strong>Use Architecture-Neutral Pointers:</strong> Use
+<code>UINTN</code> and <code>INTN</code> for integers that match the
+native pointer size of the target platform (32-bit on 32-bit systems,
+64-bit on 64-bit systems).</li>
+<li><strong>Respect Memory Alignment:</strong> Many RISC and ARM
+processors enforce strict alignment rules and will generate alignment
+faults if unaligned memory accesses occur. Always use unaligned access
+helper functions (such as <code>ReadUnaligned32()</code> and
+<code>WriteUnaligned32()</code> from EDK II) when parsing packed binary
+data or external file formats.</li>
+</ul>
+<h2 id="maintain-endianness-and-structure-portability">Maintain
+Endianness and Structure Portability</h2>
+<p>While the most common UEFI implementations are little-endian, writing
+strictly portable code requires avoiding endian-dependent
+assumptions.</p>
+<ul>
+<li><strong>Structure Packing:</strong> Avoid compiler-specific packing
+pragmas where possible, or use standard macros provided by the
+development framework (such as <code>PACKED</code> in EDK II) to ensure
+structures remain binary-compatible across different compilers and
+targets.</li>
+<li><strong>Explicit Byte Swapping:</strong> If reading data formats
+that use network byte order (big-endian), utilize explicit conversion
+functions to preserve correctness on both little-endian and big-endian
+systems.</li>
+</ul>
+<h2 id="leverage-edk-ii-for-multi-architecture-builds">Leverage EDK II
+for Multi-Architecture Builds</h2>
+<p>The TianoCore EDK II framework provides the standard build
+infrastructure for cross-platform UEFI development.</p>
+<ul>
+<li><strong>Use MdePkg:</strong> Base your application on the standard
+<code>MdePkg</code> (Module Development Environment Package). It
+provides architecture-independent headers, standard library equivalents,
+and wrappers for basic operations.</li>
+<li><strong>Configure Target Architectures:</strong> Configure the
+application build description (<code>.inf</code>) file to list all
+supported architectures in the <code>VALID_ARCHITECTURES</code> field
+(e.g., <code>IA32 X64 ARM AARCH64 RISCV64</code>).</li>
+<li><strong>Avoid Conditional Compilation:</strong> While
+<code>#ifdef</code> macros for specific architectures (like
+<code>MDE_CPU_X64</code> or <code>MDE_CPU_AARCH64</code>) exist, keep
+them isolated to platform-specific drivers. The top-level application
+logic should remain free of architectural branches.</li>
+</ul>
+<h2 id="distribute-via-standard-directory-structures">Distribute via
+Standard Directory Structures</h2>
+<p>Because UEFI binaries are compiled as architecture-specific PE32+
+executables, running on multiple platforms requires distributing
+separate binaries for each target architecture. Follow the standard EFI
+System Partition (ESP) layout by deploying binaries to their recognized
+default paths, such as <code>\EFI\BOOT\BOOTX64.EFI</code>,
+<code>\EFI\BOOT\BOOTAA64.EFI</code>, or
+<code>\EFI\BOOT\BOOTRISCV64.EFI</code>, ensuring the firmware
+automatically loads the appropriate binary for the host CPU.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-to-write-cross-platform-uefi-applications';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

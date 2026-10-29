@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disabling CSM on GPUs Without UEFI GOP Support - uefi</title>
+    <meta name="description" content="Disabling the Compatibility Support Module (CSM) on a motherboard paired with an older discrete graphics card lacking UEFI Graphics Output Protocol (GOP) support results in severe display and boot issues, most notably a complete loss of video output durin">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/disabling-csm-on-gp-us-without-uefi-gop-support">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Disabling CSM on GPUs Without UEFI GOP Support - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/disabling-csm-on-gp-us-without-uefi-gop-support" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Disabling the Compatibility Support Module (CSM) on a motherboard paired with an older discrete graphics card lacking UEFI Graphics Output Protocol (GOP) support results in severe display and boot issues, most notably a complete loss of video output durin" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="disabling-csm-on-gpus-without-uefi-gop-support">Disabling CSM on
+GPUs Without UEFI GOP Support</h1>
+<p>Disabling the Compatibility Support Module (CSM) on a motherboard
+paired with an older discrete graphics card lacking UEFI Graphics Output
+Protocol (GOP) support results in severe display and boot issues, most
+notably a complete loss of video output during the boot process. This
+article explains the technical interaction between CSM and GOP, details
+the direct consequences of turning off legacy support with incompatible
+video cards, and outlines how to recover a system trapped in a
+non-booting state.</p>
+<h2 id="understanding-csm-and-uefi-gop">Understanding CSM and UEFI
+GOP</h2>
+<p>The Compatibility Support Module (CSM) is a sub-component of modern
+UEFI firmware that emulates a legacy BIOS environment. This emulation
+allows older hardware components and legacy operating systems to
+function on UEFI-native motherboards.</p>
+<p>Legacy graphics cards rely on a legacy Video BIOS (VBIOS) to
+initialize video output before the operating system loads. In contrast,
+modern UEFI systems require the Graphics Output Protocol (GOP)—a driver
+integrated directly into the graphics card’s firmware—to display the
+pre-boot environment, such as the motherboard splash screen and UEFI
+setup menus.</p>
+<h2 id="what-happens-when-csm-is-disabled">What Happens When CSM Is
+Disabled</h2>
+<p>When you disable CSM, the motherboard enforces a strict, purely
+native UEFI boot environment. If your discrete graphics card lacks GOP
+support in its VBIOS, the system encounters critical communication
+failures during the Power-On Self-Test (POST):</p>
+<h3 id="1-black-screen-and-no-pre-boot-video">1. Black Screen and No
+Pre-Boot Video</h3>
+<p>The motherboard firmware cannot communicate with the graphics card
+using legacy VBIOS calls. Because no GOP driver is present on the card
+to take its place, the motherboard cannot initialize a pre-boot display.
+The monitor will enter power-saving mode, displaying no motherboard
+logo, no boot options, and no access to the UEFI/BIOS settings
+interface.</p>
+<h3 id="2-motherboard-post-halts-and-diagnostic-errors">2. Motherboard
+POST Halts and Diagnostic Errors</h3>
+<p>Modern motherboards check for video initialization during POST. When
+the firmware cannot identify a GOP-compatible display device:</p>
+<ul>
+<li><strong>Debug LEDs:</strong> The motherboard's onboard "VGA"
+diagnostic LED will stay illuminated continuously.</li>
+<li><strong>Beep Codes:</strong> Motherboards with internal speakers
+often emit specific error beep codes (frequently one long beep followed
+by two or three short beeps) indicating a display adapter failure.</li>
+<li><strong>POST Failure:</strong> Many systems will refuse to proceed
+past the POST phase entirely, causing the machine to hang indefinitely
+in an unbootable state.</li>
+</ul>
+<h3 id="3-blind-booting-into-the-operating-system">3. Blind Booting into
+the Operating System</h3>
+<p>If the motherboard does not strictly halt on a pre-boot display
+failure, it may attempt to bypass POST and hand off execution to the
+operating system. In this scenario:</p>
+<ul>
+<li>The monitor remains black until the operating system loads its own
+dedicated graphics drivers.</li>
+<li>If the operating system is installed on a legacy MBR partition
+instead of a modern GPT partition, the OS will also fail to boot because
+CSM is required for legacy partition schemes, resulting in a total boot
+failure.</li>
+</ul>
+<h3 id="4-automatic-csm-fallback">4. Automatic CSM Fallback</h3>
+<p>Some motherboard firmware designs include failsafe logic. If CSM is
+disabled manually but the POST routine detects a non-GOP graphics card,
+the system may automatically re-enable CSM upon reboot to ensure display
+functionality. However, this feature varies widely across motherboard
+vendors and cannot be relied upon universally.</p>
+<h2 id="recovery-and-solutions">Recovery and Solutions</h2>
+<p>If a system becomes inaccessible after disabling CSM with an
+incompatible GPU, the following steps resolve the issue:</p>
+<ul>
+<li><strong>Clear the CMOS:</strong> Reset the motherboard's firmware
+settings by shorting the CLR_CMOS jumper, pressing the dedicated CMOS
+reset button, or removing the CR2032 coin cell battery for several
+minutes. This resets the firmware to factory defaults, which typically
+re-enables CSM automatically.</li>
+<li><strong>Use an Integrated GPU:</strong> If the CPU includes
+integrated graphics with UEFI GOP support, move the display cable to the
+motherboard's video port to regain display output and re-enable CSM in
+the firmware.</li>
+<li><strong>Update the GPU Firmware:</strong> Some older graphics cards
+(such as the NVIDIA GeForce GTX 600/700 series or AMD Radeon HD 7000
+series) have manufacturer-provided VBIOS updates or firmware patches
+that add UEFI GOP support.</li>
+<li><strong>Upgrade the Graphics Card:</strong> Replacing the legacy
+graphics card with any modern GPU natively equipped with UEFI GOP
+support permanently resolves the incompatibility and allows the system
+to run in pure UEFI mode, which is required for features like Secure
+Boot and Windows 11 installation.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/disabling-csm-on-gp-us-without-uefi-gop-support';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

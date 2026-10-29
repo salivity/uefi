@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Architectural Protocols vs Platform Protocols - uefi</title>
+    <meta name="description" content="In Unified Extensible Firmware Interface (UEFI) and Platform Initialization (PI) firmware development, protocols serve as standard software interfaces between distinct modules. While both architectural protocols and standard platform protocols use the sam">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-architectural-protocols-vs-platform-protocols">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Architectural Protocols vs Platform Protocols - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-architectural-protocols-vs-platform-protocols" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="In Unified Extensible Firmware Interface (UEFI) and Platform Initialization (PI) firmware development, protocols serve as standard software interfaces between distinct modules. While both architectural protocols and standard platform protocols use the sam" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-architectural-protocols-vs-platform-protocols">UEFI
+Architectural Protocols vs Platform Protocols</h1>
+<p>In Unified Extensible Firmware Interface (UEFI) and Platform
+Initialization (PI) firmware development, protocols serve as standard
+software interfaces between distinct modules. While both architectural
+protocols and standard platform protocols use the same underlying
+registration and discovery mechanism
+(<code>InstallProtocolInterface</code> and <code>LocateProtocol</code>),
+they fundamentally differ in their purpose, required presence, and
+relationship to the core firmware dispatcher. This article breaks down
+the technical differences between architectural protocols and standard
+platform protocols, highlighting why the firmware foundation treats them
+differently during the boot process.</p>
+<h2 id="the-role-of-architectural-protocols">The Role of Architectural
+Protocols</h2>
+<p>Architectural protocols (often designated with an <code>_ARCH_</code>
+suffix in their names) are explicitly defined by the UEFI Platform
+Initialization (PI) Specification. Their primary consumer is the Driver
+Execution Environment (DXE) Core itself, rather than standard
+third-party drivers or end-user applications.</p>
+<p>The DXE Core is a platform-independent entity. To execute core system
+services—such as allocating memory, dispatching drivers based on timer
+events, or managing non-volatile variables—the DXE Core relies on
+underlying platform drivers to provide hardware-specific hooks. It
+consumes these hooks through architectural protocols.</p>
+<p>Examples of architectural protocols include:</p>
+<ul>
+<li><code>EFI_CPU_ARCH_PROTOCOL</code>: Provides processor control, such
+as interrupt handling and cache management.</li>
+<li><code>EFI_TIMER_ARCH_PROTOCOL</code>: Configures system timer ticks
+required to run the DXE event dispatcher.</li>
+<li><code>EFI_VARIABLE_ARCH_PROTOCOL</code>: Enables the runtime storage
+and retrieval of UEFI variables.</li>
+<li><code>EFI_RESET_ARCH_PROTOCOL</code>: Exposes methods to reset or
+shut down the machine.</li>
+</ul>
+<p>The critical characteristic of architectural protocols is that they
+are <strong>mandatory dependencies</strong> for the DXE Foundation. The
+DXE Core maintains an internal state machine; it cannot exit the DXE
+phase or hand over execution to the Boot Device Selection (BDS) phase
+until every required architectural protocol has been installed.</p>
+<h2 id="the-role-of-standard-platform-protocols">The Role of Standard
+Platform Protocols</h2>
+<p>Standard platform protocols encompass all other protocols produced
+and consumed within the UEFI environment. These protocols are defined
+either by the public UEFI Specification (such as device I/O
+abstractions) or privately by original equipment manufacturers (OEMs)
+and independent BIOS vendors (IBVs).</p>
+<p>Unlike architectural protocols, standard platform protocols are
+designed for modular software consumption, hardware peripheral
+abstraction, and boot policy management. They do not feed essential
+hardware services back into the DXE Core engine.</p>
+<p>Examples of standard platform protocols include:</p>
+<ul>
+<li>Device abstraction protocols: <code>EFI_PCI_IO_PROTOCOL</code>,
+<code>EFI_BLOCK_IO_PROTOCOL</code>,
+<code>EFI_SIMPLE_TEXT_INPUT_PROTOCOL</code>.</li>
+<li>Infrastructure and management protocols:
+<code>EFI_DISK_INFO_PROTOCOL</code>,
+<code>EFI_GRAPHICS_OUTPUT_PROTOCOL</code> (GOP).</li>
+<li>OEM-specific custom protocols: Internal telemetry protocols,
+platform configuration protocols, or proprietary board routing
+services.</li>
+</ul>
+<p>A missing standard platform protocol will only affect the specific
+drivers or devices that depend on it. It will not cause the DXE Core
+dispatcher to stall or halt system transition into the BDS phase.</p>
+<h2 id="key-distinctions">Key Distinctions</h2>
+<h3 id="consumer-and-purpose">Consumer and Purpose</h3>
+<ul>
+<li><strong>Architectural Protocols:</strong> Consumed primarily by the
+DXE Core to complete its own initialization and satisfy system-wide
+runtime services.</li>
+<li><strong>Standard Platform Protocols:</strong> Consumed by peripheral
+drivers, the BDS phase, third-party UEFI applications, or the OS
+bootloader to perform operational tasks and drive hardware.</li>
+</ul>
+<h3 id="system-enforcement">System Enforcement</h3>
+<ul>
+<li><strong>Architectural Protocols:</strong> Hard-enforced by the DXE
+Core. The transition from the DXE phase to the BDS phase is blocked
+until the complete architectural protocol set is registered.</li>
+<li><strong>Standard Platform Protocols:</strong> Conditionally loaded.
+Their presence depends on platform topology, attached hardware, and user
+configuration. The DXE Core treats them as optional payload.</li>
+</ul>
+<h3 id="specification-scope">Specification Scope</h3>
+<ul>
+<li><strong>Architectural Protocols:</strong> Strictly governed by
+Volume 2 of the UEFI Platform Initialization (PI) Specification (DXE
+Architecture).</li>
+<li><strong>Standard Platform Protocols:</strong> Governed by the main
+UEFI Specification (for standard runtime and boot protocols) or defined
+independently by platform vendors without modifying PI architecture
+conformance.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-architectural-protocols-vs-platform-protocols';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

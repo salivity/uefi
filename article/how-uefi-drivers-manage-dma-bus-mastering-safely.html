@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Drivers Manage DMA Bus Mastering Safely - uefi</title>
+    <meta name="description" content="Direct Memory Access (DMA) allows peripherals to transfer data directly to and from system memory without continuous CPU intervention, but doing so during the pre-boot phase poses severe risks to system stability and security. UEFI drivers manage DMA bus">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-drivers-manage-dma-bus-mastering-safely">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Drivers Manage DMA Bus Mastering Safely - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-drivers-manage-dma-bus-mastering-safely" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Direct Memory Access (DMA) allows peripherals to transfer data directly to and from system memory without continuous CPU intervention, but doing so during the pre-boot phase poses severe risks to system stability and security. UEFI drivers manage DMA bus" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-drivers-manage-dma-bus-mastering-safely">How UEFI
+Drivers Manage DMA Bus Mastering Safely</h1>
+<p>Direct Memory Access (DMA) allows peripherals to transfer data
+directly to and from system memory without continuous CPU intervention,
+but doing so during the pre-boot phase poses severe risks to system
+stability and security. UEFI drivers manage DMA bus mastering safely by
+abstracting hardware operations through standardized protocols—primarily
+the <code>EFI_PCI_IO_PROTOCOL</code>—which manage buffer allocation,
+translate host addresses to bus addresses, handle cache coherency, and
+enforce hardware-based memory protection mechanisms such as IOMMUs.</p>
+<h2 id="the-abstraction-of-device-addresses">The Abstraction of Device
+Addresses</h2>
+<p>UEFI drivers never pass raw host physical memory addresses directly
+to hardware for bus-mastering transactions. The physical memory layout
+perceived by the CPU may differ significantly from the address space
+visible to a PCI device due to host bridges, I/O virtualization, or
+addressing limitations (e.g., a 32-bit device operating on a 64-bit
+platform).</p>
+<p>To bridge this gap safely, the UEFI specification delegates DMA
+transactions to the <code>EFI_PCI_IO_PROTOCOL</code>. This protocol
+abstracts the underlying architecture, ensuring that drivers obtain
+safe, hardware-compatible addresses for any data exchange.</p>
+<h2 id="the-dma-lifecycle-allocation-mapping-and-unmapping">The DMA
+Lifecycle: Allocation, Mapping, and Unmapping</h2>
+<p>Safe bus-master transactions in UEFI follow a strict three-phase
+lifecycle:</p>
+<h3 id="1-buffer-allocation">1. Buffer Allocation</h3>
+<p>When a driver requires memory for bidirectional communication or
+persistent control structures (such as ring buffers), it calls
+<code>EFI_PCI_IO_PROTOCOL.AllocateBuffer()</code>.</p>
+<ul>
+<li>Drivers specify the memory type (typically
+<code>EfiBootServicesData</code> or
+<code>EfiRuntimeServicesData</code>).</li>
+<li>This method ensures the allocated memory meets the addressing
+capabilities of the device (such as restricting allocation below 4 GB
+for legacy 32-bit controllers).</li>
+</ul>
+<h3 id="2-device-mapping">2. Device Mapping</h3>
+<p>Before hardware initiates a read or write, the driver must register
+the buffer using <code>EFI_PCI_IO_PROTOCOL.Map()</code>. The driver
+specifies the operation type:</p>
+<ul>
+<li><code>EfiPciIoOperationBusMasterRead</code>: Used when the device
+reads system memory.</li>
+<li><code>EfiPciIoOperationBusMasterWrite</code>: Used when the device
+writes to system memory.</li>
+<li><code>EfiPciIoOperationBusMasterCommonBuffer</code>: Used for memory
+that will be accessed simultaneously by both the CPU and the
+device.</li>
+</ul>
+<p>The <code>Map()</code> function provides a <code>DeviceAddress</code>
+that the driver programs into the peripheral's registers, as well as a
+tracking token (<code>Mapping</code>). If the device cannot access the
+original buffer directly—either due to physical address limits or page
+isolation—the UEFI firmware transparently provides an internal "bounce
+buffer" located in an accessible region.</p>
+<h3 id="3-unmapping-and-finalization">3. Unmapping and Finalization</h3>
+<p>Once the transaction concludes, the driver calls
+<code>EFI_PCI_IO_PROTOCOL.Unmap()</code>. This step is critical:</p>
+<ul>
+<li>If a bounce buffer was used during a write operation,
+<code>Unmap()</code> copies the modified data from the bounce buffer
+back into the caller's target memory.</li>
+<li>It frees any temporary resources allocated for the translation.</li>
+<li>It invalidates the hardware mapping token to prevent dangling
+access.</li>
+</ul>
+<h2 id="cache-coherency-management">Cache Coherency Management</h2>
+<p>CPUs rely heavily on high-speed caches, which can lead to stale data
+if a bus-mastering device updates system RAM directly. Conversely, data
+written by the CPU might reside in cache lines rather than main memory
+when a device attempts to read it.</p>
+<p>UEFI drivers prevent cache incoherency through the <code>Map()</code>
+and <code>Unmap()</code> sequences:</p>
+<ul>
+<li>Calling <code>Map()</code> for a read operation flushes dirty CPU
+cache lines down to physical RAM so the device sees the most recent
+data.</li>
+<li>Calling <code>Unmap()</code> after a write operation invalidates the
+CPU cache lines associated with that memory range, forcing the processor
+to reload updated data directly from system RAM.</li>
+<li>Memory allocated for common buffers is assigned cache attributes
+(typically uncached or write-combining) that ensure immediate coherency
+without explicit flushing.</li>
+</ul>
+<h2 id="hardware-enforced-protection-iommu">Hardware-Enforced Protection
+(IOMMU)</h2>
+<p>Modern UEFI platforms enforce security against malicious or errant
+DMA (such as attacks via external Thunderbolt or PCIe ports) using an
+Input-Output Memory Management Unit (IOMMU), such as Intel VT-d or
+AMD-Vi.</p>
+<p>UEFI firmware integrates the <code>EDKII_IOMMU_PROTOCOL</code>. Under
+this model:</p>
+<ul>
+<li>DMA is disabled by default for all devices until explicitly enabled
+by firmware.</li>
+<li>When <code>Map()</code> is called, the platform programs the IOMMU
+page tables to permit access <em>only</em> to the specific physical
+pages registered for that transaction.</li>
+<li>Unauthorized memory access attempts trigger a hardware fault,
+isolating the operating system and platform firmware from pre-boot DMA
+attacks.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-drivers-manage-dma-bus-mastering-safely';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

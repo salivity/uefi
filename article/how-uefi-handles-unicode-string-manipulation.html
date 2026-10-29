@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Handles Unicode String Manipulation - uefi</title>
+    <meta name="description" content="This article explores how the Unified Extensible Firmware Interface (UEFI) manages Unicode strings internally across its architecture and execution environments. It covers the underlying encoding standard, memory representation, the role of core protocols">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-handles-unicode-string-manipulation">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Handles Unicode String Manipulation - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-handles-unicode-string-manipulation" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article explores how the Unified Extensible Firmware Interface (UEFI) manages Unicode strings internally across its architecture and execution environments. It covers the underlying encoding standard, memory representation, the role of core protocols" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-handles-unicode-string-manipulation">How UEFI Handles
+Unicode String Manipulation</h1>
+<p>This article explores how the Unified Extensible Firmware Interface
+(UEFI) manages Unicode strings internally across its architecture and
+execution environments. It covers the underlying encoding standard,
+memory representation, the role of core protocols such as the Unicode
+Collation Protocol, case folding, and the internal handling of character
+comparisons and conversions within EDK II implementations.</p>
+<h3 id="character-encoding-the-ucs-2-standard">Character Encoding: The
+UCS-2 Standard</h3>
+<p>UEFI relies primarily on UCS-2 (Universal Character Set 2) encoding
+rather than standard UTF-8 or full UTF-16, a design choice originating
+from the legacy EFI 1.10 specifications.</p>
+<ul>
+<li><strong>Data Type:</strong> Strings are composed of elements of the
+<code>CHAR16</code> data type, defined as an unsigned 16-bit integer
+(<code>uint16_t</code>).</li>
+<li><strong>Fixed Width:</strong> UCS-2 represents each character
+strictly as a single 16-bit code unit, limiting native representation to
+the Basic Multilingual Plane (BMP, code points <code>U+0000</code>
+through <code>U+FFFF</code>).</li>
+<li><strong>Surrogate Pairs:</strong> While modern EDK II
+implementations increasingly handle UTF-16 surrogate pairs without
+crashing, the core UEFI specification treats surrogate pairs as two
+distinct UCS-2 code units rather than a single compound scalar
+value.</li>
+<li><strong>Byte Ordering:</strong> Strings follow the host
+architecture’s native endianness, which is little-endian on standard
+x86, ARM, and RISC-V platforms.</li>
+</ul>
+<h3 id="memory-representation-and-termination">Memory Representation and
+Termination</h3>
+<p>Internally, a UEFI Unicode string is managed as an array of 16-bit
+integers stored in contiguous memory:</p>
+<ul>
+<li><strong>Null Termination:</strong> Strings are null-terminated using
+a 16-bit null value (<code>0x0000</code>), requiring two zero bytes
+instead of the single zero byte used in standard 8-bit ASCII or C
+strings.</li>
+<li><strong>Alignment:</strong> Because <code>CHAR16</code> is a 16-bit
+type, string buffers must be 2-byte aligned in system memory. Accessing
+an unaligned <code>CHAR16</code> pointer can cause alignment faults on
+architectures with strict memory access requirements (such as certain
+ARM configurations).</li>
+</ul>
+<h3 id="uefi-unicode-collation-protocol">UEFI Unicode Collation
+Protocol</h3>
+<p>High-level string manipulation—such as locale-aware case folding,
+wild-card matching, and comparison—is delegated to the
+<code>EFI_UNICODE_COLLATION_PROTOCOL</code> (or the newer
+<code>EFI_UNICODE_COLLATION2_PROTOCOL</code>, which supports RFC 4646
+language tags).</p>
+<p>The protocol exposes several function pointers that manage strings
+internally:</p>
+<ul>
+<li><strong><code>StriColl</code> (String Collate):</strong> Performs
+locale-sensitive, case-insensitive string comparisons. Internally, the
+driver normalizes characters using language-specific uppercase tables
+before comparing their numerical values.</li>
+<li><strong><code>MetaiMatch</code>:</strong> Implements pattern
+matching using wildcard characters (<code>*</code>, <code>?</code>, and
+<code>[</code> <code>]</code>). The service evaluates UCS-2 characters
+against pattern tokens recursively or iteratively through the
+buffer.</li>
+<li><strong><code>StrLwr</code> and <code>StrUpr</code>:</strong> Mutate
+strings in-place by looking up each <code>CHAR16</code> value in an
+internal conversion lookup table defined by the active language (e.g.,
+English "en" vs. French "fr").</li>
+<li><strong><code>FatToStr</code> and <code>StrToFat</code>:</strong>
+Handle conversions between UCS-2 and the 8.3 short-filename format used
+by the FAT file system, substituting illegal characters with valid
+fallback symbols.</li>
+</ul>
+<h3 id="base-library-edk-ii-string-services">Base Library (EDK II)
+String Services</h3>
+<p>For raw string manipulation that does not require localized
+collation, UEFI core implementations (such as EDK II) provide
+lightweight, fast-path functions via <code>BaseLib</code>:</p>
+<ul>
+<li><strong>Linear Scanning:</strong> Functions like
+<code>StrLen</code>, <code>StrCpy</code>, and <code>StrCmp</code>
+iterate through memory two bytes at a time until encountering
+<code>0x0000</code>.</li>
+<li><strong>Lexicographical Comparison:</strong> Standard
+<code>StrCmp</code> operations compare raw 16-bit integer values rather
+than linguistic weights, making them deterministic and independent of
+firmware localization settings.</li>
+<li><strong>Safe String Functions:</strong> Modern EDK II includes
+bounds-checking variants (e.g., <code>StrCpyS</code>,
+<code>StrCatS</code>) that accept a maximum character count to prevent
+buffer overflows during firmware execution.</li>
+</ul>
+<h3 id="ascii-and-utf-8-conversions">ASCII and UTF-8 Conversions</h3>
+<p>Firmware often interfaces with external components (such as hardware
+devices, ACPI tables, and NVRAM variables) that produce or consume 8-bit
+strings. UEFI string services handle this via internal conversion
+routines:</p>
+<ul>
+<li><strong>Narrowing (Unicode to ASCII):</strong> Truncates the upper 8
+bits of each <code>CHAR16</code> unit. If a character resides outside
+the ASCII range (<code>&gt; 0x007F</code>), it is replaced with an
+underscore (<code>_</code>) or an implementation-defined
+placeholder.</li>
+<li><strong>Widening (ASCII to Unicode):</strong> Zero-extends standard
+8-bit <code>CHAR8</code> values into 16-bit <code>CHAR16</code> units by
+padding the high-order byte with <code>0x00</code>.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-handles-unicode-string-manipulation';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

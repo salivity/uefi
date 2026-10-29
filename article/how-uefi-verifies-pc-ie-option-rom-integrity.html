@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Verifies PCIe Option ROM Integrity - uefi</title>
+    <meta name="description" content="Unified Extensible Firmware Interface (UEFI) verifies the integrity of Option ROMs (OpROMs) on PCIe expansion cards primarily through the UEFI Secure Boot protocol, cryptographic signature validation, and Trusted Platform Module (TPM) measurements. By tre">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-verifies-pc-ie-option-rom-integrity">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Verifies PCIe Option ROM Integrity - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-verifies-pc-ie-option-rom-integrity" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Unified Extensible Firmware Interface (UEFI) verifies the integrity of Option ROMs (OpROMs) on PCIe expansion cards primarily through the UEFI Secure Boot protocol, cryptographic signature validation, and Trusted Platform Module (TPM) measurements. By tre" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-verifies-pcie-option-rom-integrity">How UEFI Verifies
+PCIe Option ROM Integrity</h1>
+<p>Unified Extensible Firmware Interface (UEFI) verifies the integrity
+of Option ROMs (OpROMs) on PCIe expansion cards primarily through the
+UEFI Secure Boot protocol, cryptographic signature validation, and
+Trusted Platform Module (TPM) measurements. By treating PCIe Option ROMs
+as loadable driver images rather than executing them as legacy raw
+binary payloads, UEFI applies standard Authenticode verification,
+platform key hierarchies, and revocation databases before allowing any
+code on the peripheral to execute.</p>
+<h2 id="uefi-secure-boot-and-the-authenticode-architecture">UEFI Secure
+Boot and the Authenticode Architecture</h2>
+<p>Under UEFI, modern Option ROMs contain UEFI drivers packaged as
+standard PE/COFF (Portable Executable/Common Object File Format) 32-bit
+or 64-bit binaries. When a PCIe card is initialized, the UEFI firmware
+discovers the ROM on the PCIe bus, reads its Expansion ROM Header, and
+identifies the UEFI image within.</p>
+<p>Before execution, the firmware checks this binary using Microsoft
+Authenticode standards:</p>
+<ul>
+<li><strong>Digital Signatures:</strong> The vendor signs the UEFI
+driver using a cryptographic certificate.</li>
+<li><strong>Integrity Hashing:</strong> The signature embeds an SHA-256
+(or stronger) hash of the binary image to guarantee it has not been
+altered or corrupted.</li>
+</ul>
+<h2 id="database-validation-db-and-dbx">Database Validation:
+<code>db</code> and <code>dbx</code></h2>
+<p>The firmware verifies the Option ROM’s certificate against internal
+Non-Volatile RAM (NVRAM) key stores managed by the platform:</p>
+<ol type="1">
+<li><strong>Authorized Signature Database (<code>db</code>):</strong>
+The firmware checks if the certificate used to sign the PCIe driver
+matches an entry in the <code>db</code> (such as the Microsoft UEFI
+Driver Authority or the hardware OEM's key). If the certificate or the
+binary's hash is explicitly present in the <code>db</code>, it passes
+verification.</li>
+<li><strong>Forbidden Signature Database (<code>dbx</code>):</strong>
+The firmware cross-references the driver against the revocation list
+(<code>dbx</code>). If the signing key has been revoked or the image
+hash matches a known vulnerable or malicious Option ROM, the firmware
+immediately rejects the code.</li>
+</ol>
+<p>This process relies on the Platform Key (PK) and Key Exchange Key
+(KEK) hierarchy, ensuring that unauthorized third parties cannot alter
+the lists of trusted or revoked ROM signatures.</p>
+<h2 id="measured-boot-via-the-tpm">Measured Boot via the TPM</h2>
+<p>In addition to signature verification, modern systems log Option ROMs
+via Measured Boot using a Trusted Platform Module (TPM):</p>
+<ul>
+<li><strong>PCR Measurement:</strong> Before the Option ROM driver
+executes, the firmware calculates a cryptographic hash of the ROM
+binary.</li>
+<li><strong>Platform Configuration Register 2 (PCR 2):</strong> This
+hash is extended into PCR 2 of the TPM chip, which is specifically
+designated for add-in card firmware and Option ROMs.</li>
+<li><strong>Remote Attestation:</strong> Even if an unsigned or altered
+ROM were to execute (for instance, on a system where Secure Boot is
+disabled), the altered measurement in PCR 2 breaks the known-good
+cryptographic seal, preventing access to disk encryption keys or failing
+remote attestation checks.</li>
+</ul>
+<h2 id="policy-enforcement-and-legacy-fallback-prevention">Policy
+Enforcement and Legacy Fallback Prevention</h2>
+<p>If an Option ROM fails signature validation and Secure Boot is
+enabled, UEFI firmware halts the driver execution, typically displaying
+a <code>Security Violation</code> message or silently disabling the
+expansion card’s boot capabilities while allowing the operating system
+to load without peripheral firmware support.</p>
+<p>To eliminate bypass vectors, systems with Secure Boot enforce pure
+UEFI execution by disabling the Compatibility Support Module (CSM). This
+prevents PCIe devices from executing legacy, unverified 16-bit real-mode
+x86 code (traditional PC-BIOS Option ROMs), ensuring that every piece of
+executable expansion code is subjected to cryptographic integrity
+checks.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-verifies-pc-ie-option-rom-integrity';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

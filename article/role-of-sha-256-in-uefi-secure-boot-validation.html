@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Role of SHA-256 in UEFI Secure Boot Validation - uefi</title>
+    <meta name="description" content="UEFI Secure Boot establishes a hardware-rooted chain of trust by ensuring that only authenticated, unmodified code executes during the pre-boot phase. Cryptographic hash algorithms, most notably SHA-256, are the foundation of this process. They generate d">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/role-of-sha-256-in-uefi-secure-boot-validation">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Role of SHA-256 in UEFI Secure Boot Validation - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/role-of-sha-256-in-uefi-secure-boot-validation" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI Secure Boot establishes a hardware-rooted chain of trust by ensuring that only authenticated, unmodified code executes during the pre-boot phase. Cryptographic hash algorithms, most notably SHA-256, are the foundation of this process. They generate d" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="role-of-sha-256-in-uefi-secure-boot-validation">Role of SHA-256
+in UEFI Secure Boot Validation</h1>
+<p>UEFI Secure Boot establishes a hardware-rooted chain of trust by
+ensuring that only authenticated, unmodified code executes during the
+pre-boot phase. Cryptographic hash algorithms, most notably SHA-256, are
+the foundation of this process. They generate deterministic, fixed-size
+digests of boot components—such as bootloaders, drivers, and OS
+kernels—allowing the firmware to verify code integrity and confirm
+digital signatures against stored security keys before control of the
+system is handed over.</p>
+<h3 id="the-role-of-hash-functions-in-digital-signatures">The Role of
+Hash Functions in Digital Signatures</h3>
+<p>Asymmetric cryptography (such as RSA or ECDSA) is computationally
+expensive and cannot efficiently sign large executable files directly.
+Hash functions solve this limitation:</p>
+<ol type="1">
+<li><strong>Digest Generation:</strong> During development, the binary
+(in PE/COFF format) is passed through a hashing algorithm, typically
+SHA-256. This produces a unique 256-bit representation of the
+executable, excluding mutable fields like checksums and the signature
+directory itself (using the Microsoft Authenticode specification).</li>
+<li><strong>Signature Creation:</strong> The software vendor encrypts
+this 256-bit digest with their private key to create the digital
+signature embedded inside the binary.</li>
+<li><strong>Firmware Verification:</strong> At boot time, UEFI firmware
+extracts the certificate, computes the SHA-256 hash of the binary
+independently, and decrypts the embedded signature using the
+corresponding public key. If the computed hash matches the decrypted
+hash, the firmware confirms that the binary has not been modified and
+comes from a trusted authority.</li>
+</ol>
+<h3 id="direct-whitelisting-and-revocation">Direct Whitelisting and
+Revocation</h3>
+<p>Beyond validating certificate-based digital signatures, SHA-256
+hashes play a direct role in the non-volatile UEFI variable
+databases:</p>
+<ul>
+<li><strong>The Allowed Database (<code>db</code>):</strong> Individual
+binaries that are unsigned or signed with an untrusted key can still be
+authorized by placing their exact SHA-256 hash directly into the
+<code>db</code>. The firmware will permit execution if the binary's hash
+matches an entry.</li>
+<li><strong>The Revoked Database (<code>dbx</code>):</strong> When a
+vulnerability is discovered in a previously signed bootloader or driver,
+authorities cannot easily revoke the entire signing certificate without
+invalidating thousands of legitimate files. Instead, the SHA-256 hash of
+the vulnerable binary is added to the <code>dbx</code>. Before executing
+any code, UEFI firmware compares the binary's hash against the
+<code>dbx</code>; if a match is found, execution is blocked immediately,
+overriding any valid signature.</li>
+</ul>
+<h3 id="collision-resistance-and-security">Collision Resistance and
+Security</h3>
+<p>Secure Boot depends heavily on the cryptographic strength of SHA-256.
+The algorithm’s collision resistance ensures that an attacker cannot
+generate a malicious binary that produces the same 256-bit hash as an
+approved one. As older standards like SHA-1 have been deprecated due to
+collision vulnerabilities, SHA-256 remains the minimum standard for
+ensuring that every pre-boot component executed by the UEFI remains
+immutable and authentic.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/role-of-sha-256-in-uefi-secure-boot-validation';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

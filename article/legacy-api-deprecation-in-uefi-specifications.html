@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legacy API Deprecation in UEFI Specifications - uefi</title>
+    <meta name="description" content="This article outlines the governance, architectural criteria, and transitional protocols the Unified Extensible Firmware Interface (UEFI) Forum uses to deprecate legacy Application Programming Interfaces (APIs). As hardware platforms evolve, older interfa">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/legacy-api-deprecation-in-uefi-specifications">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Legacy API Deprecation in UEFI Specifications - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/legacy-api-deprecation-in-uefi-specifications" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article outlines the governance, architectural criteria, and transitional protocols the Unified Extensible Firmware Interface (UEFI) Forum uses to deprecate legacy Application Programming Interfaces (APIs). As hardware platforms evolve, older interfa" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="legacy-api-deprecation-in-uefi-specifications">Legacy API
+Deprecation in UEFI Specifications</h1>
+<p>This article outlines the governance, architectural criteria, and
+transitional protocols the Unified Extensible Firmware Interface (UEFI)
+Forum uses to deprecate legacy Application Programming Interfaces
+(APIs). As hardware platforms evolve, older interfaces become security
+risks or architectural bottlenecks, prompting the UEFI specification
+working groups to systematically flag, phase out, and replace legacy
+protocols while maintaining system interoperability.</p>
+<h3 id="the-engineering-change-request-ecr-process">The Engineering
+Change Request (ECR) Process</h3>
+<p>API deprecation begins through an Engineering Change Request (ECR)
+submitted to the UEFI Specification Working Group (USWG). The proposing
+member must demonstrate:</p>
+<ul>
+<li><strong>Technical justification:</strong> Why the existing API or
+protocol is redundant, computationally inefficient, or insecure.</li>
+<li><strong>Functional replacement:</strong> A modern, standardized
+replacement protocol capable of handling current hardware demands (such
+as switching from legacy 32-bit interfaces to 64-bit-native
+interfaces).</li>
+<li><strong>Impact assessment:</strong> An analysis of existing
+operating system boot loaders, option ROMs, and pre-boot applications
+that rely on the legacy call.</li>
+</ul>
+<h3 id="formal-specification-tagging">Formal Specification Tagging</h3>
+<p>When an ECR for deprecation is approved:</p>
+<ul>
+<li>The specific API, protocol GUID, or data structure is annotated in
+the official UEFI Specification text with a "Deprecated"
+designation.</li>
+<li>The documentation details the exact specification version in which
+the deprecation took effect.</li>
+<li>The specification references the modern protocol that must be
+adopted in place of the deprecated component.</li>
+</ul>
+<h3
+id="source-level-deprecation-in-reference-implementations">Source-Level
+Deprecation in Reference Implementations</h3>
+<p>Deprecation moves from documentation to code through TianoCore EDK
+II, the open-source reference implementation of UEFI:</p>
+<ul>
+<li><strong>Header Annotations:</strong> Function pointers and structure
+definitions in C headers are marked using compiler-specific deprecation
+macros (such as GCC’s <code>__attribute__((deprecated))</code> or MSVC’s
+<code>__declspec(deprecated)</code>).</li>
+<li><strong>Build Flags:</strong> Platform build configuration files
+(<code>DSC</code> and <code>DEC</code> files) introduce feature flags
+such as <code>DISABLE_NEW_DEPRECATED_INTERFACES</code> or
+<code>MdePkg</code> deprecation flags. These flags generate build-time
+warnings or hard errors if firmware code attempts to invoke the
+deprecated symbols.</li>
+</ul>
+<h3 id="binary-compatibility-and-grace-periods">Binary Compatibility and
+Grace Periods</h3>
+<p>The UEFI Forum enforces a multi-version grace period to prevent
+breaking pre-boot environments across hardware generations:</p>
+<ul>
+<li><strong>Non-Immediate Removal:</strong> Deprecated APIs are rarely
+deleted immediately from the specification. They remain defined in the
+spec across subsequent releases to preserve Application Binary Interface
+(ABI) stability for legacy payloads.</li>
+<li><strong>Return-Value Stubs:</strong> During transition phases,
+firmware implementations often retain the deprecated function pointer in
+system tables, but modify the underlying implementation to return
+<code>EFI_UNSUPPORTED</code> or a functionally restricted result if
+hardware no longer supports the call.</li>
+<li><strong>Firmware-OS Boundary Protection:</strong> Core runtime and
+boot services essential to OS loaders remain functional longer than
+internal driver-to-driver protocols, ensuring operating systems
+developed for older revisions can still boot on newer firmware.</li>
+</ul>
+<h3 id="security-driven-accelerated-deprecation">Security-Driven
+Accelerated Deprecation</h3>
+<p>Standard deprecation cycles are bypassed when cryptographic
+vulnerabilities are identified. For insecure hashing algorithms,
+obsolete cipher suites, or vulnerable variable storage methods, the UEFI
+Security Sub-Team expedites the deprecation timeline. In these
+scenarios, older APIs are replaced with modern cryptographically agile
+interfaces in point releases, and reference code is quickly configured
+to reject legacy algorithms by default.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/legacy-api-deprecation-in-uefi-specifications';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

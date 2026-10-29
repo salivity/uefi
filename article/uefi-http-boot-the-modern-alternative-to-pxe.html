@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI HTTP Boot: The Modern Alternative to PXE - uefi</title>
+    <meta name="description" content="UEFI HTTP Boot is a network deployment standard that enables client systems to download bootloaders and operating system installation media using HTTP or HTTPS rather than legacy protocols. This article provides a clear overview of what UEFI HTTP Boot is,">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-http-boot-the-modern-alternative-to-pxe">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI HTTP Boot: The Modern Alternative to PXE - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-http-boot-the-modern-alternative-to-pxe" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI HTTP Boot is a network deployment standard that enables client systems to download bootloaders and operating system installation media using HTTP or HTTPS rather than legacy protocols. This article provides a clear overview of what UEFI HTTP Boot is," />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-http-boot-the-modern-alternative-to-pxe">UEFI HTTP Boot:
+The Modern Alternative to PXE</h1>
+<p>UEFI HTTP Boot is a network deployment standard that enables client
+systems to download bootloaders and operating system installation media
+using HTTP or HTTPS rather than legacy protocols. This article provides
+a clear overview of what UEFI HTTP Boot is, explains the core
+operational differences between it and legacy Preboot Execution
+Environment (PXE) booting, and details why replacing TFTP with standard
+web protocols significantly improves speed, network reliability, and
+deployment security.</p>
+<h3 id="what-is-uefi-http-boot">What Is UEFI HTTP Boot?</h3>
+<p>Introduced in the UEFI 2.5 specification, UEFI HTTP Boot merges the
+traditional network boot concept with modern web standards. Instead of
+relying solely on the Trivial File Transfer Protocol (TFTP) to fetch
+initial boot files, the UEFI firmware contains an embedded network stack
+capable of resolving DNS, establishing TCP connections, and fetching
+deployment files using standard HTTP or TLS-encrypted HTTPS requests via
+standard web servers.</p>
+<h3 id="the-limitations-of-traditional-tftp-based-pxe">The Limitations
+of Traditional TFTP-Based PXE</h3>
+<p>Traditional PXE has served as the enterprise standard for bare-metal
+deployment for decades, but it relies on an aging protocol stack:</p>
+<ul>
+<li><strong>UDP/TFTP Overhead:</strong> TFTP operates over UDP and
+transfers files using a stop-and-wait mechanism. In its basic
+implementation, every packet must be individually acknowledged before
+the next is sent. Even with modern options like windowing
+(<code>blksize</code> and <code>windowsize</code> extensions), a single
+dropped packet can stall the transfer or cause timeouts.</li>
+<li><strong>Lack of Scalability:</strong> As modern operating system
+images, boot files (like Windows PE or Linux initramfs), and recovery
+environments have grown to hundreds of megabytes or several gigabytes,
+TFTP becomes exceptionally slow and inefficient.</li>
+<li><strong>Security Deficits:</strong> Traditional PXE transfers
+unencrypted payloads across the local network without server
+authentication, leaving the boot process vulnerable to man-in-the-middle
+(MITM) attacks and malicious payload injection.</li>
+<li><strong>Firewall and Routing Complexities:</strong> TFTP requires
+non-standard port negotiation and relies heavily on local
+broadcast/multicast configurations, making deployments across complex
+network segments, routed subnets, or wide-area networks difficult
+without specialized DHCP helpers or network proxies.</li>
+</ul>
+<h3 id="why-uefi-http-boot-is-a-superior-alternative">Why UEFI HTTP Boot
+Is a Superior Alternative</h3>
+<p>UEFI HTTP Boot resolves the structural weaknesses of legacy PXE by
+migrating the transport mechanism to the modern web layer.</p>
+<h4 id="1-faster-and-more-reliable-transfers">1. Faster and More
+Reliable Transfers</h4>
+<p>HTTP runs on top of TCP, providing native congestion control, sliding
+window algorithms, and packet retransmission. This fundamental shift
+eliminates the transfer bottlenecks inherent in TFTP. Boot images and
+kernels transfer at standard network line speeds, drastically reducing
+provisioning times for modern multi-gigabyte operating systems.</p>
+<h4 id="2-enterprise-grade-security-via-https">2. Enterprise-Grade
+Security via HTTPS</h4>
+<p>With HTTPS support built directly into the firmware, the client can
+authenticate the boot server using industry-standard TLS certificates.
+This ensures that the machine only downloads bootloaders and operating
+systems from trusted infrastructure. When paired with UEFI Secure Boot,
+which cryptographically validates the signature of the bootloader before
+execution, HTTP Boot delivers end-to-end security from transfer to
+execution.</p>
+<h4 id="3-simplified-network-architecture">3. Simplified Network
+Architecture</h4>
+<p>Because UEFI HTTP Boot uses standard ports (TCP 80 for HTTP and TCP
+443 for HTTPS), it integrates cleanly with modern network
+topologies:</p>
+<ul>
+<li>No special firewall exceptions or TFTP-specific helpers are
+required.</li>
+<li>Boot images can be stored behind standard enterprise web proxies,
+content delivery networks (CDNs), or load balancers.</li>
+<li>Systems can boot across subnets, from cloud-hosted storage, or over
+the public internet, enabling remote recovery and zero-touch
+provisioning outside the physical datacenter.</li>
+</ul>
+<h4 id="4-url-based-boot-paths">4. URL-Based Boot Paths</h4>
+<p>In an HTTP Boot configuration, the DHCP server or firmware
+configuration provides a uniform resource locator (URL) pointing to the
+boot image. This eliminates fragile path-resolution assumptions and
+allows administrators to point systems directly to specific virtual
+hosts, paths, or remote endpoints using standard DNS names.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-http-boot-the-modern-alternative-to-pxe';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

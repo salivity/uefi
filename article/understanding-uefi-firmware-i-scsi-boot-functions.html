@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Understanding UEFI Firmware iSCSI Boot Functions - uefi</title>
+    <meta name="description" content="Advanced Unified Extensible Firmware Interface (UEFI) firmware packages increasingly feature built-in Internet Small Computer System Interface (iSCSI) boot capabilities. This technology enables a computer to locate, connect to, and load an operating syste">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/understanding-uefi-firmware-i-scsi-boot-functions">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Understanding UEFI Firmware iSCSI Boot Functions - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/understanding-uefi-firmware-i-scsi-boot-functions" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Advanced Unified Extensible Firmware Interface (UEFI) firmware packages increasingly feature built-in Internet Small Computer System Interface (iSCSI) boot capabilities. This technology enables a computer to locate, connect to, and load an operating syste" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="understanding-uefi-firmware-iscsi-boot-functions">Understanding
+UEFI Firmware iSCSI Boot Functions</h1>
+<p>Advanced Unified Extensible Firmware Interface (UEFI) firmware
+packages increasingly feature built-in Internet Small Computer System
+Interface (iSCSI) boot capabilities. This technology enables a computer
+to locate, connect to, and load an operating system over an IP network
+from a remote storage target rather than relying on a local storage
+drive. By standardizing this process directly within the firmware,
+organizations can streamline system architecture, lower hardware costs,
+and simplify server provisioning and maintenance across enterprise
+environments.</p>
+<h3 id="the-mechanics-of-uefi-iscsi-boot">The Mechanics of UEFI iSCSI
+Boot</h3>
+<p>Traditional system booting requires a local physical drive—such as an
+NVMe SSD or SATA hard disk—or dedicated hardware expansion cards to
+initiate a network boot. Built-in UEFI iSCSI boot moves the required
+networking and iSCSI protocols directly into the motherboard's pre-boot
+environment.</p>
+<p>During the pre-boot phase, the UEFI firmware initializes the network
+interface card (NIC), configures an IP address using static settings or
+DHCP, and initiates a TCP/IP connection across a standard Ethernet
+network. It then logs into a specified iSCSI target (a Logical Unit
+Number, or LUN, located on a Network Attached Storage system or Storage
+Area Network) using the iSCSI protocol. Once connected, the UEFI driver
+translates the remote target into a standard block storage device that
+presents itself to the system as a local disk. The system then reads the
+boot sector and loads the operating system kernel seamlessly.</p>
+<h3 id="eliminating-proprietary-hardware">Eliminating Proprietary
+Hardware</h3>
+<p>Historically, achieving an iSCSI boot required specialized, expensive
+network interface cards known as Host Bus Adapters (HBAs) or network
+cards with vendor-specific iSCSI Option ROMs. Advanced UEFI packages
+eliminate this requirement. Because the firmware provides the entire
+software-based network and storage stack, systems can boot from an iSCSI
+target using commodity, off-the-shelf Ethernet controllers. This
+drastically lowers initial hardware capital expenses while maintaining
+high throughput.</p>
+<h3 id="operational-advantages">Operational Advantages</h3>
+<ul>
+<li><strong>Diskless Architectures:</strong> Physical servers and thin
+clients can run without local hard drives. This reduces power
+consumption, minimizes heat output, and eliminates mechanical drive
+failure points.</li>
+<li><strong>Centralized Storage Management:</strong> Operating system
+images reside on centralized SANs. System administrators can snapshot,
+clone, patch, and back up OS volumes globally without physically
+accessing individual target machines.</li>
+<li><strong>Rapid Provisioning and Disaster Recovery:</strong> Replacing
+a failed compute node requires mounting the existing iSCSI LUN to a new
+physical chassis. Server deployment times drop from hours to minutes, as
+compute hardware remains stateless.</li>
+<li><strong>Security Integration:</strong> Modern UEFI implementations
+integrate iSCSI boot with security protocols like Challenge Handshake
+Authentication Protocol (CHAP) and Mutual CHAP to restrict LUN access.
+Furthermore, these implementations work alongside UEFI Secure Boot to
+ensure that network-retrieved bootloaders are cryptographically signed
+and untampered with.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/understanding-uefi-firmware-i-scsi-boot-functions';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

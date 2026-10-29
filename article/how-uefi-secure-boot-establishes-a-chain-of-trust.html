@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Secure Boot Establishes a Chain of Trust - uefi</title>
+    <meta name="description" content="UEFI Secure Boot protects a computer&#39;s startup sequence by verifying that each software component loaded during boot is cryptographically authentic and untampered with. By establishing a sequential chain of trust starting from hardware-embedded root keys">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-secure-boot-establishes-a-chain-of-trust">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Secure Boot Establishes a Chain of Trust - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-secure-boot-establishes-a-chain-of-trust" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI Secure Boot protects a computer&#39;s startup sequence by verifying that each software component loaded during boot is cryptographically authentic and untampered with. By establishing a sequential chain of trust starting from hardware-embedded root keys" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-secure-boot-establishes-a-chain-of-trust">How UEFI
+Secure Boot Establishes a Chain of Trust</h1>
+<p>UEFI Secure Boot protects a computer's startup sequence by verifying
+that each software component loaded during boot is cryptographically
+authentic and untampered with. By establishing a sequential chain of
+trust starting from hardware-embedded root keys and proceeding through
+firmware, bootloaders, and into the operating system kernel, Secure Boot
+ensures that malicious code such as bootkits and rootkits cannot execute
+before the system defenses are fully initialized.</p>
+<h2 id="the-foundation-uefi-secure-boot-key-hierarchy">The Foundation:
+UEFI Secure Boot Key Hierarchy</h2>
+<p>The chain of trust relies on a hierarchical structure of asymmetric
+cryptographic keys stored in non-volatile, tamper-resistant memory
+(NVRAM):</p>
+<ul>
+<li><strong>Platform Key (PK):</strong> The root of trust for the
+platform, establishing a trust relationship between the platform owner
+(typically the device manufacturer or OEM) and the UEFI firmware. The PK
+controls access to the Key Exchange Key database.</li>
+<li><strong>Key Exchange Key (KEK):</strong> Establishes trust between
+the operating system vendor and the firmware. KEKs are used to write and
+update the authorized signature database and the forbidden signature
+database.</li>
+<li><strong>Authorized Signature Database (<code>db</code>):</strong>
+Contains the public keys, certificates, and cryptographic hashes of
+approved firmware drivers, bootloaders, and OS kernels. The most common
+entry is the Microsoft Corporation UEFI CA.</li>
+<li><strong>Forbidden Signature Database (<code>dbx</code>):</strong> A
+revocation list containing hashes of compromised, vulnerable, or
+malicious binaries that the system must refuse to execute, even if
+signed by a trusted key in the <code>db</code>.</li>
+</ul>
+<h2 id="step-1-hardware-and-firmware-initialization">Step 1: Hardware
+and Firmware Initialization</h2>
+<p>The chain begins at the hardware level. When the computer powers on,
+the processor executes code from the motherboard's SPI flash chip via
+the Security (SEC) and Pre-EFI Initialization (PEI) phases. Because this
+initial code resides in non-volatile hardware memory configured by the
+manufacturer, it acts as the initial, implicit trust anchor.</p>
+<p>During the Driver Execution Environment (DXE) phase, the UEFI core
+initializes the Secure Boot engine and loads the cryptographic keys
+(<code>PK</code>, <code>KEK</code>, <code>db</code>, and
+<code>dbx</code>) from protected NVRAM into memory.</p>
+<h2 id="step-2-verification-of-uefi-drivers-and-option-roms">Step 2:
+Verification of UEFI Drivers and Option ROMs</h2>
+<p>Before accessing the boot disk, the system may need to load hardware
+drivers (Option ROMs) from expansion cards, such as network adapters or
+graphics cards.</p>
+<p>Before executing any third-party driver, the UEFI firmware inspects
+the binary's Authenticode digital signature:</p>
+<ol type="1">
+<li>It computes a cryptographic hash of the binary.</li>
+<li>It verifies the hash against the <code>dbx</code>. If a match is
+found, execution is blocked immediately.</li>
+<li>It checks the signature against the certificates and keys inside the
+<code>db</code>.</li>
+<li>If the binary is signed by a recognized certificate authority and
+has not been altered, the firmware executes it. Otherwise, execution
+halts with a boot failure.</li>
+</ol>
+<h2 id="step-3-verifying-the-first-stage-bootloader">Step 3: Verifying
+the First-Stage Bootloader</h2>
+<p>Once hardware initialization completes, the Boot Device Select (BDS)
+phase identifies the boot target located on the EFI System Partition
+(ESP).</p>
+<p>The firmware locates the primary operating system bootloader (such as
+<code>bootx64.efi</code> or <code>shimx64.efi</code>). Just as it did
+with peripheral drivers, the firmware checks the bootloader against the
+<code>dbx</code> and <code>db</code>. If the bootloader’s digital
+signature matches a trusted authority, control of the CPU is handed over
+to the bootloader.</p>
+<h2 id="step-4-extending-trust-to-the-operating-system">Step 4:
+Extending Trust to the Operating System</h2>
+<p>Once executed, the bootloader inherits the chain of trust and is
+responsible for verifying the next components in the sequence:</p>
+<ul>
+<li><strong>In Linux (Shim/GRUB model):</strong> The first-stage
+bootloader (<code>shim</code>), which is signed by a standard vendor key
+in the UEFI <code>db</code>, contains its own embedded Machine Owner Key
+(MOK) database. <code>Shim</code> verifies the second-stage bootloader
+(GRUB). GRUB then cryptographically verifies the Linux kernel binary and
+loaded kernel modules before executing them.</li>
+<li><strong>In Windows:</strong> The Windows Boot Manager
+(<code>bootmgr</code>) is verified by the UEFI firmware. In turn,
+<code>bootmgr</code> cryptographically verifies the Windows OS Loader
+(<code>winload.efi</code>). The OS loader then verifies the integrity of
+the Windows kernel (<code>ntoskrnl.exe</code>), Early Launch
+Anti-Malware (ELAM) drivers, and all boot-start drivers before passing
+execution to the kernel.</li>
+</ul>
+<p>Through this continuous sequence of cryptographic verifications—where
+each component validates the signature of the subsequent binary before
+running it—UEFI Secure Boot guarantees that the system state remains
+secure and unbroken from the moment power is applied until the operating
+system takes full control.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-secure-boot-establishes-a-chain-of-trust';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Drivers and Power Management Chip Interfaces - uefi</title>
+    <meta name="description" content="Modern computer platforms rely on Unified Extensible Firmware Interface (UEFI) drivers to configure, monitor, and regulate advanced power management chips—primarily Power Management Integrated Circuits (PMICs) and Embedded Controllers (ECs). This article">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-drivers-and-power-management-chip-interfaces">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Drivers and Power Management Chip Interfaces - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-drivers-and-power-management-chip-interfaces" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Modern computer platforms rely on Unified Extensible Firmware Interface (UEFI) drivers to configure, monitor, and regulate advanced power management chips—primarily Power Management Integrated Circuits (PMICs) and Embedded Controllers (ECs). This article" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-drivers-and-power-management-chip-interfaces">UEFI Drivers
+and Power Management Chip Interfaces</h1>
+<p>Modern computer platforms rely on Unified Extensible Firmware
+Interface (UEFI) drivers to configure, monitor, and regulate advanced
+power management chips—primarily Power Management Integrated Circuits
+(PMICs) and Embedded Controllers (ECs). This article explains how UEFI
+firmware establishes hardware-level bus communication with these chips,
+abstracts functionality through specialized firmware protocols,
+coordinates boot-time power rail sequencing, and dynamically builds the
+ACPI structures required to transfer power-state authority to the
+operating system.</p>
+<h3 id="hardware-bus-communication">Hardware Bus Communication</h3>
+<p>Advanced power management chips do not sit directly on high-speed
+memory-mapped buses like PCIe. Instead, they connect to the system
+chipset via low-pin-count serial interfaces such as I2C, SMBus, SPI, or
+eSPI (enhanced Serial Peripheral Interface).</p>
+<p>To interact with a PMIC, the UEFI environment relies on a layered
+driver architecture:</p>
+<ol type="1">
+<li><strong>Host Controller Drivers:</strong> A low-level UEFI driver
+initializes the platform's bus master (e.g., an Intel or AMD I2C host
+controller).</li>
+<li><strong>Bus Protocols:</strong> The host driver produces standard
+interfaces, such as the <code>EFI_I2C_IO_PROTOCOL</code>, which abstract
+read, write, and command-packet transmission.</li>
+<li><strong>Target Device Drivers:</strong> The dedicated PMIC or EC
+driver consumes these generic bus protocols to read and write to the
+chip’s internal command and configuration registers.</li>
+</ol>
+<p>Through these serial commands, the driver accesses specific chip
+registers that govern voltage regulators, current limits, battery
+monitoring, and platform thermal thresholds.</p>
+<h3 id="boot-phase-responsibilities-pei-vs-dxe">Boot Phase
+Responsibilities: PEI vs. DXE</h3>
+<p>Firmware communication with power hardware occurs across two primary
+UEFI phases:</p>
+<ul>
+<li><strong>Pre-EFI Initialization (PEI):</strong> During early
+initialization, memory has not yet been trained. Early power management
+drivers (PEIMs) execute from ROM or CPU cache to assert essential power
+rails, configure CPU core voltages (Vcore), and enable memory power
+(VDDQ). Without this step, main system memory cannot initialize.</li>
+<li><strong>Driver Execution Environment (DXE):</strong> Once main
+memory is online, DXE drivers manage more sophisticated power
+capabilities. At this stage, drivers establish dynamic voltage and
+frequency policies, configure fine-grained power sequencing, set charge
+rates, and prepare telemetry pathways.</li>
+</ul>
+<h3 id="the-role-of-uefi-protocols">The Role of UEFI Protocols</h3>
+<p>In the DXE phase, vendor-specific chip drivers register protocols in
+the UEFI core database to expose power functions to the rest of the
+firmware. For example, a custom <code>PLATFORM_PMIC_PROTOCOL</code>
+might expose functions such as <code>SetVoltageRail()</code>,
+<code>GetBatteryStatus()</code>, or <code>SetLowPowerState()</code>.</p>
+<p>Other modular firmware components, such as thermal management
+modules, display drivers, or CPU initialization code, call these
+protocols without needing to know the low-level bus address or register
+layout of the specific PMIC installed on the motherboard.</p>
+<h3 id="preparing-the-acpi-handoff">Preparing the ACPI Handoff</h3>
+<p>The UEFI firmware does not control the PMIC indefinitely; it must
+hand over runtime power control to the operating system. UEFI drivers
+prepare this transition by dynamically generating or patching Advanced
+Configuration and Power Interface (ACPI) tables.</p>
+<ul>
+<li><strong>OperationRegions:</strong> UEFI drivers define ACPI
+<code>OperationRegion</code> structures in the DSDT (Differentiated
+System Description Table) or SSDT (Secondary System Description Table).
+For serial bus PMICs, these are frequently declared using the
+<code>GenericSerialBus</code> or <code>EmbeddedControl</code> address
+spaces.</li>
+<li><strong>AML Methods:</strong> The driver populates control methods
+(such as <code>_ON</code>, <code>_OFF</code>, <code>_PS0</code>, and
+<code>_PS3</code>) in ACPI Machine Language (AML). When the operating
+system changes a device's power state, the OS ACPI driver executes the
+AML bytecode, which issues transactions across the underlying serial bus
+directly to the power management chip.</li>
+</ul>
+<p>Through this coordinated handoff, UEFI drivers establish initial
+platform stability and guarantee that runtime operating systems have the
+register definitions necessary to execute modern sleep, wake, and
+dynamic power policies.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-drivers-and-power-management-chip-interfaces';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

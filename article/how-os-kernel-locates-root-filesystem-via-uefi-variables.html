@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How OS Kernel Locates Root Filesystem via UEFI Variables - uefi</title>
+    <meta name="description" content="When a modern computer boots, the operating system kernel relies on a chain of execution initiated by the Unified Extensible Firmware Interface (UEFI). The firmware uses non-volatile RAM (NVRAM) variables—specifically boot options defined in the UEFI spec">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-os-kernel-locates-root-filesystem-via-uefi-variables">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How OS Kernel Locates Root Filesystem via UEFI Variables - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-os-kernel-locates-root-filesystem-via-uefi-variables" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="When a modern computer boots, the operating system kernel relies on a chain of execution initiated by the Unified Extensible Firmware Interface (UEFI). The firmware uses non-volatile RAM (NVRAM) variables—specifically boot options defined in the UEFI spec" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-os-kernel-locates-root-filesystem-via-uefi-variables">How OS
+Kernel Locates Root Filesystem via UEFI Variables</h1>
+<p>When a modern computer boots, the operating system kernel relies on a
+chain of execution initiated by the Unified Extensible Firmware
+Interface (UEFI). The firmware uses non-volatile RAM (NVRAM)
+variables—specifically boot options defined in the UEFI specification—to
+determine which binary to execute and which parameters to pass. By
+reading these variables, either directly through the Linux EFI Boot Stub
+or indirectly via a bootloader, the kernel receives the precise
+identifier of the storage device and partition hosting the root
+filesystem, allowing the initial RAM disk to locate and mount it.</p>
+<h3 id="1-uefi-boot-variables-and-nvram-storage">1. UEFI Boot Variables
+and NVRAM Storage</h3>
+<p>UEFI systems store boot configuration in non-volatile storage known
+as NVRAM. The firmware utilizes specific standardized variables to
+orchestrate startup:</p>
+<ul>
+<li><strong><code>BootOrder</code></strong>: An array of 16-bit integers
+defining the sequence in which boot options are attempted.</li>
+<li><strong><code>BootNext</code></strong>: An optional variable
+specifying a one-time boot override.</li>
+<li><strong><code>BootCurrent</code></strong>: A variable set by the
+firmware indicating which boot entry was successfully loaded.</li>
+<li><strong><code>Boot####</code></strong>: Individual entries (e.g.,
+<code>Boot0001</code>, <code>Boot0002</code>) structured as
+<code>EFI_LOAD_OPTION</code> descriptors.</li>
+</ul>
+<p>Each <code>EFI_LOAD_OPTION</code> contains several critical fields:
+attributes, a human-readable description, a UEFI device path pointing to
+the executable file (typically on the EFI System Partition, or ESP), and
+an <code>OptionalData</code> binary buffer.</p>
+<h3 id="2-passing-boot-parameters-via-optionaldata">2. Passing Boot
+Parameters via <code>OptionalData</code></h3>
+<p>The <code>OptionalData</code> field in a <code>Boot####</code>
+variable acts as a command-line carrier. System utilities like
+<code>efibootmgr</code> can populate this field with kernel parameters
+such as:</p>
+<pre class="text"><code>root=UUID=4f9c8b72-1234-4a5b-8c9d-0123456789ab rw</code></pre>
+<p>Alternatively, partition identifiers can be used:</p>
+<pre class="text"><code>root=PARTUUID=a1b2c3d4-e5f6-7890-abcd-ef0123456789</code></pre>
+<p>When the UEFI Boot Manager executes the binary specified in the
+device path, it encapsulates these parameters inside an
+<code>EFI_LOADED_IMAGE_PROTOCOL</code> structure. The executable
+receives access to this structure, specifically reading the
+<code>LoadOptions</code> and <code>LoadOptionsSize</code> fields, which
+contain the exact string stored in the NVRAM
+<code>OptionalData</code>.</p>
+<h3 id="3-handoff-to-the-kernel-direct-boot-vs-bootloader">3. Handoff to
+the Kernel: Direct Boot vs. Bootloader</h3>
+<p>There are two primary ways the kernel acquires these parameters:</p>
+<ul>
+<li><strong>Direct Boot (EFI Boot Stub):</strong> When compiled with
+<code>CONFIG_EFI_STUB</code>, the Linux kernel binary functions as a
+native PE/COFF UEFI executable. The firmware loads the kernel directly.
+The kernel's stub code queries the
+<code>EFI_LOADED_IMAGE_PROTOCOL</code> for <code>LoadOptions</code>,
+extracts the command-line string containing the <code>root=</code>
+parameter, and integrates it into the kernel's internal command buffer
+before exiting UEFI Boot Services.</li>
+<li><strong>Bootloader Handoff (GRUB, systemd-boot):</strong> The
+firmware loads the bootloader first. The bootloader inspects the boot
+variables, determines the boot entry, merges any user configuration with
+the variables, loads the kernel and initramfs into memory, and passes
+the synthesized command line to the kernel via the boot protocol.
+Bootloaders like <code>systemd-boot</code> also set additional UEFI
+variables (e.g., <code>LoaderDevicePartUUID</code>) to inform the OS
+where it booted from.</li>
+</ul>
+<h3 id="4-reading-uefi-variables-from-userspace-and-initramfs">4.
+Reading UEFI Variables from Userspace and Initramfs</h3>
+<p>Once the kernel takes control and terminates UEFI Boot Services,
+direct calls to the UEFI firmware interface are largely replaced by UEFI
+Runtime Services.</p>
+<p>The kernel exposes these services to user space via the
+<code>efivarfs</code> pseudo-filesystem, typically mounted at
+<code>/sys/firmware/efi/efivars</code>. This allows early boot
+components in the initial RAM disk (initramfs) to inspect NVRAM
+variables dynamically if required by the boot scheme (for example,
+discovering system-token variables or partition identifiers generated by
+the bootloader).</p>
+<h3 id="5-identification-and-mounting-of-the-root-filesystem">5.
+Identification and Mounting of the Root Filesystem</h3>
+<p>The actual discovery and mounting of the root filesystem proceed
+through the initramfs:</p>
+<ol type="1">
+<li><strong>Parameter Parsing:</strong> The initramfs parses the kernel
+command line received from the UEFI environment to find the
+<code>root=</code> specifier.</li>
+<li><strong>Device Enumeration:</strong> The kernel initializes storage
+controllers (NVMe, SATA, USB) and registers block devices.</li>
+<li><strong>Udev Detection:</strong> The <code>udev</code> daemon inside
+the initramfs listens for kernel uevents as storage devices are
+registered. It reads partition headers (GPT) and filesystem superblocks,
+generating symlinks under <code>/dev/disk/by-uuid/</code> and
+<code>/dev/disk/by-partuuid/</code>.</li>
+<li><strong>Resolution:</strong> The initramfs matches the target UUID
+or PARTUUID provided in the UEFI-originating command line with the
+detected device nodes.</li>
+<li><strong>Mount and Switch:</strong> The root device is mounted to a
+temporary target (such as <code>/sysroot</code>). Once mounted, the
+initramfs transfers execution using <code>switch_root</code> or
+<code>pivot_root</code>, making the targeted storage volume the active
+root directory of the operating system.</li>
+</ol></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-os-kernel-locates-root-filesystem-via-uefi-variables';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

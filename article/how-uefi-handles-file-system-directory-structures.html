@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Handles File System Directory Structures - uefi</title>
+    <meta name="description" content="The Unified Extensible Firmware Interface (UEFI) abstracts storage hardware through a standardized set of protocols that present diverse physical media and partition layouts as a unified hierarchical file system. This article explores how UEFI manages dir">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-handles-file-system-directory-structures">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Handles File System Directory Structures - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-handles-file-system-directory-structures" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Unified Extensible Firmware Interface (UEFI) abstracts storage hardware through a standardized set of protocols that present diverse physical media and partition layouts as a unified hierarchical file system. This article explores how UEFI manages dir" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-handles-file-system-directory-structures">How UEFI
+Handles File System Directory Structures</h1>
+<p>The Unified Extensible Firmware Interface (UEFI) abstracts storage
+hardware through a standardized set of protocols that present diverse
+physical media and partition layouts as a unified hierarchical file
+system. This article explores how UEFI manages directory structures
+using the Simple File System Protocol and File Protocol, detailing path
+traversal, directory iteration, and driver-level abstractions that
+maintain consistency across different platforms.</p>
+<h3 id="the-uefi-file-system-architecture">The UEFI File System
+Architecture</h3>
+<p>UEFI decouples firmware applications, boot loaders, and hardware
+drivers using an object-oriented protocol model. Instead of requiring
+applications to implement specific storage controller logic or raw block
+device access, UEFI relies on a layered architecture:</p>
+<ol type="1">
+<li><strong>Block I/O Protocol
+(<code>EFI_BLOCK_IO_PROTOCOL</code>):</strong> Provides raw access to
+block devices like NVMe drives, SATA SSDs, and USB storage.</li>
+<li><strong>Disk I/O Protocol
+(<code>EFI_DISK_IO_PROTOCOL</code>):</strong> Adds byte-level addressing
+on top of block devices.</li>
+<li><strong>Simple File System Protocol
+(<code>EFI_SIMPLE_FILE_SYSTEM_PROTOCOL</code>):</strong> Bridges
+low-level disk access with a high-level file system representation.</li>
+<li><strong>File Protocol (<code>EFI_FILE_PROTOCOL</code>):</strong>
+Provides handles to individual files and directories, exposing
+operations like open, read, write, and close.</li>
+</ol>
+<p>By relying on this pipeline, the firmware does not need to know the
+physical geometry or interface of the drive; it interacts purely with
+logical volumes.</p>
+<h3 id="root-initialization-and-directory-representation">Root
+Initialization and Directory Representation</h3>
+<p>The abstraction layer views any compatible partition—most commonly
+the EFI System Partition (ESP)—as a volume containing a root
+directory.</p>
+<p>Handling a directory begins with the
+<code>EFI_SIMPLE_FILE_SYSTEM_PROTOCOL.OpenVolume()</code> function. This
+call returns an <code>EFI_FILE_PROTOCOL</code> pointer representing the
+root directory token (<code>\</code>). In UEFI, directories and files
+use the exact same interface structure (<code>EFI_FILE_PROTOCOL</code>).
+The difference between a directory and a standard data file is marked by
+an attribute flag (<code>EFI_FILE_DIRECTORY</code>) within the file's
+metadata.</p>
+<h3 id="path-resolution-and-navigation">Path Resolution and
+Navigation</h3>
+<p>UEFI standardizes path syntax regardless of the operating system that
+generated the files:</p>
+<ul>
+<li><strong>Separators:</strong> UEFI strictly uses the backslash
+(<code>\</code>) as the path separator, following DOS-style conventions.
+Forward slashes are treated as invalid characters unless translated by a
+custom driver or shell.</li>
+<li><strong>Relative vs. Absolute Paths:</strong> Paths starting with
+<code>\</code> are resolved relative to the root handle of the volume.
+Paths without a leading backslash are evaluated relative to the current
+directory handle from which the <code>Open()</code> method was
+called.</li>
+<li><strong>Parent References:</strong> The special token
+<code>..</code> allows traversal to parent directories, while
+<code>.</code> refers to the current directory.</li>
+</ul>
+<p>When an application calls <code>EFI_FILE_PROTOCOL.Open()</code>, the
+abstraction layer parses the path string token by token. The underlying
+driver traverses the tree structure by resolving each node sequentially
+until it locates the target file or directory handle.</p>
+<h3 id="directory-enumeration-via-efi_file_info">Directory Enumeration
+via <code>EFI_FILE_INFO</code></h3>
+<p>Because UEFI lacks the POSIX-style <code>opendir()</code> or
+<code>readdir()</code> functions, directory enumeration is handled
+directly through the <code>Read()</code> function of the
+<code>EFI_FILE_PROTOCOL</code>:</p>
+<ol type="1">
+<li><strong>Opening the Directory:</strong> The caller opens the target
+directory with read access.</li>
+<li><strong>Reading Entries:</strong> Calling <code>Read()</code> on an
+open directory handle does not read binary file data. Instead, it
+populates a caller-allocated buffer with an <code>EFI_FILE_INFO</code>
+structure corresponding to the next directory entry.</li>
+<li><strong>Metadata Retrieval:</strong> Each <code>EFI_FILE_INFO</code>
+record contains critical attributes:
+<ul>
+<li>File name (null-terminated UTF-16 string)</li>
+<li>File size and physical space allocated</li>
+<li>Creation, last access, and modification timestamps</li>
+<li>Attribute masks (Read-Only, Hidden, System, Directory, Archive)</li>
+</ul></li>
+<li><strong>End of Directory:</strong> The driver advances its internal
+cursor with each read. When the end of the directory is reached, the
+buffer size is returned as zero.</li>
+<li><strong>Rewinding:</strong> Setting the file position to zero via
+the <code>SetPosition()</code> function resets the directory cursor back
+to the first entry.</li>
+</ol>
+<h3 id="supporting-different-underlying-file-systems">Supporting
+Different Underlying File Systems</h3>
+<p>The UEFI specification mandates support for the FAT family (FAT12,
+FAT16, and FAT32) for the EFI System Partition. However, the abstraction
+layer is agnostic to the underlying on-disk layout.</p>
+<p>Third-party or custom UEFI drivers can implement the
+<code>EFI_SIMPLE_FILE_SYSTEM_PROTOCOL</code> for non-FAT file systems
+such as ext4, Btrfs, or NTFS. As long as the driver's implementation
+translates the file system's native inode tables, B-trees, or Master
+File Tables into the standard <code>EFI_FILE_PROTOCOL</code> methods,
+the UEFI boot manager and applications can navigate the resulting
+directory structures identically without modifications to the core
+firmware.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-handles-file-system-directory-structures';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

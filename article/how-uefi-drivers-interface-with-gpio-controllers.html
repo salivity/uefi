@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Drivers Interface with GPIO Controllers - uefi</title>
+    <meta name="description" content="This article explores how Unified Extensible Firmware Interface (UEFI) drivers interact with platform-specific General Purpose Input/Output (GPIO) controllers. It covers the architectural separation between platform-independent code and silicon-specific h">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-drivers-interface-with-gpio-controllers">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Drivers Interface with GPIO Controllers - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-drivers-interface-with-gpio-controllers" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article explores how Unified Extensible Firmware Interface (UEFI) drivers interact with platform-specific General Purpose Input/Output (GPIO) controllers. It covers the architectural separation between platform-independent code and silicon-specific h" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-drivers-interface-with-gpio-controllers">How UEFI
+Drivers Interface with GPIO Controllers</h1>
+<p>This article explores how Unified Extensible Firmware Interface
+(UEFI) drivers interact with platform-specific General Purpose
+Input/Output (GPIO) controllers. It covers the architectural separation
+between platform-independent code and silicon-specific hardware, the
+role of custom and standardized firmware protocols, direct register
+manipulation via Memory-Mapped I/O (MMIO), and the eventual handover of
+GPIO pin states and descriptors to the operating system through ACPI
+tables.</p>
+<h3 id="architectural-hierarchy-in-edk-ii">Architectural Hierarchy in
+EDK II</h3>
+<p>In standard UEFI implementations, such as TianoCore EDK II, the
+firmware isolates hardware-agnostic logic from silicon-specific
+implementations. The architecture divides hardware interaction across
+distinct firmware phases, primarily the Pre-EFI Initialization (PEI) and
+Driver Execution Environment (DXE) phases.</p>
+<p>Platform-specific GPIO controllers reside on the system-on-chip (SoC)
+or platform controller hub (PCH). Because every silicon vendor (such as
+Intel, AMD, or ARM-based SoC manufacturers) designs their GPIO register
+layouts, pad multiplexing, and interrupt banks differently, the UEFI
+core cannot interact with these pins directly through a universal
+specification. Instead, silicon initialization code provides a driver
+that encapsulates these hardware nuances, exposing standard or
+semi-standard interfaces to consumer drivers.</p>
+<h3 id="protocols-and-architectural-abstraction">Protocols and
+Architectural Abstraction</h3>
+<p>In the DXE phase, a silicon-specific GPIO driver publishes an
+interface called an <code>EFI_PROTOCOL</code>. While the UEFI
+specification does not mandate a universal GPIO protocol, vendors define
+standard interfaces (often designated as <code>EFI_GPIO_PROTOCOL</code>
+or vendor-specific variants like <code>PCH_GPIO_PROTOCOL</code>).</p>
+<p>Consumer drivers—such as those controlling panel backlights, I2C bus
+expanders, TPM chips, or discrete power-delivery circuits—locate this
+protocol using the <code>gBS-&gt;LocateProtocol()</code> boot service.
+The protocol function table exposes platform-agnostic APIs to manipulate
+pins, including:</p>
+<ul>
+<li><strong>Pin Direction Configuration:</strong> Setting pins to input,
+output, or alternative function modes.</li>
+<li><strong>State Manipulation:</strong> Driving pins high or low
+(<code>SetPull()</code>, <code>WritePin()</code>).</li>
+<li><strong>State Reading:</strong> Polling current pin levels
+(<code>ReadPin()</code>).</li>
+<li><strong>Multiplexing (Pinmux):</strong> Assigning specific
+controller functions (like UART, SPI, or I2C) to physical pads.</li>
+<li><strong>Interrupt and Wake Routing:</strong> Configuring electrical
+interrupt triggers and routing events to System Management Interrupts
+(SMI) or advanced configuration interfaces.</li>
+</ul>
+<h3 id="memory-mapped-io-mmio-and-register-access">Memory-Mapped I/O
+(MMIO) and Register Access</h3>
+<p>Beneath the protocol layer, the silicon-specific driver interacts
+directly with the GPIO controller hardware using Memory-Mapped I/O
+(MMIO).</p>
+<p>During early boot, the firmware initializes base address registers
+(BARs) for the GPIO block. The driver uses platform-level I/O
+services—such as <code>EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL</code> or direct
+CPU memory access primitives—to read and write to pad configuration
+registers. These operations typically require:</p>
+<ol type="1">
+<li><strong>Pad Ownership and Protection:</strong> Unlocking register
+banks that prevent unauthorized modifications during runtime.</li>
+<li><strong>Configuration Masking:</strong> Modifying directional bits,
+slew rates, internal pull-up/pull-down resistors, and input inversion
+settings without disrupting adjacent pin definitions in the same
+register bank.</li>
+<li><strong>Synchronization and Fencing:</strong> Utilizing memory
+barriers to ensure register writes complete in order, preventing race
+conditions during time-sensitive peripheral resets.</li>
+</ol>
+<h3 id="table-driven-static-configuration">Table-Driven Static
+Configuration</h3>
+<p>Most modern platforms avoid hardcoding pin transitions into
+procedural driver code. Instead, platform engineers define pin states in
+declarative data tables during firmware compilation.</p>
+<p>The platform board package (Board DXE/PEI driver) provides a
+platform-specific pin configuration table specifying every pad's
+required reset state, electrical characteristics, and ownership flags
+(Host, CSME/PSP, or EC). The silicon driver iterates through this table
+during PEI or DXE, writing configuration blocks sequentially to place
+all pins into a known, safe electrical state before secondary peripheral
+drivers execute.</p>
+<h3 id="handoff-to-the-operating-system-via-acpi">Handoff to the
+Operating System via ACPI</h3>
+<p>UEFI drivers maintain authority over GPIO controllers only until
+<code>ExitBootServices()</code> is invoked. To allow the operating
+system to interface with platform GPIOs, UEFI generates or patches ACPI
+tables during the boot sequence:</p>
+<ul>
+<li><strong>Differentiated System Description Table (DSDT):</strong>
+UEFI injects GPIO controllers as ACPI devices (<code>PNP0C40</code> or
+vendor-specific hardware IDs).</li>
+<li><strong>Resource Descriptors:</strong> Peripheral devices declared
+in ACPI describe their GPIO pin connections via <code>GpioIo()</code>
+and <code>GpioInt()</code> connection descriptors, indicating pin
+numbers and electrical parameters defined during the UEFI boot
+phase.</li>
+<li><strong>GPIO Operation Regions (<code>OpRegion</code>):</strong>
+UEFI can define custom ACPI address spaces, allowing ACPI control
+methods (<code>_OSC</code>, <code>_DSM</code>, or power resource
+transitions) to evaluate and change pin states using native OS GPIO
+drivers after boot services terminate.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-drivers-interface-with-gpio-controllers';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

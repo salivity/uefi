@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preserving Vendor Flags in UEFI Firmware Updates - uefi</title>
+    <meta name="description" content="Upgrading UEFI firmware requires updating core low-level system code without erasing unique machine states, hardware configurations, or vendor-specific feature flags. During a firmware update procedure, vendors preserve these configuration flags by isolat">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/preserving-vendor-flags-in-uefi-firmware-updates">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Preserving Vendor Flags in UEFI Firmware Updates - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/preserving-vendor-flags-in-uefi-firmware-updates" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Upgrading UEFI firmware requires updating core low-level system code without erasing unique machine states, hardware configurations, or vendor-specific feature flags. During a firmware update procedure, vendors preserve these configuration flags by isolat" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="preserving-vendor-flags-in-uefi-firmware-updates">Preserving
+Vendor Flags in UEFI Firmware Updates</h1>
+<p>Upgrading UEFI firmware requires updating core low-level system code
+without erasing unique machine states, hardware configurations, or
+vendor-specific feature flags. During a firmware update procedure,
+vendors preserve these configuration flags by isolating non-volatile
+storage regions, utilizing protected NVRAM variable stores, staging
+persistent data via UEFI Capsule Update structures, and executing schema
+migration scripts upon the first post-flash boot.</p>
+<h3 id="segmentation-of-the-spi-flash-memory">Segmentation of the SPI
+Flash Memory</h3>
+<p>Modern motherboards store firmware on a Serial Peripheral Interface
+(SPI) flash chip. This physical chip is divided into distinct, isolated
+logical partitions. Critical code resides in write-targeted partitions
+(such as the main BIOS region), while vendor-specific flags, hardware
+profiles, and serial numbers are stored in segregated regions, often
+referred to as Vital Product Data (VPD), the Variable Store, or
+Board-Specific Data.</p>
+<p>During standard flashing procedures, the flash update tool—whether
+running via an OS daemon or within the UEFI environment itself—targets
+only the specific flash blocks containing executable binaries,
+explicitly masking out and skipping write operations to the
+configuration blocks.</p>
+<h3 id="protected-nvram-variables-with-vendor-guids">Protected NVRAM
+Variables with Vendor GUIDs</h3>
+<p>Configuration flags are typically implemented as UEFI NVRAM
+variables. These variables are defined by attributes like
+<code>EFI_VARIABLE_NON_VOLATILE</code> and categorized under
+vendor-specific Globally Unique Identifiers (GUIDs).</p>
+<p>Because the UEFI specification isolates configuration data under
+distinct GUID namespaces, the update mechanism treats vendor blocks
+differently than runtime code. Standard operating variables may be
+cleared, but variables associated with the vendor’s custom GUID remain
+untouched in the NVRAM region of the SPI flash unless a full factory
+reset (clobbering NVRAM) is explicitly mandated.</p>
+<h3 id="the-uefi-capsule-update-mechanism">The UEFI Capsule Update
+Mechanism</h3>
+<p>When a system performs a modern update via the UEFI Capsule Update
+standard, the process preserves settings through controlled memory
+staging:</p>
+<ol type="1">
+<li><strong>Pre-Update Verification:</strong> The operating system
+passes the update payload (capsule) to the firmware via system memory or
+the EFI System Partition (ESP), calling
+<code>UpdateCapsule()</code>.</li>
+<li><strong>Flag Serialization:</strong> If the update requires
+rewriting the entire flash layout, the existing firmware serializes
+active vendor configuration flags and writes them to a reserved,
+persistent memory area or temporary flash scratchpad.</li>
+<li><strong>Firmware Application:</strong> The system resets into a
+minimal Pre-EFI Initialization (PEI) state, verifies the capsule
+signature, and writes the new payload to the executable ROM
+sections.</li>
+<li><strong>Restoration:</strong> If data was staged, the PEI or early
+Driver Execution Environment (DXE) phase reads the backed-up flags from
+the scratchpad and writes them back into the new environment.</li>
+</ol>
+<h3 id="schema-migration-handlers">Schema Migration Handlers</h3>
+<p>When a firmware update fundamentally alters how a configuration flag
+is represented (for example, moving from a 1-byte boolean to a multi-bit
+bitmask), preserving the raw binary value is insufficient.</p>
+<p>To handle schema changes, vendors bundle data-migration drivers into
+the DXE phase of the update capsule. During the first boot following the
+flash operation, these drivers execute before user access is restored.
+The driver inspects the old variable layout, maps the legacy flag
+settings to the new data format, commits the updated structures to the
+NVRAM store, and deprecates the old data blocks safely without resetting
+the system to default states.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/preserving-vendor-flags-in-uefi-firmware-updates';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

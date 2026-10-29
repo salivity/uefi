@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Simple Pointer Protocol Explained - uefi</title>
+    <meta name="description" content="The Unified Extensible Firmware Interface (UEFI) Simple Pointer protocol provides a standardized interface for interacting with relative pointing devices such as mice, trackballs, and touchpads during the pre-boot phase. This article explores the architec">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-simple-pointer-protocol-explained">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Simple Pointer Protocol Explained - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-simple-pointer-protocol-explained" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Unified Extensible Firmware Interface (UEFI) Simple Pointer protocol provides a standardized interface for interacting with relative pointing devices such as mice, trackballs, and touchpads during the pre-boot phase. This article explores the architec" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-simple-pointer-protocol-explained">UEFI Simple Pointer
+Protocol Explained</h1>
+<p>The Unified Extensible Firmware Interface (UEFI) Simple Pointer
+protocol provides a standardized interface for interacting with relative
+pointing devices such as mice, trackballs, and touchpads during the
+pre-boot phase. This article explores the architecture, core data
+structures, and operational mechanics of the
+<code>EFI_SIMPLE_POINTER_PROTOCOL</code>, detailing how firmware and
+pre-boot applications capture user input before an operating system
+loads.</p>
+<h3 id="core-function-of-the-protocol">Core Function of the
+Protocol</h3>
+<p>The primary role of the Simple Pointer protocol is to abstract
+pointing device hardware into a platform-independent model based on
+relative motion. Unlike modern operating systems that handle complex
+multi-touch gestures and high-precision absolute coordinates natively,
+UEFI environments often require lightweight, low-overhead input
+handling. The protocol standardizes input events so that pre-boot
+environments—such as UEFI shell tools, boot managers, and BIOS setup
+utility screens—can implement a graphical cursor.</p>
+<h3 id="key-components-and-architecture">Key Components and
+Architecture</h3>
+<p>The protocol is defined within the UEFI specification as
+<code>EFI_SIMPLE_POINTER_PROTOCOL</code>. When a pointer device is
+initialized by firmware, the corresponding driver installs this protocol
+on the device handle.</p>
+<p>The protocol structure consists of the following primary members:</p>
+<ul>
+<li><strong><code>Reset()</code></strong>: A function that resets the
+pointer hardware to its initial state, clearing any internal buffers and
+pending movement data.</li>
+<li><strong><code>GetState()</code></strong>: A function that retrieves
+the current state of the pointer device and resets the internal relative
+counters back to zero.</li>
+<li><strong><code>WaitForInput</code></strong>: An event triggered
+whenever the pointer device has new state data available, allowing
+applications to block or wait efficiently rather than continuously
+polling the device.</li>
+<li><strong><code>Mode</code></strong>: A pointer to an
+<code>EFI_SIMPLE_POINTER_MODE</code> structure that contains runtime
+details about the device, including whether a pointing device is
+physically present and its movement resolution along the axes.</li>
+</ul>
+<h3 id="data-reporting-the-efi_simple_pointer_state">Data Reporting: The
+<code>EFI_SIMPLE_POINTER_STATE</code></h3>
+<p>When an application calls <code>GetState()</code>, the protocol
+populates the <code>EFI_SIMPLE_POINTER_STATE</code> structure. This
+structure tracks relative changes since the last poll:</p>
+<ul>
+<li><strong><code>RelativeMovementX</code></strong>: An integer
+indicating movement along the horizontal axis. Positive values indicate
+movement to the right; negative values indicate movement to the
+left.</li>
+<li><strong><code>RelativeMovementY</code></strong>: An integer
+indicating movement along the vertical axis. Positive values typically
+indicate movement downward; negative values indicate movement
+upward.</li>
+<li><strong><code>RelativeMovementZ</code></strong>: An integer
+indicating movement along the scroll axis, commonly tied to a mouse
+scroll wheel.</li>
+<li><strong><code>LeftButton</code></strong>: A boolean value that
+evaluates to <code>TRUE</code> if the primary pointer button is actively
+pressed.</li>
+<li><strong><code>RightButton</code></strong>: A boolean value that
+evaluates to <code>TRUE</code> if the secondary pointer button is
+actively pressed.</li>
+</ul>
+<p>Because the coordinates are relative rather than absolute, the
+consumer application is responsible for maintaining the cursor's
+absolute screen coordinates, applying acceleration curves, and enforcing
+boundary constraints against the display resolution.</p>
+<h3 id="simple-pointer-vs-absolute-pointer">Simple Pointer vs. Absolute
+Pointer</h3>
+<p>UEFI provides two distinct pointer protocols:</p>
+<ul>
+<li><strong>Simple Pointer Protocol</strong>: Designed for
+relative-coordinate devices like mice. Coordinates represent the
+distance and direction moved since the previous read.</li>
+<li><strong>Absolute Pointer Protocol</strong>: Designed for devices
+mapped directly to a display surface, such as touchscreens and
+digitizers. It returns absolute X, Y, and Z positions within a
+predefined coordinate range.</li>
+</ul>
+<p>The UEFI Simple Pointer protocol serves as the foundation for
+desktop-style navigation in firmware, enabling hardware-agnostic cursor
+tracking with minimal overhead.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-simple-pointer-protocol-explained';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

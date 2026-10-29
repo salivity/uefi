@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Variables and Kernel Command-Line Arguments - uefi</title>
+    <meta name="description" content="UEFI environment variables serve as a foundational mechanism for defining, storing, and passing kernel command-line arguments during the system boot process. Stored in non-volatile RAM (NVRAM), these variables allow the UEFI Boot Manager and intermediate">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-variables-and-kernel-command-line-arguments">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Variables and Kernel Command-Line Arguments - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-variables-and-kernel-command-line-arguments" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI environment variables serve as a foundational mechanism for defining, storing, and passing kernel command-line arguments during the system boot process. Stored in non-volatile RAM (NVRAM), these variables allow the UEFI Boot Manager and intermediate" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-variables-and-kernel-command-line-arguments">UEFI Variables
+and Kernel Command-Line Arguments</h1>
+<p>UEFI environment variables serve as a foundational mechanism for
+defining, storing, and passing kernel command-line arguments during the
+system boot process. Stored in non-volatile RAM (NVRAM), these variables
+allow the UEFI Boot Manager and intermediate bootloaders to supply
+configuration parameters directly to an operating system kernel. This
+article examines how UEFI variables encapsulate boot options, how the
+UEFI architecture delivers these parameters to the kernel, and the
+operational advantages this integration provides for modern system
+management.</p>
+<h3 id="the-role-of-boot-and-efi_load_option">The Role of
+<code>Boot####</code> and <code>EFI_LOAD_OPTION</code></h3>
+<p>At the firmware level, UEFI manages boot targets using variables
+named <code>Boot####</code> (where <code>####</code> is a four-digit
+hexadecimal number) referenced by the <code>BootOrder</code> variable.
+Each <code>Boot####</code> variable stores a standardized binary
+structure known as <code>EFI_LOAD_OPTION</code>.</p>
+<p>The <code>EFI_LOAD_OPTION</code> structure consists of:</p>
+<ul>
+<li><strong>Attributes:</strong> Flags defining whether the entry is
+active or hidden.</li>
+<li><strong>FilePathList:</strong> The device path to the target EFI
+binary (such as a bootloader or a kernel with an embedded EFI
+stub).</li>
+<li><strong>Description:</strong> A human-readable label for the boot
+option.</li>
+<li><strong>OptionalData:</strong> A binary or string payload placed at
+the end of the structure.</li>
+</ul>
+<p>Kernel command-line arguments are stored inside this
+<code>OptionalData</code> field. When the UEFI firmware loads a binary,
+it populates an instance of the <code>EFI_LOADED_IMAGE_PROTOCOL</code>
+interface in memory. The data located in <code>OptionalData</code> is
+copied to the <code>LoadOptions</code> pointer of this protocol, while
+<code>LoadOptionsSize</code> tracks the length of the string.</p>
+<h3 id="direct-kernel-execution-via-the-efi-boot-stub">Direct Kernel
+Execution via the EFI Boot Stub</h3>
+<p>Modern operating system kernels, including Linux compiled with
+<code>CONFIG_EFI_STUB</code>, can act as standalone EFI applications.
+When using the EFI stub:</p>
+<ol type="1">
+<li>The UEFI Boot Manager reads the selected <code>Boot####</code>
+variable from NVRAM.</li>
+<li>The firmware initializes the kernel image into memory and exposes
+the <code>EFI_LOADED_IMAGE_PROTOCOL</code>.</li>
+<li>The kernel's early EFI entry point accesses <code>LoadOptions</code>
+directly through the protocol.</li>
+<li>The kernel decodes this payload (typically an ASCII or UTF-16
+string) into standard kernel boot parameters (such as
+<code>root=UUID=...</code>, <code>ro</code>, and <code>quiet</code>)
+before exiting UEFI boot services and transitioning into runtime
+mode.</li>
+</ol>
+<p>This method eliminates the need for a secondary bootloader like GRUB,
+allowing the firmware to directly initialize the operating system using
+arguments held entirely within NVRAM.</p>
+<h3 id="interaction-with-intermediate-bootloaders">Interaction with
+Intermediate Bootloaders</h3>
+<p>When an intermediate bootloader (such as GRUB, rEFInd, or
+systemd-boot) is used, UEFI variables still govern parameter handling,
+either directly or indirectly:</p>
+<ul>
+<li><strong>Receiving Arguments:</strong> The intermediate bootloader
+receives the initial command line via <code>LoadOptions</code> from the
+firmware. It can use these options to select a configuration profile,
+alter boot behavior, or append parameters.</li>
+<li><strong>Stateful Communication:</strong> Bootloaders frequently
+write to custom or standardized UEFI variables (such as
+<code>LoaderCommandLine</code> or <code>LoaderEntrySelected</code>) to
+communicate state to the OS or preserve configuration across
+reboots.</li>
+<li><strong>Overriding Defaults:</strong> Administrators can pass
+fallback flags to the bootloader itself through firmware NVRAM variables
+without mounting or editing storage filesystems.</li>
+</ul>
+<h3 id="runtime-configuration-and-security-considerations">Runtime
+Configuration and Security Considerations</h3>
+<p>Because UEFI variables are exposed to the operating system through
+UEFI Runtime Services, administrators can read and modify kernel
+arguments directly from user space using utilities like
+<code>efibootmgr</code>. Updating a kernel command line requires
+updating the <code>OptionalData</code> payload inside the relevant
+<code>Boot####</code> variable, without altering the disk's partition
+table or master boot record.</p>
+<p>Under UEFI Secure Boot, this capability introduces security
+trade-offs. If a user-space process with elevated privileges can alter
+<code>Boot####</code> variables, it could potentially inject malicious
+command-line parameters (such as <code>init=/bin/sh</code> or parameters
+disabling security modules). To mitigate this:</p>
+<ul>
+<li><strong>Unified Kernel Images (UKIs):</strong> Modern Linux
+implementations often combine the kernel, initramfs, and a static,
+signed command line into a single cryptographic binary. In a UKI setup,
+the kernel ignores external <code>LoadOptions</code> passed by the NVRAM
+variable unless explicitly permitted, preventing unauthorized parameter
+tampering.</li>
+<li><strong>Firmware Protections:</strong> Firmware implementations can
+restrict variable write access to authenticated updates or apply policy
+checks before honoring runtime-modified parameters.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-variables-and-kernel-command-line-arguments';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

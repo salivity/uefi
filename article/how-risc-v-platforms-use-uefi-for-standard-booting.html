@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How RISC-V Platforms Use UEFI for Standard Booting - uefi</title>
+    <meta name="description" content="RISC-V platforms are rapidly adopting the Unified Extensible Firmware Interface (UEFI) to establish an interoperable, vendor-neutral boot sequence across diverse hardware ecosystems. Historically, early RISC-V devices depended heavily on proprietary initi">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-risc-v-platforms-use-uefi-for-standard-booting">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How RISC-V Platforms Use UEFI for Standard Booting - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-risc-v-platforms-use-uefi-for-standard-booting" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="RISC-V platforms are rapidly adopting the Unified Extensible Firmware Interface (UEFI) to establish an interoperable, vendor-neutral boot sequence across diverse hardware ecosystems. Historically, early RISC-V devices depended heavily on proprietary initi" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-risc-v-platforms-use-uefi-for-standard-booting">How RISC-V
+Platforms Use UEFI for Standard Booting</h1>
+<p>RISC-V platforms are rapidly adopting the Unified Extensible Firmware
+Interface (UEFI) to establish an interoperable, vendor-neutral boot
+sequence across diverse hardware ecosystems. Historically, early RISC-V
+devices depended heavily on proprietary initialization routines and
+tightly coupled device configurations. By adopting UEFI specifications,
+RISC-V aligns with established enterprise and PC architectures, enabling
+a single, unmodified operating system distribution to detect hardware,
+load bootloaders, and initialize the system cleanly.</p>
+<h3 id="the-role-of-privilege-levels-in-risc-v-uefi">The Role of
+Privilege Levels in RISC-V UEFI</h3>
+<p>The RISC-V architecture defines distinct privilege modes to isolate
+hardware control and execution environments. UEFI fits directly into
+this hierarchy by cooperating with the underlying Supervisor Binary
+Interface (SBI):</p>
+<ul>
+<li><strong>Machine Mode (M-Mode):</strong> The most privileged
+execution tier, typically running low-level initialization firmware such
+as OpenSBI. M-Mode firmware directly interfaces with the silicon, sets
+up basic memory controllers, and exposes standardized SBI calls.</li>
+<li><strong>Supervisor Mode (S-Mode):</strong> The execution tier where
+the UEFI implementation operates. S-Mode lacks direct access to
+low-level hardware registers governed by M-mode, relying instead on SBI
+calls to manage timers, inter-processor interrupts (IPIs), and core
+power states. Operating system kernels also execute in S-Mode.</li>
+<li><strong>User Mode (U-Mode):</strong> The unprivileged layer reserved
+for user-space applications.</li>
+</ul>
+<p>Because the UEFI environment runs within S-mode, it interacts with
+platform resources predictably, relying on standard SBI calls rather
+than direct, platform-specific hardware manipulations.</p>
+<h3 id="firmware-implementations-edk-ii-and-u-boot">Firmware
+Implementations: EDK II and U-Boot</h3>
+<p>RISC-V hardware vendors achieve UEFI compliance primarily through two
+open-source firmware platforms:</p>
+<ol type="1">
+<li><strong>Tianocore EDK II:</strong> The standard reference
+implementation for enterprise-grade UEFI. On RISC-V, EDK II executes in
+S-Mode to provide standard UEFI Boot Services and Runtime Services. It
+mimics traditional enterprise environments, making it ideal for RISC-V
+servers and high-performance workstations.</li>
+<li><strong>U-Boot (with UEFI Payloads):</strong> Widely utilized in
+embedded and development boards, U-Boot includes a built-in UEFI
+subsystem. U-Boot can initialize platform devices, instantiate UEFI
+interfaces, and expose the standard UEFI API directly to downstream
+bootloaders.</li>
+</ol>
+<h3 id="passing-platform-hardware-descriptions">Passing Platform
+Hardware Descriptions</h3>
+<p>Operating systems require an accurate map of system resources,
+including memory layouts, peripherals, and interrupt lines. In a
+UEFI-driven RISC-V platform, this information is supplied through
+standard UEFI Configuration Tables:</p>
+<ul>
+<li><strong>Flattened Device Tree (FDT):</strong> While common in
+embedded systems, the FDT is passed via a standard UEFI configuration
+table identifier rather than being hardcoded at a specific memory
+offset. This allows UEFI to dynamically adjust device trees based on
+runtime discoveries before handing off control to the kernel.</li>
+<li><strong>Advanced Configuration and Power Interface (ACPI):</strong>
+For enterprise and server-grade RISC-V environments, ACPI tables replace
+device trees. UEFI exposes these tables to the OS via standard root
+system description pointers, matching the workflow used in modern x86
+and AArch64 servers.</li>
+</ul>
+<h3 id="the-unified-boot-sequence">The Unified Boot Sequence</h3>
+<p>The standardized boot sequence progresses through well-defined
+stages:</p>
+<ol type="1">
+<li><strong>Reset and M-Mode Execution:</strong> The CPU starts
+executing from ROM, transitioning to a secondary stage bootloader or
+OpenSBI in M-Mode. Basic hardware features and memory are
+initialized.</li>
+<li><strong>UEFI Initialization (S-Mode):</strong> OpenSBI drops
+execution to S-Mode, launching the UEFI firmware (EDK II or U-Boot).
+UEFI sets up memory allocation services, protocol drivers, and
+configuration tables.</li>
+<li><strong>Boot Manager Execution:</strong> UEFI scans non-volatile
+storage, network interfaces, or removable media for standard EFI System
+Partitions (ESP) to locate valid boot applications (such as
+<code>EFI/BOOT/BOOTRISCV64.EFI</code>).</li>
+<li><strong>Bootloader Handoff:</strong> The UEFI Boot Manager launches
+intermediate loaders like GRUB or systemd-boot. The bootloader uses UEFI
+Boot Services to load the OS kernel and initial RAM disk (initramfs)
+into memory.</li>
+<li><strong>ExitBootServices Call:</strong> The OS kernel calls
+<code>ExitBootServices()</code>. UEFI terminates its temporary memory
+allocation and boot services, hands over final control of the processor
+cores, and leaves only UEFI Runtime Services accessible for platform
+management tasks like setting non-volatile variables.</li>
+</ol>
+<h3 id="standardization-through-brs-and-ebbr">Standardization Through
+BRS and EBBR</h3>
+<p>To avoid vendor-specific deviations, the RISC-V ecosystem defines
+strict profiles:</p>
+<ul>
+<li><strong>Embedded Base Boot Requirements (EBBR):</strong> Tailored
+for single-board computers and embedded devices, EBBR mandates a subset
+of UEFI features combined with Device Tree handoffs, allowing low-cost
+platforms to boot generic distributions.</li>
+<li><strong>Boot and Runtime Services (BRS):</strong> Developed by the
+RISC-V International community, BRS codifies full enterprise-class boot
+standards. BRS requires conformant UEFI implementations, ACPI support,
+and standard SBI versions, ensuring enterprise distributions like
+Fedora, Debian, or openSUSE operate seamlessly out of the box.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-risc-v-platforms-use-uefi-for-standard-booting';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

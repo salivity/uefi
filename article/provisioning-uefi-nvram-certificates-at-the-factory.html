@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Provisioning UEFI NVRAM Certificates at the Factory - uefi</title>
+    <meta name="description" content="This article details how Original Equipment Manufacturers (OEMs) and Original Design Manufacturers (ODMs) inject cryptographic certificates into UEFI Non-Volatile Random-Access Memory (NVRAM) during device production. It covers the specific keys required">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/provisioning-uefi-nvram-certificates-at-the-factory">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Provisioning UEFI NVRAM Certificates at the Factory - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/provisioning-uefi-nvram-certificates-at-the-factory" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article details how Original Equipment Manufacturers (OEMs) and Original Design Manufacturers (ODMs) inject cryptographic certificates into UEFI Non-Volatile Random-Access Memory (NVRAM) during device production. It covers the specific keys required" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1
+id="provisioning-uefi-nvram-certificates-at-the-factory">Provisioning
+UEFI NVRAM Certificates at the Factory</h1>
+<p>This article details how Original Equipment Manufacturers (OEMs) and
+Original Design Manufacturers (ODMs) inject cryptographic certificates
+into UEFI Non-Volatile Random-Access Memory (NVRAM) during device
+production. It covers the specific keys required for UEFI Secure Boot,
+the automated factory mechanisms used to commit these credentials to SPI
+flash memory, and the final lockdown steps that transition firmware from
+manufacturing mode to secure user mode.</p>
+<h2 id="the-hierarchy-of-uefi-secure-boot-keys">The Hierarchy of UEFI
+Secure Boot Keys</h2>
+<p>Before provisioning occurs, manufacturers assemble a standard
+hierarchy of keys and databases defined by the UEFI Specification:</p>
+<ul>
+<li><strong>Platform Key (PK):</strong> Establishes a trust relationship
+between the platform owner (the OEM) and the platform firmware. It
+controls access to the KEK database.</li>
+<li><strong>Key Exchange Key (KEK):</strong> Establishes trust between
+the operating system and the platform firmware. It controls updates to
+the authorized (<code>db</code>) and forbidden (<code>dbx</code>)
+signature databases. OEMs typically include their own KEK alongside the
+Microsoft Corporation KEK CA.</li>
+<li><strong>Authorized Signature Database (<code>db</code>):</strong>
+Contains certificates, public keys, and cryptographic hashes used to
+authenticate bootloaders, option ROMs, and OS kernels (such as the
+Microsoft Windows Production PCA and Microsoft UEFI CA).</li>
+<li><strong>Forbidden Signature Database (<code>dbx</code>):</strong>
+Contains revoked keys, certificates, and binary hashes known to be
+vulnerable or malicious.</li>
+</ul>
+<h2 id="factory-provisioning-methods">Factory Provisioning Methods</h2>
+<p>Platform manufacturers employ two primary architectural approaches to
+inject these certificates into NVRAM: pre-programming raw SPI flash
+images or dynamic in-line execution via firmware services.</p>
+<h3 id="1-pre-populated-nvram-variable-store-binary-injection">1.
+Pre-Populated NVRAM Variable Store (Binary Injection)</h3>
+<p>In high-volume automated surface-mount technology (SMT) lines,
+flashing the physical chip directly prior to or immediately following
+board soldering is the fastest method:</p>
+<ol type="1">
+<li><strong>Variable Store Construction:</strong> Off-line build tools
+compile the default UEFI NVRAM variable store binary file. This file
+contains the authenticated variable structures (formatted according to
+the UEFI specification's
+<code>EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS</code> definitions)
+including the pre-enrolled <code>db</code>, <code>dbx</code>,
+<code>KEK</code>, and <code>PK</code>.</li>
+<li><strong>SPI Image Integration:</strong> The compiled variable store
+is merged into the designated NVRAM offset of the primary system
+BIOS/UEFI ROM using tools such as Intel Flash Image Tool (FIT) or
+vendor-specific BIOS builders.</li>
+<li><strong>Direct Flashing:</strong> Automated Gang Programmers flash
+this unified image directly onto the physical SPI NOR flash chip before
+the chip is placed on the motherboard, or via automated In-System
+Programming (ISP) headers on the assembly line.</li>
+</ol>
+<h3 id="2-in-line-provisioning-in-uefi-setup-mode">2. In-Line
+Provisioning in UEFI Setup Mode</h3>
+<p>Alternatively, manufacturers program blank or unprovisioned boards
+and execute provisioning dynamically during the Post-Assembly
+Verification and Testing (PAVT) phase:</p>
+<ol type="1">
+<li><strong>Operating in Setup Mode:</strong> The device boots initially
+with no Platform Key installed, placing the UEFI subsystem in
+<strong>Setup Mode</strong> (<code>SetupMode = 1</code>). In this mode,
+firmware does not enforce authentication checks on modifications to
+secure boot databases.</li>
+<li><strong>Automated Factory Harness:</strong> The unit boots into a
+specialized, ephemeral execution environment—typically an automated UEFI
+Shell, a bare-metal factory diagnostic environment, or an embedded
+Manufacturing Linux environment via a local network (PXE) or dedicated
+USB fixture.</li>
+<li><strong>Executing <code>SetVariable()</code> Calls:</strong> A
+provisioning script loads signed variable binaries (e.g.,
+<code>.auth</code> files) retrieved from a local factory server or
+Hardware Security Module (HSM). The script commits variables via the
+UEFI Runtime Services API using the <code>SetVariable()</code> interface
+in a strict order:
+<ul>
+<li>Write <code>dbx</code> (Revocation list)</li>
+<li>Write <code>db</code> (Allowed signatures)</li>
+<li>Write <code>KEK</code> (Key Exchange Keys)</li>
+<li>Write <code>PK</code> (Platform Key)</li>
+</ul></li>
+</ol>
+<h2 id="transitioning-to-user-mode-and-hardware-locking">Transitioning
+to User Mode and Hardware Locking</h2>
+<p>The commitment of the Platform Key (<code>PK</code>) triggers an
+internal hardware-enforced state change:</p>
+<ul>
+<li><strong>Entering User Mode:</strong> As soon as the <code>PK</code>
+is written, the platform automatically changes <code>SetupMode</code>
+from <code>1</code> to <code>0</code> (<strong>User Mode</strong>) and
+sets <code>SecureBoot</code> to <code>1</code>. Subsequent updates to
+the <code>KEK</code>, <code>db</code>, or <code>dbx</code> strictly
+require cryptographic authorization signed by a corresponding private
+key.</li>
+<li><strong>Hardware Root of Trust Binding:</strong> On platforms
+leveraging hardware-level root of trust (such as Intel Boot Guard or AMD
+Platform Secure Boot), manufacturing line test fixtures blow physical
+One-Time Programmable (OTP) eFuses on the SoC/CPU. These fuses
+permanently store the cryptographic hash of the OEM's signing key, tying
+the silicon directly to the authenticated boot block in the SPI
+flash.</li>
+<li><strong>SPI Flash Lockdown:</strong> Factory scripts set the Flash
+Descriptor to read-only, enable BIOS Guard/SMM protections, and set
+chipset control registers (such as <code>BIOS_CNTL</code> and
+<code>SMM_BWP</code>) to prevent arbitrary writes to NVRAM from outside
+authenticated System Management Mode (SMM) runtime handlers.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/provisioning-uefi-nvram-certificates-at-the-factory';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

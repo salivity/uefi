@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Uses Partition GUIDs to Identify Volumes - uefi</title>
+    <meta name="description" content="Unified Extensible Firmware Interface (UEFI) firmware relies on Globally Unique Identifiers (GUIDs) within the GUID Partition Table (GPT) scheme to accurately distinguish and boot from storage volumes. Unlike legacy BIOS systems that depend on hardcoded s">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-uses-partition-gui-ds-to-identify-volumes">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Uses Partition GUIDs to Identify Volumes - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-uses-partition-gui-ds-to-identify-volumes" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Unified Extensible Firmware Interface (UEFI) firmware relies on Globally Unique Identifiers (GUIDs) within the GUID Partition Table (GPT) scheme to accurately distinguish and boot from storage volumes. Unlike legacy BIOS systems that depend on hardcoded s" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-uses-partition-guids-to-identify-volumes">How UEFI Uses
+Partition GUIDs to Identify Volumes</h1>
+<p>Unified Extensible Firmware Interface (UEFI) firmware relies on
+Globally Unique Identifiers (GUIDs) within the GUID Partition Table
+(GPT) scheme to accurately distinguish and boot from storage volumes.
+Unlike legacy BIOS systems that depend on hardcoded sector locations and
+fragile drive ordering, UEFI uses 128-bit Partition GUIDs to
+deterministically identify the EFI System Partition (ESP), map operating
+system bootloaders, and track distinct data drives across system reboots
+and hardware reconfigurations.</p>
+<h3 id="the-distinction-between-type-guids-and-unique-guids">The
+Distinction Between Type GUIDs and Unique GUIDs</h3>
+<p>The GPT specification defines two critical GUIDs for every disk
+partition, both of which serve distinct functions for UEFI firmware:</p>
+<ol type="1">
+<li><strong>Partition Type GUID:</strong> This identifier defines the
+intended role or content of the partition. UEFI firmware specifically
+scans for the standardized EFI System Partition Type GUID
+(<code>C12A7328-F81F-11D2-BA4B-00A0C93EC93B</code>). When the firmware
+encounters this value, it recognizes the partition as a system volume
+containing executable UEFI drivers, applications, and operating system
+bootloaders. Other type GUIDs designate vendor-specific system volumes,
+recovery partitions, or general basic data storage.</li>
+<li><strong>Unique Partition GUID:</strong> Generated at the time of
+partition creation, this 128-bit value is mathematically guaranteed to
+be unique to that specific volume instance. The firmware uses this value
+to single out one particular partition among multiple physical disks or
+identical partition types.</li>
+</ol>
+<h3 id="uefi-device-paths-and-nvram-variables">UEFI Device Paths and
+NVRAM Variables</h3>
+<p>UEFI maintains its boot configuration within non-volatile RAM (NVRAM)
+as numbered variables (such as <code>Boot0001</code> or
+<code>BootCurrent</code>). Each boot entry contains a structured UEFI
+Device Path that describes the hardware route to a specific target
+file.</p>
+<p>Instead of relying on volatile hardware indicators like SATA port
+numbers or PCIe bus positions, the firmware constructs a <strong>Hard
+Drive Media Device Path</strong> node. This node encapsulates the
+partition’s starting LBA (Logical Block Address), size, and crucially,
+its Unique Partition GUID. A typical device path resolves to a format
+structurally similar to:</p>
+<p><code>PciRoot(0x0)/.../HD(1,GPT,E8B2C456-1234-ABCD-EF01-23456789ABCD)/File(\EFI\BOOT\BOOTX64.EFI)</code></p>
+<p>By evaluating the embedded Unique Partition GUID, the firmware
+locates the exact partition target regardless of whether drives have
+been physically moved to different ports or storage controllers have
+re-enumerated.</p>
+<h3 id="volume-mounting-and-boot-execution">Volume Mounting and Boot
+Execution</h3>
+<p>During the Boot Device Selection (BDS) phase, the UEFI firmware
+initiates the following process:</p>
+<ol type="1">
+<li><strong>Table Parsing:</strong> The firmware queries connected
+storage devices, reads the Primary GPT Header, and parses the Partition
+Entry Array.</li>
+<li><strong>Handle Creation:</strong> For every valid partition found,
+the firmware creates a device handle and attaches protocol interfaces to
+it, including the <code>EFI_BLOCK_IO_PROTOCOL</code> and
+<code>EFI_DISK_IO_PROTOCOL</code>.</li>
+<li><strong>Identity Verification:</strong> The firmware attaches a
+<code>DEVICE_PATH_PROTOCOL</code> containing the Unique Partition GUID
+to the handle.</li>
+<li><strong>Filesystem Binding:</strong> If the partition matches the
+ESP Type GUID, the firmware attaches the
+<code>EFI_SIMPLE_FILE_SYSTEM_PROTOCOL</code>, enabling native FAT32
+directory navigation.</li>
+<li><strong>Execution:</strong> The firmware matches its stored NVRAM
+boot target to the handle bearing the correct Unique Partition GUID,
+loads the designated executable into system memory, and transfers
+control to the operating system bootloader.</li>
+</ol>
+<p>This reliance on GUID-driven identification eliminates drive mapping
+conflicts, prevents accidental booting from mirrored or cloned drives,
+and provides a stable, hardware-agnostic foundation for modern operating
+system initialization.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-uses-partition-gui-ds-to-identify-volumes';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

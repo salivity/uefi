@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Verifies Hardware Component Authenticity - uefi</title>
+    <meta name="description" content="During manufacturing, UEFI firmware images verify hardware component authenticity by leveraging hardware-based Roots of Trust, cryptographic identity provisioning, and standard attestation protocols. This process ensures that every critical sub-component—">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-verifies-hardware-component-authenticity">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Verifies Hardware Component Authenticity - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-verifies-hardware-component-authenticity" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="During manufacturing, UEFI firmware images verify hardware component authenticity by leveraging hardware-based Roots of Trust, cryptographic identity provisioning, and standard attestation protocols. This process ensures that every critical sub-component—" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-verifies-hardware-component-authenticity">How UEFI
+Verifies Hardware Component Authenticity</h1>
+<p>During manufacturing, UEFI firmware images verify hardware component
+authenticity by leveraging hardware-based Roots of Trust, cryptographic
+identity provisioning, and standard attestation protocols. This process
+ensures that every critical sub-component—such as system-on-chips
+(SoCs), network controllers, and expansion devices—is genuine,
+untampered, and authorized by the original equipment manufacturer (OEM)
+before the system enters the supply chain.</p>
+<h3 id="hardware-root-of-trust-and-silicon-identity">Hardware Root of
+Trust and Silicon Identity</h3>
+<p>Verification begins at the physical layer with a hardware Root of
+Trust (RoT) integrated into the silicon. During the fabrication process,
+silicon vendors inject unique cryptographic keys and public key
+infrastructures (PKIs) into secure storage, such as write-once
+electronic fuses (eFuses) or physically unclonable functions (PUFs).</p>
+<p>These keys establish an immutable identity for each component, often
+adhering to the IEEE 802.1AR Secure Device Identifier (DevID) standard
+or using the Device Identifier Composition Engine (DICE) architecture.
+The UEFI firmware image contains the corresponding trusted public keys
+or certificate chains necessary to validate these hardware
+identities.</p>
+<h3 id="security-protocol-and-data-model-spdm">Security Protocol and
+Data Model (SPDM)</h3>
+<p>Modern UEFI implementations use the Distributed Management Task Force
+(DMTF) Security Protocol and Data Model (SPDM) over protocols like the
+Management Component Transport Protocol (MCTP) to communicate with
+onboard devices, including GPUs, NVMe drives, and PCIe adapters.</p>
+<p>During the manufacturing provisioning phase, the UEFI firmware acts
+as an SPDM Requester, querying the sub-components (the SPDM Responders).
+The firmware executes a mutual authentication handshake:</p>
+<ol type="1">
+<li><strong>Certificate Exchange:</strong> The component presents its
+device certificate, signed by the component vendor's factory
+authority.</li>
+<li><strong>Cryptographic Challenge:</strong> The UEFI firmware
+challenges the component to sign a random nonce using its private key,
+proving it possesses the private key tied to the valid silicon
+certificate.</li>
+<li><strong>Firmware Measurement:</strong> The component returns
+cryptographic digests of its running internal firmware.</li>
+</ol>
+<h3 id="manifest-validation-and-golden-measurements">Manifest Validation
+and Golden Measurements</h3>
+<p>To establish a legitimate baseline, factory-provisioned UEFI firmware
+compares the component's reported measurements against a
+cryptographically signed hardware manifest. These manifests, often
+structured as Concise Reference Integrity Manifests (CoRIM), define the
+exact expected measurements (hashes) of genuine hardware and its initial
+firmware version.</p>
+<p>If a component's certificate does not chain back to an authorized
+vendor, or if its measurements deviate from the factory-approved golden
+image, the UEFI firmware marks the component as untrusted. Depending on
+manufacturing policy, the system will halt initialization, log a supply
+chain fault, or alert factory line operators to a potential counterfeit
+or damaged part.</p>
+<h3 id="factory-state-locking">Factory State Locking</h3>
+<p>Once all components pass authentication, the UEFI firmware locks the
+manufacturing state. The firmware fuses the platform's root public key
+hashes into the central processor or platform controller hub, binds the
+peripheral identifiers to the motherboard via cryptographically signed
+platform manifests, and transitions the system out of the open
+manufacturing mode. This final step permanently enforces authentication
+checks for all subsequent boot cycles across the hardware's operational
+lifecycle.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-verifies-hardware-component-authenticity';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

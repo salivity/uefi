@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Network Driver Link Speed Negotiation - uefi</title>
+    <meta name="description" content="Before a UEFI-enabled system can request an IP address via DHCP during a network boot (PXE), the underlying UEFI network driver and Network Interface Card (NIC) must establish a physical layer link with the network switch. This article breaks down the pre">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-network-driver-link-speed-negotiation">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Network Driver Link Speed Negotiation - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-network-driver-link-speed-negotiation" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Before a UEFI-enabled system can request an IP address via DHCP during a network boot (PXE), the underlying UEFI network driver and Network Interface Card (NIC) must establish a physical layer link with the network switch. This article breaks down the pre" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-network-driver-link-speed-negotiation">UEFI Network Driver
+Link Speed Negotiation</h1>
+<p>Before a UEFI-enabled system can request an IP address via DHCP
+during a network boot (PXE), the underlying UEFI network driver and
+Network Interface Card (NIC) must establish a physical layer link with
+the network switch. This article breaks down the pre-boot link
+establishment process, detailing the transition from UEFI driver
+initialization to hardware-level physical layer (PHY) auto-negotiation,
+link state polling via the Simple Network Protocol, and the eventual
+handoff to the DHCP client.</p>
+<h3 id="driver-initialization-and-binding">Driver Initialization and
+Binding</h3>
+<p>The process begins during the UEFI Driver Execution Environment (DXE)
+phase. The UEFI Driver Model uses the
+<code>EFI_DRIVER_BINDING_PROTOCOL</code> to connect hardware devices to
+their respective drivers:</p>
+<ol type="1">
+<li><strong>Device Discovery:</strong> The PCI bus driver discovers the
+network controller on the PCI bus and installs a handle with the
+<code>EFI_PCI_IO_PROTOCOL</code>.</li>
+<li><strong>Driver Binding:</strong> The network driver's
+<code>Supported()</code> function evaluates the device. If compatible,
+the core invokes the driver's <code>Start()</code> function.</li>
+<li><strong>Register Mapping:</strong> The driver maps the NIC’s
+memory-mapped I/O (MMIO) space, resets the controller, and initializes
+access to the Medium Access Control (MAC) core and the Physical Layer
+(PHY) chip, typically via the Management Data Input/Output (MDIO)
+interface.</li>
+</ol>
+<h3 id="physical-layer-phy-auto-negotiation">Physical Layer (PHY)
+Auto-Negotiation</h3>
+<p>Link speed and duplex settings are primarily negotiated at the
+hardware layer rather than the software layer, following IEEE 802.3
+standards.</p>
+<ul>
+<li><strong>Triggering Negotiation:</strong> Once the driver brings the
+PHY out of reset, it configures the PHY's Auto-Negotiation Advertisement
+Register via MDIO. By default, it advertises all supported speeds (e.g.,
+10/100/1000/10000 Mbps) and full/half-duplex capabilities.</li>
+<li><strong>Electrical Signaling:</strong> The PHY exchanges bursts of
+pulses—known as Fast Link Pulses (FLP) in 1000BASE-T or Link Code
+Words—with the link partner (the switch port).</li>
+<li><strong>Technology Resolution:</strong> Both devices compare
+capabilities and select the highest common performance mode according to
+the priority resolution table defined in IEEE 802.3 (favoring full
+duplex and highest bandwidth).</li>
+</ul>
+<h3 id="link-state-polling-via-simple-network-protocol-snp">Link State
+Polling via Simple Network Protocol (SNP)</h3>
+<p>While the PHY and the switch negotiate automatically at the
+electrical level, the UEFI network driver must monitor and confirm this
+status before higher-level network operations can start:</p>
+<ol type="1">
+<li><strong>Protocol Installation:</strong> The driver installs the
+<code>EFI_SIMPLE_NETWORK_PROTOCOL</code> (SNP) on the network device
+handle.</li>
+<li><strong>Media Status Check:</strong> Upper-layer drivers (such as
+the PXE Base Code or MNP—Managed Network Protocol) call the SNP’s
+<code>GetStatus()</code> function.</li>
+<li><strong>Hardware Polling:</strong> <code>GetStatus()</code> reads
+the PHY’s Basic Mode Status Register (BMSR) through MDIO. The driver
+checks the "Link Status" bit to determine whether the physical link is
+active.</li>
+<li><strong>Link Up Confirmation:</strong> If the link is not yet
+established, the driver executes a polling loop with an
+implementation-specific timeout (typically between 3 to 10 seconds) to
+allow the PHY auto-negotiation to complete.</li>
+</ol>
+<h3 id="handoff-to-the-dhcp-stack">Handoff to the DHCP Stack</h3>
+<p>Once the PHY confirms a link, the driver reads the resolved speed and
+duplex status from the PHY registers, configures the MAC's internal
+transmit and receive clocks to match those settings, and flags the
+<code>MediaPresent</code> boolean in the
+<code>EFI_SIMPLE_NETWORK_MODE</code> structure as <code>TRUE</code>.</p>
+<p>With physical connectivity confirmed, the UEFI network stack
+initializes the <code>EFI_DHCP4_PROTOCOL</code> or
+<code>EFI_DHCP6_PROTOCOL</code>. The system then transmits the initial
+DHCP DISCOVER packet onto a stable, synchronized network medium.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-network-driver-link-speed-negotiation';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

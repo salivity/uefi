@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Role of UEFI Unicode Collation in String Sorting - uefi</title>
+    <meta name="description" content="This article explores the role of the Unified Extensible Firmware Interface (UEFI) Unicode Collation protocol in managing string sorting operations within pre-boot environments. It details how the protocol abstracts language-specific character ordering ru">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/role-of-uefi-unicode-collation-in-string-sorting">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Role of UEFI Unicode Collation in String Sorting - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/role-of-uefi-unicode-collation-in-string-sorting" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article explores the role of the Unified Extensible Firmware Interface (UEFI) Unicode Collation protocol in managing string sorting operations within pre-boot environments. It details how the protocol abstracts language-specific character ordering ru" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="role-of-uefi-unicode-collation-in-string-sorting">Role of UEFI
+Unicode Collation in String Sorting</h1>
+<p>This article explores the role of the Unified Extensible Firmware
+Interface (UEFI) Unicode Collation protocol in managing string sorting
+operations within pre-boot environments. It details how the protocol
+abstracts language-specific character ordering rules, ensures consistent
+case-insensitive comparisons, and provides the necessary algorithms for
+ordering data such as file listings, boot menu entries, and
+configuration options.</p>
+<h3 id="overview-of-uefi-unicode-collation">Overview of UEFI Unicode
+Collation</h3>
+<p>In the pre-boot environment, firmware must handle human-readable text
+across various languages and alphabets. Standard byte-by-byte or binary
+comparisons (such as ASCII value checks) fail to sort multilingual text
+correctly because Unicode code point values do not inherently reflect
+alphabetical or cultural order.</p>
+<p>The UEFI specification addresses this through the Unicode Collation
+protocol (<code>EFI_UNICODE_COLLATION_PROTOCOL</code> and its modern
+revision, <code>EFI_UNICODE_COLLATION2_PROTOCOL</code>). This protocol
+provides standardized services that enable firmware drivers and
+applications to compare, search, and sort Unicode strings based on
+specific language conventions (RFC 4646 / BCP 47 language codes).</p>
+<h3 id="core-functions-in-string-comparison-and-sorting">Core Functions
+in String Comparison and Sorting</h3>
+<p>The protocol defines several interfaces that directly impact sorting
+operations:</p>
+<ul>
+<li><strong><code>StriColl</code> (String Collate):</strong> Performs a
+case-insensitive comparison of two null-terminated Unicode strings using
+language-specific rules. It determines whether a string precedes,
+matches, or follows another string. This function serves as the
+comparison predicate in standard sorting algorithms (such as quicksort
+or bubble sort) implemented by UEFI applications.</li>
+<li><strong><code>StrLwr</code> and <code>StrUpr</code>:</strong>
+Lowercases or uppercases a Unicode string according to locale
+conventions. Consistent case folding is a prerequisite for
+case-insensitive sorting and canonical string matching.</li>
+<li><strong><code>MetaiMatch</code>:</strong> Performs pattern matching
+with wildcard support (<code>*</code>, <code>?</code>), allowing
+filtered directory scans prior to sorting.</li>
+</ul>
+<h3 id="role-in-file-system-and-directory-sorting">Role in File System
+and Directory Sorting</h3>
+<p>The primary practical application of the Unicode Collation protocol
+is handling file systems, specifically FAT-based formats (FAT12, FAT16,
+and FAT32) mandated by the UEFI specification.</p>
+<ol type="1">
+<li><strong>FAT Long File Name (LFN) Handling:</strong> File systems
+require consistent string comparison to prevent duplicate file names
+differing only by case and to maintain alphabetized directory
+indexes.</li>
+<li><strong>Short File Name Conversion:</strong> The protocol provides
+<code>FatToStr</code> and <code>StrToFat</code> functions to map
+standard Unicode strings to 8.3 legacy FAT formats, ensuring that
+sorting operations can be bridged between legacy disk structures and
+modern display interfaces.</li>
+</ol>
+<h3 id="role-in-boot-manager-and-ui-presentation">Role in Boot Manager
+and UI Presentation</h3>
+<p>The UEFI Boot Manager, device configuration screens, and UEFI Shell
+commands (such as <code>ls</code> or <code>dir</code>) rely on ordered
+lists. When displaying boot options, available devices, or setup
+menus:</p>
+<ul>
+<li>The sorting algorithms invoke the Unicode Collation protocol to
+ensure lists appear in natural alphabetical order rather than an
+arbitrary binary sequence.</li>
+<li>The system can adapt its sorting behavior depending on the currently
+configured platform language (e.g., handling diacritics, accents, and
+specific script orderings correctly).</li>
+</ul>
+<h3 id="distinction-between-version-1-and-version-2">Distinction Between
+Version 1 and Version 2</h3>
+<p>UEFI initially utilized ISO 639-2 language codes in
+<code>EFI_UNICODE_COLLATION_PROTOCOL</code>. Starting with UEFI 2.1,
+<code>EFI_UNICODE_COLLATION2_PROTOCOL</code> was introduced to
+standardize on RFC 4646 (BCP 47) language tags (such as
+<code>en-US</code> or <code>fr-FR</code>). Modern firmware primarily
+relies on the second revision to align with prevailing
+internationalization standards, providing accurate linguistic sorting
+rules across globalized firmware deployments.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/role-of-uefi-unicode-collation-in-string-sorting';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

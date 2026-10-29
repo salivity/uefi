@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Handling Floating-Point Arithmetic in UEFI - uefi</title>
+    <meta name="description" content="Handling floating-point arithmetic within the Unified Extensible Firmware Interface (UEFI) pre-boot environment presents significant architectural and software challenges. Because UEFI firmware is designed to be lightweight, deterministic, and closely tie">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/handling-floating-point-arithmetic-in-uefi">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Handling Floating-Point Arithmetic in UEFI - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/handling-floating-point-arithmetic-in-uefi" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Handling floating-point arithmetic within the Unified Extensible Firmware Interface (UEFI) pre-boot environment presents significant architectural and software challenges. Because UEFI firmware is designed to be lightweight, deterministic, and closely tie" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="handling-floating-point-arithmetic-in-uefi">Handling
+Floating-Point Arithmetic in UEFI</h1>
+<p>Handling floating-point arithmetic within the Unified Extensible
+Firmware Interface (UEFI) pre-boot environment presents significant
+architectural and software challenges. Because UEFI firmware is designed
+to be lightweight, deterministic, and closely tied to hardware
+initialization, it lacks the abstract operating system services
+typically required for floating-point calculations. As a result,
+firmware developers face complications regarding register state
+management, missing runtime libraries, compiler optimizations, and
+performance limitations when working with floating-point types prior to
+OS handoff.</p>
+<h3 id="register-state-management-and-context-preservation">Register
+State Management and Context Preservation</h3>
+<p>In standard operating systems, the kernel transparently manages
+floating-point and vector registers (such as x87, SSE, AVX on x86, or
+NEON on ARM) across context switches and hardware interrupts. The UEFI
+specification, however, does not mandate automatic preservation of
+floating-point registers across driver boundaries or interrupt service
+routines (ISRs).</p>
+<p>If a UEFI driver or application executes floating-point instructions,
+it risks corrupting the register states utilized by another driver or an
+OS bootloader. To safely use hardware floating-point instructions on
+x86_64 systems, developers must manually manipulate control registers
+(such as clearing the <code>TS</code> bit in <code>CR0</code> and
+configuring <code>CR4</code> and <code>MXCSR</code>) and explicitly save
+and restore state buffers using instructions like
+<code>FXSAVE</code>/<code>FXRSTOR</code> or
+<code>XSAVE</code>/<code>XRSTOR</code>.</p>
+<h3 id="absence-of-standard-c-runtime-libraries">Absence of Standard C
+Runtime Libraries</h3>
+<p>Standard user-space environments provide a complete C runtime (CRT)
+and standard math libraries (<code>math.h</code>) providing
+implementations for trigonometric, logarithmic, and power functions.
+UEFI runs in a bare-metal execution model. The standard UEFI Development
+Kit (EDK II) provides only minimal baseline CRT routines. Complex
+mathematical routines are completely absent unless third-party or custom
+software math libraries are ported and linked directly into the firmware
+binary, which increases code complexity and maintenance overhead.</p>
+<h3 id="compiler-code-generation-and-abi-conflicts">Compiler Code
+Generation and ABI Conflicts</h3>
+<p>Modern C and C++ compilers frequently employ vectorization and
+hardware floating-point registers to optimize data movement and
+arithmetic, even for operations that do not explicitly declare
+<code>float</code> or <code>double</code> variables.</p>
+<p>In standard EDK II build configurations, compilers are typically
+invoked with flags that explicitly disable floating-point and SIMD
+generation (such as <code>-mno-sse -mno-mmx</code> in GCC/Clang or
+avoiding SSE-specific optimizations in MSVC). If a developer enables
+floating-point support, the compiler may emit instructions that trigger
+invalid opcode exceptions (<code>#UD</code>) or device-not-available
+faults (<code>#NM</code>) if the underlying processor's floating-point
+unit (FPU) has not been explicitly initialized by the firmware's
+Platform Initialization (PI) phases.</p>
+<h3 id="rom-footprint-and-firmware-space-constraints">ROM Footprint and
+Firmware Space Constraints</h3>
+<p>When hardware floating-point units are kept disabled to maintain
+system predictability, developers must rely on software floating-point
+emulation (soft-float). Emulation libraries substitute single CPU
+instructions with dozens or hundreds of integer instructions.</p>
+<p>This approach introduces two problems:</p>
+<ol type="1">
+<li><strong>Binary Size:</strong> Emulation routines significantly bloat
+the binary footprint of UEFI drivers, creating challenges in flash
+storage (SPI ROM) environments where image space is heavily
+constrained.</li>
+<li><strong>Execution Latency:</strong> Emulated floating-point math is
+orders of magnitude slower than native integer or hardware-accelerated
+math, introducing unwanted delays during critical boot time
+windows.</li>
+</ol>
+<h3 id="architectural-inconsistencies">Architectural
+Inconsistencies</h3>
+<p>The operational state of floating-point hardware varies across
+processor architectures during pre-boot:</p>
+<ul>
+<li><strong>x86_64:</strong> While 64-bit mode assumes the presence of
+SSE/SSE2, firmware execution environments often intentionally mask or
+disable SIMD exceptions and avoid enabling extended state features
+(AVX/AVX-512) to avoid OS handover conflicts.</li>
+<li><strong>ARM / AArch64:</strong> Access to the floating-point and
+Advanced SIMD architecture is disabled by default upon reset. Firmware
+must write to system registers (such as <code>CPACR_EL1</code>) to grant
+execution levels access to the FPU registers; otherwise, any
+floating-point operation generates a synchronous exception.</li>
+</ul>
+<p>Because of these complexities, standard practice in UEFI development
+avoids floating-point operations altogether, relying instead on
+fixed-point arithmetic, scaled integers, or deferring complex
+calculation workloads entirely to the post-boot operating system
+environment.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/handling-floating-point-arithmetic-in-uefi';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

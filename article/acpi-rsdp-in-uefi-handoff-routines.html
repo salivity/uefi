@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACPI RSDP in UEFI Handoff Routines - uefi</title>
+    <meta name="description" content="The Root System Description Pointer (RSDP) serves as the primary bridge between UEFI firmware and the operating system&#39;s ACPI (Advanced Configuration and Power Interface) subsystem. During the boot sequence, the RSDP provides the initial memory pointer re">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/acpi-rsdp-in-uefi-handoff-routines">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="ACPI RSDP in UEFI Handoff Routines - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/acpi-rsdp-in-uefi-handoff-routines" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Root System Description Pointer (RSDP) serves as the primary bridge between UEFI firmware and the operating system&#39;s ACPI (Advanced Configuration and Power Interface) subsystem. During the boot sequence, the RSDP provides the initial memory pointer re" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="acpi-rsdp-in-uefi-handoff-routines">ACPI RSDP in UEFI Handoff
+Routines</h1>
+<p>The Root System Description Pointer (RSDP) serves as the primary
+bridge between UEFI firmware and the operating system's ACPI (Advanced
+Configuration and Power Interface) subsystem. During the boot sequence,
+the RSDP provides the initial memory pointer required by the OS kernel
+to discover, map, and parse hardware configuration tables. Without the
+RSDP handoff, modern operating systems cannot configure device power
+states, enumerate non-PCI hardware, or initialize platform-level ACPI
+features.</p>
+<h3 id="the-role-of-the-rsdp-structure">The Role of the RSDP
+Structure</h3>
+<p>The RSDP is a small, standardized descriptor structure containing
+essential validation metadata and memory addresses. Its primary role is
+to supply the physical address of the Root System Description Table
+(RSDT) or the Extended System Description Table (XSDT).</p>
+<p>Key fields within the RSDP structure include:</p>
+<ul>
+<li><strong>Signature:</strong> An 8-byte string reading
+<code>"RSD PTR "</code> used for validation.</li>
+<li><strong>Checksums:</strong> One-byte values verifying the integrity
+of the ACPI 1.0 table descriptor and the extended ACPI 2.0+ fields.</li>
+<li><strong>XsdtAddress:</strong> A 64-bit physical pointer pointing
+directly to the XSDT (superseding the 32-bit <code>RsdtAddress</code> on
+modern platforms).</li>
+</ul>
+<h3 id="the-uefi-handoff-mechanism">The UEFI Handoff Mechanism</h3>
+<p>Unlike legacy BIOS systems—where the operating system had to scan the
+Extended BIOS Data Area (EBDA) or physical memory regions between
+<code>0x000E0000</code> and <code>0x000FFFFF</code> to locate the
+<code>"RSD PTR "</code> signature—UEFI provides a deterministic,
+pointer-based handoff mechanism.</p>
+<ol type="1">
+<li><strong>Table Registration:</strong> During firmware initialization,
+the UEFI DXE (Driver Execution Environment) builds the ACPI tables and
+publishes the RSDP. The firmware registers a pointer to the RSDP inside
+the <code>EFI_CONFIGURATION_TABLE</code> array, which is housed in the
+global <code>EFI_SYSTEM_TABLE</code>.</li>
+<li><strong>GUID Association:</strong> The entry is tagged with a
+well-known GUID. For modern systems running ACPI 2.0 or later, it uses
+<code>EFI_ACPI_20_TABLE_GUID</code>
+(<code>8868e871-e4f1-11d3-bc22-0080c73c8881</code>). For legacy
+compliance, <code>ACPI_10_TABLE_GUID</code> may also be published.</li>
+<li><strong>OS Loader Query:</strong> When the UEFI bootloader executes,
+it queries the <code>EFI_SYSTEM_TABLE-&gt;ConfigurationTable</code>
+array for the ACPI GUID. Once located, the <code>VendorTable</code>
+pointer within that configuration table entry directly references the
+physical memory location of the RSDP.</li>
+<li><strong>Parameter Passing:</strong> The bootloader passes this
+pointer directly to the OS kernel through architecture-specific boot
+parameters (such as the <code>boot_params</code> structure in x86-64
+Linux or the EFI initialization structures in Windows).</li>
+</ol>
+<h3 id="preserving-memory-across-exitbootservices">Preserving Memory
+Across <code>ExitBootServices()</code></h3>
+<p>A critical part of the handoff is memory management. Before
+transferring full execution to the OS kernel, the bootloader calls
+<code>ExitBootServices()</code>, which terminates UEFI boot-time
+services and invalidates standard boot memory allocations.</p>
+<p>To prevent the RSDP and downstream ACPI tables from being
+overwritten, UEFI places these structures into memory regions marked as
+<code>EfiACPIReclaimMemory</code> or <code>EfiACPIMemoryNVS</code>. The
+operating system's memory manager reads the UEFI memory map, identifies
+these regions, and preserves them during the initial kernel memory
+setup.</p>
+<h3 id="os-consumption">OS Consumption</h3>
+<p>Once the kernel has control and reads the RSDP:</p>
+<ol type="1">
+<li>It validates the structure using the embedded checksums.</li>
+<li>It extracts the 64-bit address of the XSDT.</li>
+<li>It traverses the XSDT to discover pointers to all secondary tables,
+such as the FADT (Fixed ACPI Description Table), MADT (Multiple APIC
+Description Table), and DSDT (Differentiated System Description
+Table).</li>
+</ol>
+<p>Through this chain of pointers, the RSDP enables the operating system
+to take full operational control of the platform's power management,
+multiprocessor initialization, and device topology.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/acpi-rsdp-in-uefi-handoff-routines';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

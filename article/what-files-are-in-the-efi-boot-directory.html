@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What Files Are in the EFI BOOT Directory? - uefi</title>
+    <meta name="description" content="The EFI/BOOT directory on an EFI System Partition (ESP) serves as the standardized fallback location for system firmware to locate bootloaders when no specific NVRAM boot entries exist. This article outlines the typical executable binaries, architecture-s">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/what-files-are-in-the-efi-boot-directory">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="What Files Are in the EFI BOOT Directory? - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/what-files-are-in-the-efi-boot-directory" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The EFI/BOOT directory on an EFI System Partition (ESP) serves as the standardized fallback location for system firmware to locate bootloaders when no specific NVRAM boot entries exist. This article outlines the typical executable binaries, architecture-s" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="what-files-are-in-the-efi-boot-directory">What Files Are in the
+EFI BOOT Directory?</h1>
+<p>The <code>EFI/BOOT</code> directory on an EFI System Partition (ESP)
+serves as the standardized fallback location for system firmware to
+locate bootloaders when no specific NVRAM boot entries exist. This
+article outlines the typical executable binaries, architecture-specific
+fallback files, and auxiliary configuration components commonly stored
+in this directory across different operating systems.</p>
+<h2 id="standard-architecture-executables">Standard Architecture
+Executables</h2>
+<p>The UEFI specification defines a standardized naming convention for
+default bootloaders. When a system boots from removable media (like a
+USB drive) or a fixed drive lacking a configured NVRAM boot entry, the
+firmware searches <code>EFI/BOOT</code> for a binary matched to the
+processor architecture:</p>
+<ul>
+<li><strong><code>BOOTX64.EFI</code></strong>: The default fallback
+bootloader for standard 64-bit x86 systems (x86_64/AMD64). This is the
+most common file found on modern PCs.</li>
+<li><strong><code>BOOTIA32.EFI</code></strong>: Used for 32-bit x86 UEFI
+implementations (often found on older Intel Atom tablets).</li>
+<li><strong><code>BOOTAA64.EFI</code></strong>: The fallback bootloader
+for 64-bit ARM architectures (AArch64).</li>
+<li><strong><code>BOOTARM.EFI</code></strong>: The bootloader for 32-bit
+ARM architectures.</li>
+<li><strong><code>BOOTRISCV64.EFI</code></strong>: Used for 64-bit
+RISC-V platforms.</li>
+</ul>
+<h2 id="linux-and-grub-ecosystem-files">Linux and GRUB Ecosystem
+Files</h2>
+<p>On Linux distributions utilizing Secure Boot and the GRUB bootloader,
+the <code>EFI/BOOT</code> directory typically contains components
+designed to initialize the kernel securely:</p>
+<ul>
+<li><strong><code>BOOTX64.EFI</code> (Shim)</strong>: On Secure
+Boot-enabled systems, this file is usually a renamed version of the
+Microsoft-signed "shim" pre-loader (<code>shimx64.efi</code>). Its role
+is to verify the secondary bootloader's signature before executing
+it.</li>
+<li><strong><code>grubx64.efi</code></strong>: The core GRUB binary
+executed by the shim once cryptographic verification succeeds.</li>
+<li><strong><code>mmx64.efi</code></strong>: The Machine Owner Key (MOK)
+Manager. If Secure Boot validation fails on a custom driver or kernel,
+the shim launches this utility to allow the user to enroll custom keys
+manually.</li>
+<li><strong><code>fbx64.efi</code></strong>: The Fallback application.
+It automatically detects, reconstructs, and re-adds missing NVRAM boot
+entries pointing back to the distribution's primary directory (such as
+<code>EFI/ubuntu</code> or <code>EFI/fedora</code>).</li>
+<li><strong><code>grub.cfg</code></strong>: A small stub configuration
+file that directs GRUB to find the root partition or the primary
+configuration file located in the main distribution directory.</li>
+</ul>
+<h2 id="windows-boot-manager-files">Windows Boot Manager Files</h2>
+<p>When Windows writes to the default boot directory, it populates it
+with a standard set of recovery and loader files:</p>
+<ul>
+<li><strong><code>bootx64.efi</code></strong>: A copy of the Windows
+Boot Manager (<code>bootmgfw.efi</code>), allowing the Windows
+installation media or system drive to boot if BIOS/UEFI settings are
+reset.</li>
+<li><strong><code>boot.sdi</code></strong>: A System Deployment Image
+file used during recovery and installation routines to host a virtual
+RAM disk.</li>
+<li><strong><code>BCD</code></strong>: The Boot Configuration Data
+registry hive, which stores parameters and menu options for starting the
+Windows operating system.</li>
+</ul>
+<h2 id="diagnostic-and-shell-utilities">Diagnostic and Shell
+Utilities</h2>
+<p>On administrative media, flash drives, or custom recovery
+environments, other auxiliary tools may reside in the directory:</p>
+<ul>
+<li><strong><code>Shell.efi</code></strong>: An interactive UEFI Shell
+binary allowing direct manipulation of drives, memory maps, and EFI
+variables from a command line prior to OS initialization.</li>
+<li><strong>Driver Files (<code>.efi</code>)</strong>: Pre-boot UEFI
+drivers required to initialize specific storage controllers, file
+systems (such as <code>ext4_x64.efi</code> or
+<code>ntfs_x64.efi</code>), or network adapters.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/what-files-are-in-the-efi-boot-directory';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

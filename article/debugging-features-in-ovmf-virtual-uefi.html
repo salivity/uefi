@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debugging Features in OVMF Virtual UEFI - uefi</title>
+    <meta name="description" content="Open Virtual Machine Firmware (OVMF), the EDK II port targeted at virtual machines, incorporates an extensive set of debugging facilities designed to inspect, trace, and troubleshoot UEFI pre-boot operations. This article provides an overview of the core">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/debugging-features-in-ovmf-virtual-uefi">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Debugging Features in OVMF Virtual UEFI - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/debugging-features-in-ovmf-virtual-uefi" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Open Virtual Machine Firmware (OVMF), the EDK II port targeted at virtual machines, incorporates an extensive set of debugging facilities designed to inspect, trace, and troubleshoot UEFI pre-boot operations. This article provides an overview of the core" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="debugging-features-in-ovmf-virtual-uefi">Debugging Features in
+OVMF Virtual UEFI</h1>
+<p>Open Virtual Machine Firmware (OVMF), the EDK II port targeted at
+virtual machines, incorporates an extensive set of debugging facilities
+designed to inspect, trace, and troubleshoot UEFI pre-boot operations.
+This article provides an overview of the core debugging tools integrated
+directly into OVMF and its underlying EDK II codebase. It details the
+dedicated hypervisor debug console, fine-grained logging configurations
+via Platform Configuration Database (PCD) tokens, source-level GDB
+integration, CPU exception handling, and memory validation
+mechanisms.</p>
+<h2 id="qemu-debug-console-and-serial-logging">QEMU Debug Console and
+Serial Logging</h2>
+<p>OVMF routes debug output outside the guest operating system primarily
+through low-overhead I/O ports. Rather than relying solely on emulated
+standard UART serial devices, OVMF provides support for the QEMU
+<code>isa-debugcon</code> interface.</p>
+<ul>
+<li><strong>Port 0x402 Debug Console:</strong> By default, standard OVMF
+debug builds direct raw logging strings to I/O port <code>0x402</code>.
+This allows hypervisors like QEMU to capture logs into a host file or
+pipe them directly to standard output via the command-line flag
+<code>-debugcon file:uefi_debug.log -global isa-debugcon.iobase=0x402</code>.
+This path has minimal performance overhead compared to full hardware
+UART emulation.</li>
+<li><strong>Standard Serial Redirection (COM1 / 0x3f8):</strong> OVMF
+can be configured to use traditional serial ports (<code>0x3f8</code>).
+This is particularly useful for environments where console redirection
+is required across both firmware execution and OS boot phases (via UEFI
+Serial Terminal protocols).</li>
+</ul>
+<h2 id="pcd-controlled-verbosity-and-log-filtering">PCD-Controlled
+Verbosity and Log Filtering</h2>
+<p>Logging granularity inside OVMF is governed by the EDK II Platform
+Configuration Database (PCD) framework. When building OVMF from source,
+developers can configure these values to adjust trace output
+dynamically:</p>
+<ul>
+<li><strong><code>PcdDebugPrintErrorLevel</code>:</strong> Controls the
+severity threshold for <code>DEBUG</code> macro emissions. Bitmasks can
+be toggled to output specific categories, such as initialization info
+(<code>DEBUG_INIT</code>), warnings (<code>DEBUG_WARN</code>), load
+events (<code>DEBUG_LOAD</code>), memory management operations
+(<code>DEBUG_PAGE</code>), or critical errors
+(<code>DEBUG_ERROR</code>).</li>
+<li><strong><code>PcdDebugPropertyMask</code>:</strong> Determines the
+runtime behavior of the debug infrastructure itself. It allows
+developers to enable or disable breakpoint generation on assertion
+failures, control memory clearing on allocation/free, and switch debug
+print execution on or off globally.</li>
+</ul>
+<h2 id="source-level-debugging-via-gdb">Source-Level Debugging via
+GDB</h2>
+<p>OVMF supports interactive, source-level debugging through GDB in
+conjunction with QEMU’s built-in GDB stub (<code>-s -S</code> flags).
+Because UEFI executes in various processor modes (transitioning from
+32-bit PEI to 64-bit DXE) and loads relocatable PE32+ binaries
+dynamically into arbitrary memory addresses, OVMF provides mechanisms to
+resolve these symbols:</p>
+<ul>
+<li><strong>Debug Agent and GDB Stub:</strong> OVMF can be compiled with
+<code>SourceLevelDebugPkg</code>, which incorporates an active GDB stub
+directly inside the firmware. This enables target-hosted debugging over
+a virtual serial channel without relying solely on the hypervisor's
+external hardware breakpoints.</li>
+<li><strong>Symbol Relocation Scripts:</strong> When using QEMU's
+hypervisor GDB stub, OVMF logs the base load addresses of all loaded
+PEIMs (PEI Modules) and DXE drivers. Scripts such as
+<code>gdb_uefi.py</code> monitor OVMF log outputs or parse the EFI
+System Table in guest memory to automatically run
+<code>add-symbol-file</code> commands with the correct base
+relocations.</li>
+</ul>
+<h2 id="cpu-exception-handlers-and-crash-dumps">CPU Exception Handlers
+and Crash Dumps</h2>
+<p>When an unhandled interrupt or processor fault occurs—such as a
+General Protection Fault (<code>#GP</code>) or Page Fault
+(<code>#PF</code>)—OVMF includes default exception handlers via the
+<code>CpuExceptionHandlerLib</code>.</p>
+<p>Instead of silently hanging or rebooting the virtual machine, the
+firmware captures:</p>
+<ul>
+<li>The instruction pointer (RIP/EIP) where the fault originated.</li>
+<li>A complete dump of all general-purpose registers (RAX, RBX, RCX,
+RDX, RSI, RDI, RSP, RBP, R8–R15) and control registers (CR0, CR2, CR3,
+CR4).</li>
+<li>The raw stack trace and the base address of the faulting driver,
+allowing post-mortem analysis using the map file generated during
+compilation.</li>
+</ul>
+<h2 id="memory-tracking-and-assertion-testing">Memory Tracking and
+Assertion Testing</h2>
+<p>To identify buffer overflows and uninitialized memory usage early in
+the boot sequence, OVMF utilizes EDK II's defensive memory features:</p>
+<ul>
+<li><strong>Memory Allocation Guards:</strong> Page allocation wrappers
+mark guard pages around allocations, causing an immediate
+<code>#PF</code> if firmware drivers access memory out of bounds.</li>
+<li><strong>Memory Poisoning:</strong> Memory allocated from the pool or
+freed back to the system can be automatically filled with predefined
+patterns (such as <code>0xAF</code> or <code>0x5A</code>) to detect
+use-after-free bugs and uninitialized read states.</li>
+<li><strong>ASSERT Validation:</strong> Production builds strip
+assertions, but debug builds compile the <code>ASSERT()</code> macro to
+halt execution, log the failing line number and source file, and
+optionally enter an infinite loop to allow an engineer to attach a
+debugger.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/debugging-features-in-ovmf-virtual-uefi';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

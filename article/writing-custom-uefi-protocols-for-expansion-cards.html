@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Writing Custom UEFI Protocols for Expansion Cards - uefi</title>
+    <meta name="description" content="This article outlines the end-to-end engineering process that custom hardware manufacturers use to develop proprietary Unified Extensible Firmware Interface (UEFI) protocols for specialized expansion cards. It covers defining unique interfaces using Globa">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/writing-custom-uefi-protocols-for-expansion-cards">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Writing Custom UEFI Protocols for Expansion Cards - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/writing-custom-uefi-protocols-for-expansion-cards" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article outlines the end-to-end engineering process that custom hardware manufacturers use to develop proprietary Unified Extensible Firmware Interface (UEFI) protocols for specialized expansion cards. It covers defining unique interfaces using Globa" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="writing-custom-uefi-protocols-for-expansion-cards">Writing
+Custom UEFI Protocols for Expansion Cards</h1>
+<p>This article outlines the end-to-end engineering process that custom
+hardware manufacturers use to develop proprietary Unified Extensible
+Firmware Interface (UEFI) protocols for specialized expansion cards. It
+covers defining unique interfaces using Globally Unique Identifiers
+(GUIDs), writing driver logic that binds to specific PCI hardware,
+installing custom interfaces into the UEFI system database, flashing the
+driver as an Option ROM, and consuming the protocol for pre-boot
+management and diagnostics.</p>
+<h3 id="1-protocol-architecture-and-interface-definition">1. Protocol
+Architecture and Interface Definition</h3>
+<p>A UEFI protocol is a standard C structure containing function
+pointers and public data members, identified globally by a 128-bit GUID.
+When building a proprietary protocol for an expansion card (such as a
+custom FPGA accelerator, specialized crypto card, or industrial
+acquisition board), the manufacturer first defines this interface in a C
+header file.</p>
+<p>The interface definition establishes the control plane for the
+hardware before the operating system loads:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Example interface definition</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">typedef</span> <span class="kw">struct</span> _MY_CUSTOM_HARDWARE_PROTOCOL MY_CUSTOM_HARDWARE_PROTOCOL<span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">typedef</span> EFI_STATUS <span class="op">(</span>EFIAPI <span class="op">*</span>MY_HW_GET_STATUS<span class="op">)(</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  IN  MY_CUSTOM_HARDWARE_PROTOCOL  <span class="op">*</span>This<span class="op">,</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  OUT UINT32                       <span class="op">*</span>HardwareStatus</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="kw">typedef</span> EFI_STATUS <span class="op">(</span>EFIAPI <span class="op">*</span>MY_HW_EXECUTE_DIAGNOSTICS<span class="op">)(</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  IN  MY_CUSTOM_HARDWARE_PROTOCOL  <span class="op">*</span>This<span class="op">,</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  IN  UINT32                       TestLevel</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> _MY_CUSTOM_HARDWARE_PROTOCOL <span class="op">{</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>  UINT64                     Revision<span class="op">;</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>  MY_HW_GET_STATUS           GetStatus<span class="op">;</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>  MY_HW_EXECUTE_DIAGNOSTICS  ExecuteDiagnostics<span class="op">;</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="op">};</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="kw">extern</span> EFI_GUID gMyCustomHardwareProtocolGuid<span class="op">;</span></span></code></pre></div>
+<p>A unique GUID is generated using standard UUID tools and registered
+in the driver's package declaration file (<code>.dec</code>) using the
+Tianocore EDK II build environment.</p>
+<h3 id="2-implementing-the-uefi-driver-model">2. Implementing the UEFI
+Driver Model</h3>
+<p>Modern UEFI expansion cards follow the UEFI Driver Model, which
+separates device management into three entry points via the
+<code>EFI_DRIVER_BINDING_PROTOCOL</code>:</p>
+<ul>
+<li><strong><code>Supported()</code></strong>: Checks whether the target
+controller matches the vendor's device. It opens the standard
+<code>EFI_PCI_IO_PROTOCOL</code> on the controller handle to inspect the
+PCI Configuration Space. If the PCI Vendor ID and Device ID match the
+card, it returns <code>EFI_SUCCESS</code>.</li>
+<li><strong><code>Start()</code></strong>: Initializes the card. It
+enables memory-mapped I/O (MMIO) and bus mastering through the
+<code>EFI_PCI_IO_PROTOCOL</code>. It then allocates an internal context
+structure containing both the proprietary protocol and private driver
+state.</li>
+<li><strong><code>Stop()</code></strong>: Quiesces the device, halts
+ongoing DMA transfers, uninstalls protocol interfaces, and frees
+allocated memory.</li>
+</ul>
+<h3 id="3-installing-the-proprietary-protocol">3. Installing the
+Proprietary Protocol</h3>
+<p>Once the <code>Start()</code> function configures the base hardware,
+it installs the proprietary protocol onto the device handle using the
+UEFI Boot Services table (<code>gBS</code>):</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>Status <span class="op">=</span> gBS<span class="op">-&gt;</span>InstallMultipleProtocolInterfaces <span class="op">(</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>                <span class="op">&amp;</span>ControllerHandle<span class="op">,</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>                <span class="op">&amp;</span>gMyCustomHardwareProtocolGuid<span class="op">,</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>                <span class="op">&amp;</span>PrivateDevData<span class="op">-&gt;</span>CustomProtocol<span class="op">,</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>                NULL</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>                <span class="op">);</span></span></code></pre></div>
+<p>By attaching the proprietary protocol directly to the hardware
+controller handle, the driver links the specialized API to the physical
+device. The private context structure encapsulates the generic protocol,
+allowing member functions to access device-specific registers and
+buffers via pointer arithmetic (such as the standard <code>CR()</code>
+macro).</p>
+<h3 id="4-packaging-and-flashing-as-an-option-rom">4. Packaging and
+Flashing as an Option ROM</h3>
+<p>To allow the protocol to execute on any compatible host platform
+without requiring motherboards to pre-integrate the driver,
+manufacturers compile the code into a standard UEFI Driver Execution
+Environment (DXE) binary (<code>.efi</code>).</p>
+<p>This binary is packaged into a standard PCI Option ROM layout
+compliant with the PCI Firmware Specification. The manufacturer flashes
+this binary image to the expansion card's on-board non-volatile memory
+(typically an SPI NOR flash or EEPROM).</p>
+<p>During platform power-on (the DXE and Boot Device Selection phases),
+the system firmware enumerates the PCI bus, detects the expansion ROM
+header, loads the driver image into host memory, and invokes its entry
+point.</p>
+<h3 id="5-consuming-the-proprietary-protocol">5. Consuming the
+Proprietary Protocol</h3>
+<p>Once published, pre-boot environments—such as custom UEFI Shell
+diagnostic utilities, platform provisioning tools, or custom
+bootloaders—can discover and use the interface:</p>
+<ol type="1">
+<li><strong>Discovery</strong>: Applications locate the protocol handle
+using <code>gBS-&gt;LocateProtocol()</code> or query specific devices
+using <code>gBS-&gt;OpenProtocol()</code>.</li>
+<li><strong>Execution</strong>: Callers execute the function pointers
+directly, performing tasks such as firmware flashing, running pre-boot
+memory integrity tests on accelerators, or reading telemetry data before
+the primary operating system boots.</li>
+</ol></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/writing-custom-uefi-protocols-for-expansion-cards';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

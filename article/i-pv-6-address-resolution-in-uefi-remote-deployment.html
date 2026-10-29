@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPv6 Address Resolution in UEFI Remote Deployment - uefi</title>
+    <meta name="description" content="During remote operating system deployment via Unified Extensible Firmware Interface (UEFI), the firmware initializes network hardware to retrieve boot files via protocols like PXE or HTTP Boot. In an IPv6 environment, the UEFI network stack eliminates the">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/i-pv-6-address-resolution-in-uefi-remote-deployment">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="IPv6 Address Resolution in UEFI Remote Deployment - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/i-pv-6-address-resolution-in-uefi-remote-deployment" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="During remote operating system deployment via Unified Extensible Firmware Interface (UEFI), the firmware initializes network hardware to retrieve boot files via protocols like PXE or HTTP Boot. In an IPv6 environment, the UEFI network stack eliminates the" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="ipv6-address-resolution-in-uefi-remote-deployment">IPv6 Address
+Resolution in UEFI Remote Deployment</h1>
+<p>During remote operating system deployment via Unified Extensible
+Firmware Interface (UEFI), the firmware initializes network hardware to
+retrieve boot files via protocols like PXE or HTTP Boot. In an IPv6
+environment, the UEFI network stack eliminates the legacy Address
+Resolution Protocol (ARP) used in IPv4, replacing it with the IPv6
+Neighbor Discovery Protocol (NDP). This article details how UEFI
+leverages NDP, structured firmware drivers, and ICMPv6 messages to
+perform address resolution, detect duplicates, discover gateways, and
+communicate with deployment servers prior to OS initialization.</p>
+<h3 id="the-uefi-ipv6-network-stack-architecture">The UEFI IPv6 Network
+Stack Architecture</h3>
+<p>The UEFI specification defines a layered, modular driver design for
+network operations. At the hardware abstraction layer, the Simple
+Network Protocol (SNP) interfaces directly with the network interface
+card (NIC). Above this sits the Managed Network Protocol (MNP), which
+provides raw packet multiplexing.</p>
+<p>IPv6 network services are exposed through the
+<code>EFI_IP6_SERVICE_BINDING_PROTOCOL</code> and managed via the
+<code>EFI_IP6_PROTOCOL</code> and <code>EFI_IP6_CONFIG_PROTOCOL</code>.
+The UEFI IPv6 driver implements the Neighbor Discovery Protocol (RFC
+4861) directly within firmware space, handling address
+autoconfiguration, router discovery, and link-layer address resolution
+independently of the operating system.</p>
+<h3
+id="link-local-address-generation-and-duplicate-address-detection">Link-Local
+Address Generation and Duplicate Address Detection</h3>
+<p>Before the UEFI client can communicate across the network, it must
+generate a Link-Local address (typically with the <code>fe80::/64</code>
+prefix). This address is generated using either the device's modified
+EUI-64 identifier derived from the NIC's MAC address or an interface
+identifier configured via UEFI firmware policy.</p>
+<p>Once generated, the address is in a "tentative" state. The UEFI stack
+performs Duplicate Address Detection (DAD):</p>
+<ol type="1">
+<li>The firmware transmits an ICMPv6 Neighbor Solicitation (NS) message
+(Type 135) to the Solicited-Node multicast address corresponding to its
+tentative IPv6 address.</li>
+<li>The UEFI stack listens for an incoming Neighbor Advertisement (NA)
+message (Type 136).</li>
+<li>If no NA message is received within the specified timeout, the UEFI
+stack marks the Link-Local address as valid and assigns it to the
+interface.</li>
+</ol>
+<h3 id="router-discovery-and-prefix-configuration">Router Discovery and
+Prefix Configuration</h3>
+<p>To communicate beyond the local broadcast domain to reach remote
+deployment servers, UEFI must identify default gateways and subnet
+prefixes:</p>
+<ol type="1">
+<li><strong>Router Solicitation (RS):</strong> The UEFI client transmits
+an ICMPv6 Type 133 packet addressed to the all-routers multicast address
+(<code>ff02::2</code>).</li>
+<li><strong>Router Advertisement (RA):</strong> Local routers respond
+with an ICMPv6 Type 134 packet containing configuration flags, network
+prefixes, MTU size, and default gateway addresses.</li>
+</ol>
+<p>Based on the flags in the RA message:</p>
+<ul>
+<li><strong>Autonomous Flag (A=1):</strong> The client utilizes
+Stateless Address Autoconfiguration (SLAAC) to form a global unicast
+address.</li>
+<li><strong>Managed Address Configuration Flag (M=1):</strong> The
+client invokes the <code>EFI_DHCP6_PROTOCOL</code> to request stateful
+address assignment and boot options (such as the boot file URI or
+Network Bootstrap Program) from a DHCPv6 server.</li>
+<li><strong>Other Configuration Flag (O=1):</strong> The client uses
+SLAAC for its address but queries DHCPv6 for auxiliary deployment
+parameters.</li>
+</ul>
+<h3 id="target-address-resolution-ns-and-na">Target Address Resolution
+(NS and NA)</h3>
+<p>When the UEFI boot manager initiates file transfer from a deployment
+server (using TFTP for PXE or HTTP/HTTPS for UEFI HTTP Boot), it must
+resolve the server's or the local gateway's IPv6 address to a 48-bit
+Ethernet MAC address:</p>
+<ol type="1">
+<li><strong>Routing Check:</strong> The UEFI stack checks its internal
+routing table. If the target deployment server is on the local link, it
+resolves the server's IPv6 address directly. If the server is on a
+remote subnet, the stack resolves the default router's IPv6 address
+obtained during router discovery.</li>
+<li><strong>Sending Neighbor Solicitation:</strong> The UEFI stack
+constructs an ICMPv6 Neighbor Solicitation message. The destination is
+the Solicited-Node multicast address (<code>ff02::1:ffXX:XXXX</code>)
+corresponding to the lower 24 bits of the target IPv6 address. The
+Source Link-Layer Address option is included, containing the client's
+own MAC address.</li>
+<li><strong>Receiving Neighbor Advertisement:</strong> The target node
+processes the solicitation and responds with a unicast Neighbor
+Advertisement directed to the UEFI client. This packet includes the
+target's MAC address in the Target Link-Layer Address option.</li>
+<li><strong>Neighbor Cache Update:</strong> The UEFI network stack
+creates an entry in its internal Neighbor Cache (equivalent to an ARP
+table), binding the target's IPv6 address to its MAC address in the
+<code>REACHABLE</code> state.</li>
+</ol>
+<h3 id="file-transfer-and-handoff">File Transfer and Handoff</h3>
+<p>With address resolution complete, the UEFI network stack constructs
+Ethernet frames using the retrieved MAC address. The client downloads
+the Network Bootstrap Program (NBP), such as GRUB or the Windows Boot
+Manager, over TCP (for HTTP Boot) or UDP (for TFTP PXE).</p>
+<p>The Neighbor Cache remains active in UEFI system memory until the
+boot loader calls the UEFI <code>ExitBootServices()</code> API. At that
+point, the firmware releases control of the network interface, and the
+newly loaded operating system kernel reinitializes the NIC with its
+native IPv6 networking stack.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/i-pv-6-address-resolution-in-uefi-remote-deployment';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

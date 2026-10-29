@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How Option ROMs Register Interrupts in UEFI - uefi</title>
+    <meta name="description" content="Third-party Option ROMs (OpROMs) operating in a Unified Extensible Firmware Interface (UEFI) environment handle interrupts differently than traditional legacy BIOS implementations. This article examines the architectural mechanisms UEFI provides for inter">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-option-ro-ms-register-interrupts-in-uefi">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How Option ROMs Register Interrupts in UEFI - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-option-ro-ms-register-interrupts-in-uefi" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Third-party Option ROMs (OpROMs) operating in a Unified Extensible Firmware Interface (UEFI) environment handle interrupts differently than traditional legacy BIOS implementations. This article examines the architectural mechanisms UEFI provides for inter" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-option-roms-register-interrupts-in-uefi">How Option ROMs
+Register Interrupts in UEFI</h1>
+<p>Third-party Option ROMs (OpROMs) operating in a Unified Extensible
+Firmware Interface (UEFI) environment handle interrupts differently than
+traditional legacy BIOS implementations. This article examines the
+architectural mechanisms UEFI provides for interrupt management,
+detailing how native UEFI drivers register hardware interrupt handlers,
+use event-driven timer callbacks as non-preemptive alternatives, replace
+legacy software interrupts with protocols, and manage legacy OpROM
+execution via the Compatibility Support Module (CSM).</p>
+<h3 id="the-architectural-shift-from-legacy-bios-to-uefi">The
+Architectural Shift from Legacy BIOS to UEFI</h3>
+<p>In legacy BIOS systems, an Option ROM loaded from a PCI expansion
+card hooked directly into the real-mode Interrupt Vector Table (IVT)
+located at memory address <code>0x0000:0x0000</code> or modified the
+protected-mode Interrupt Descriptor Table (IDT). A legacy OpROM provided
+hardware and software services by intercepting real-mode interrupt calls
+such as <code>INT 10h</code> for video or <code>INT 13h</code> for
+storage.</p>
+<p>Native UEFI eliminates raw interrupt hooking for boot-time device
+drivers. UEFI runs in protected or long mode with a flat memory model
+and operates predominantly as a single-threaded, polling-based,
+cooperative multitasking environment. Consequently, native UEFI Option
+ROMs are structured as standard UEFI drivers (PE32+ binaries) rather
+than raw machine code blobs.</p>
+<h3 id="registering-hardware-interrupts-via-protocols">Registering
+Hardware Interrupts via Protocols</h3>
+<p>When a hardware device requires servicing via a physical interrupt
+line (such as PCI INTx or MSI/MSI-X) during the pre-boot phase, the UEFI
+driver cannot manipulate the CPU's IDT directly. Instead, it must rely
+on architectural protocols provided by the DXE (Driver Execution
+Environment) core.</p>
+<p>To register a hardware interrupt service routine, a driver uses the
+<code>EFI_HARDWARE_INTERRUPT_PROTOCOL</code> (or platform-specific
+variations such as <code>EFI_HARDWARE_INTERRUPT2_PROTOCOL</code>). The
+process proceeds through the following steps:</p>
+<ol type="1">
+<li><p><strong>Locate the Protocol:</strong> The third-party driver
+calls the Boot Service <code>gBS-&gt;LocateProtocol()</code> to obtain a
+pointer to the platform's active
+<code>EFI_HARDWARE_INTERRUPT_PROTOCOL</code> interface.</p></li>
+<li><p><strong>Define the Handler:</strong> The driver defines an
+interrupt handler function adhering to the
+<code>EFI_CPU_INTERRUPT_HANDLER</code> prototype:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">typedef</span> VOID <span class="op">(</span>EFIAPI <span class="op">*</span>EFI_CPU_INTERRUPT_HANDLER<span class="op">)(</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    IN EFI_EXCEPTION_TYPE InterruptType<span class="op">,</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    IN EFI_SYSTEM_CONTEXT SystemContext</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span></code></pre></div></li>
+<li><p><strong>Register the Routine:</strong> The driver invokes the
+<code>RegisterInterruptHandler</code> member function of the protocol,
+passing the target interrupt vector source assigned to the PCI device
+along with the pointer to the handler function.</p></li>
+<li><p><strong>Enable the Vector:</strong> Once registered, the driver
+calls <code>EnableInterruptSource</code> to unmask the interrupt vector
+in the platform's interrupt controller (e.g., APIC).</p></li>
+</ol>
+<p>Because UEFI core services are generally not re-entrant, code running
+within a hardware interrupt handler must be minimal, avoiding calls to
+most UEFI Boot Services to prevent deadlocks or state corruption.</p>
+<h3
+id="event-driven-asynchronous-polling-as-the-standard-approach">Event-Driven
+Asynchronous Polling as the Standard Approach</h3>
+<p>Due to the constraints and platform dependencies of hardware
+interrupts in pre-boot environments, the standard UEFI design pattern
+discourages raw hardware ISRs for third-party Option ROMs. Instead, UEFI
+provides an asynchronous event model that abstracts interrupt-like
+behavior without preemptive context switching:</p>
+<ol type="1">
+<li><strong>Creating a Timer Event:</strong> The driver uses
+<code>gBS-&gt;CreateEvent()</code> with the type
+<code>EVT_TIMER | EVT_NOTIFY_SIGNAL</code> and assigns a notification
+callback function.</li>
+<li><strong>Arming the Timer:</strong> The driver calls
+<code>gBS-&gt;SetTimer()</code>, setting the timer to
+<code>TimerPeriodic</code> with a trigger interval (often ranging from
+10 to 100 milliseconds).</li>
+<li><strong>Execution at TPL:</strong> The UEFI core's scheduler calls
+the driver’s callback function whenever the timer expires, executing at
+a specific Task Priority Level (TPL), typically
+<code>TPL_CALLBACK</code> or <code>TPL_NOTIFY</code>.</li>
+</ol>
+<p>Inside this callback, the driver queries its hardware status
+registers to determine if an operation has finished or if an error has
+occurred, mimicking an interrupt-driven state machine safely within the
+UEFI cooperative model.</p>
+<h3 id="replacing-software-interrupts-with-protocols">Replacing Software
+Interrupts with Protocols</h3>
+<p>In legacy environments, third-party Option ROMs registered themselves
+as software interrupt handlers so operating system loaders or other
+utilities could invoke their services. In UEFI, software interrupts are
+entirely replaced by the UEFI Protocol model:</p>
+<ol type="1">
+<li><strong>Protocol Implementation:</strong> The OpROM implements a
+defined interface, such as <code>EFI_BLOCK_IO_PROTOCOL</code> for mass
+storage controllers or <code>EFI_GRAPHICS_OUTPUT_PROTOCOL</code> (GOP)
+for display adapters.</li>
+<li><strong>Publishing the Interface:</strong> The driver calls
+<code>gBS-&gt;InstallMultipleProtocolInterfaces()</code> to bind its
+function pointers and device path to the handle representing the
+underlying hardware controller.</li>
+<li><strong>Consumer Discovery:</strong> Other drivers and the OS boot
+manager locate and call these services directly through function
+pointers, bypassing the need for software interrupt dispatching.</li>
+</ol>
+<h3
+id="legacy-option-roms-and-the-compatibility-support-module-csm">Legacy
+Option ROMs and the Compatibility Support Module (CSM)</h3>
+<p>If a third-party Option ROM is compiled strictly as a legacy binary
+rather than a native UEFI driver, it cannot natively interact with the
+UEFI driver model. In systems where legacy boot support is enabled:</p>
+<ol type="1">
+<li>The UEFI firmware loads the Compatibility Support Module (CSM),
+which provides a partial real-mode BIOS execution environment.</li>
+<li>The CSM driver (<code>EFI_LEGACY_BIOS_PROTOCOL</code>) copies the
+legacy OpROM into the Compatibility16 execution space (typically the
+<code>C0000h–EFFFFh</code> region).</li>
+<li>The CSM transitions the processor to real or virtual-8086 mode and
+executes the OpROM's entry point.</li>
+<li>The legacy OpROM then directly writes to the 16-bit Interrupt Vector
+Table (IVT) in the first kilobyte of physical RAM, registering
+traditional software and hardware interrupt handlers (such as
+<code>INT 13h</code> or hardware IRQs routed through the legacy 8259
+PIC) exactly as it would on native BIOS firmware.</li>
+</ol></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-option-ro-ms-register-interrupts-in-uefi';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

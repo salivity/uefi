@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How Hardware RAID Presents GPT Disks to UEFI - uefi</title>
+    <meta name="description" content="Hardware RAID controllers act as an abstraction layer between physical drives and the host system, creating a virtual disk that the Unified Extensible Firmware Interface (UEFI) detects as a single, contiguous physical block device. By leveraging onboard U">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-hardware-raid-presents-gpt-disks-to-uefi">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How Hardware RAID Presents GPT Disks to UEFI - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-hardware-raid-presents-gpt-disks-to-uefi" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Hardware RAID controllers act as an abstraction layer between physical drives and the host system, creating a virtual disk that the Unified Extensible Firmware Interface (UEFI) detects as a single, contiguous physical block device. By leveraging onboard U" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-hardware-raid-presents-gpt-disks-to-uefi">How Hardware RAID
+Presents GPT Disks to UEFI</h1>
+<p>Hardware RAID controllers act as an abstraction layer between
+physical drives and the host system, creating a virtual disk that the
+Unified Extensible Firmware Interface (UEFI) detects as a single,
+contiguous physical block device. By leveraging onboard UEFI drivers and
+protocols, the controller translates the underlying multi-drive array
+into logical block addresses (LBAs) where a standard GUID Partition
+Table (GPT) structure resides. This article explains the architectural
+handshake between the RAID controller, UEFI firmware protocols, and GPT
+structures that make modern enterprise boot operations possible.</p>
+<h3 id="the-virtual-disk-abstraction-layer">The Virtual Disk Abstraction
+Layer</h3>
+<p>A hardware RAID controller manages physical drives (SAS, SATA, or
+NVMe) via its proprietary processor and cache memory. The firmware
+inside the controller organizes these raw disks into one or more RAID
+arrays (such as RAID 1, 5, 10) and slices them into one or more Logical
+Unit Numbers (LUNs), commonly called virtual disks (VDs).</p>
+<p>To the host platform, the physical composition—spindle speeds,
+striping patterns, parity blocks, and drive counts—is completely hidden.
+The controller abstracts this complexity into a flat, linear array of
+sectors indexed from Logical Block Address 0 (LBA 0) up to the maximum
+accessible sector of the configured virtual capacity.</p>
+<h3 id="uefi-driver-integration-and-device-path-protocols">UEFI Driver
+Integration and Device Path Protocols</h3>
+<p>During the early Power-On Self-Test (POST) phase, the platform UEFI
+firmware initializes system buses (such as PCIe) and queries expansion
+ROMs. The hardware RAID controller provides its own UEFI driver,
+typically adhering to the UEFI Driver Model.</p>
+<ol type="1">
+<li><strong>Driver Binding:</strong> The UEFI firmware binds the
+controller’s UEFI driver to the PCIe handle associated with the RAID
+card.</li>
+<li><strong>Handle Creation:</strong> The RAID driver scans its
+configured virtual disks and installs an instance of the
+<code>EFI_BLOCK_IO_PROTOCOL</code> and
+<code>EFI_DISK_INFO_PROTOCOL</code> for each virtual disk onto a new
+child device handle.</li>
+<li><strong>Block IO Interface:</strong> The
+<code>EFI_BLOCK_IO_PROTOCOL</code> exposes basic sector-level read and
+write primitives (<code>ReadBlocks</code>, <code>WriteBlocks</code>,
+<code>FlushBlocks</code>) to the UEFI environment. UEFI does not need to
+understand RAID parity or striping; it simply issues block read and
+write requests to the handle representing the virtual disk.</li>
+</ol>
+<h3 id="layout-of-gpt-on-the-virtual-block-device">Layout of GPT on the
+Virtual Block Device</h3>
+<p>Once the <code>EFI_BLOCK_IO_PROTOCOL</code> is published, the UEFI
+core partition management driver (<code>PartitionBusDriver</code>)
+attempts to detect a valid partition scheme on the device. Because the
+virtual disk behaves like any other standard storage drive, GPT
+structures can be mapped directly to it:</p>
+<ul>
+<li><strong>LBA 0 (Protective MBR):</strong> A legacy MBR sector is
+positioned at LBA 0 to prevent legacy partitioning tools from
+misidentifying and overwriting the array.</li>
+<li><strong>LBA 1 (Primary GPT Header):</strong> The primary GPT header
+defines the disk GUID, header size, CRC32 checksums, and the starting
+LBA of the Partition Entry Array.</li>
+<li><strong>LBAs 2–33 (Partition Entries):</strong> This space contains
+individual partition entries, including the partition type GUIDs, unique
+partition GUIDs, and sector ranges.</li>
+<li><strong>Backup GPT Structures:</strong> Duplicate partition tables
+and the secondary GPT header are stored across the final LBAs of the
+virtual disk's accessible space.</li>
+</ul>
+<p>When the RAID controller receives a read request for LBA 1, its
+internal firmware intercepts the command, determines which physical
+drive and sector holds that data according to the array's stripe map,
+retrieves the data, and returns it to the UEFI environment as a standard
+512-byte or 4096-byte block.</p>
+<h3 id="locating-the-efi-system-partition-and-booting">Locating the EFI
+System Partition and Booting</h3>
+<p>After parsing the GPT tables on the virtual disk, the UEFI firmware
+discovers the EFI System Partition (ESP), recognized by its unique type
+GUID (<code>C12A7328-F81F-11D2-BA4B-00A0C93EC93B</code>).</p>
+<p>The UEFI system then attaches the
+<code>EFI_SIMPLE_FILE_SYSTEM_PROTOCOL</code> to the ESP handle, allowing
+the firmware to navigate the partition's FAT32 file system. The firmware
+loads the targeted operating system bootloader (such as
+<code>bootx64.efi</code>), which executes while still relying on the
+RAID controller's UEFI driver for disk reads. Once the operating system
+kernel initializes, it loads its own high-performance, OS-specific
+storage driver to take over communication with the RAID controller,
+finalizing the transition out of the UEFI environment.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-hardware-raid-presents-gpt-disks-to-uefi';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How Kernels Use UEFI Runtime Services for Wakeup Alarms - uefi</title>
+    <meta name="description" content="Modern operating system kernels interface directly with platform firmware through Unified Extensible Firmware Interface (UEFI) Runtime Services to control low-level hardware states that persist beyond the boot phase. When scheduling hardware-level wakeup">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-kernels-use-uefi-runtime-services-for-wakeup-alarms">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How Kernels Use UEFI Runtime Services for Wakeup Alarms - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-kernels-use-uefi-runtime-services-for-wakeup-alarms" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Modern operating system kernels interface directly with platform firmware through Unified Extensible Firmware Interface (UEFI) Runtime Services to control low-level hardware states that persist beyond the boot phase. When scheduling hardware-level wakeup" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-kernels-use-uefi-runtime-services-for-wakeup-alarms">How
+Kernels Use UEFI Runtime Services for Wakeup Alarms</h1>
+<p>Modern operating system kernels interface directly with platform
+firmware through Unified Extensible Firmware Interface (UEFI) Runtime
+Services to control low-level hardware states that persist beyond the
+boot phase. When scheduling hardware-level wakeup alarms, kernels invoke
+standardized firmware interfaces, specifically the UEFI Time Services,
+bypassing the need for motherboard-specific register programming. This
+article explains the underlying mechanisms modern kernels use to map
+runtime firmware memory, invoke the <code>SetWakeupTime()</code>
+service, and program hardware real-time clocks (RTC) for system
+wakeups.</p>
+<h3 id="preserving-uefi-services-post-boot">Preserving UEFI Services
+Post-Boot</h3>
+<p>During the boot sequence, the firmware provides two classes of
+services: Boot Services and Runtime Services. Once the kernel prepares
+its own memory management subsystems, it calls
+<code>ExitBootServices()</code>. This invalidates the Boot Services and
+reclaims their associated memory.</p>
+<p>Runtime Services, however, remain resident in memory. The kernel
+inspects the UEFI memory map to identify regions flagged as
+<code>EfiRuntimeServicesCode</code> and
+<code>EfiRuntimeServicesData</code>. The kernel maps these physical
+memory ranges into its own virtual address space, traditionally using
+<code>SetVirtualAddressMap()</code> during initialization, or through
+dedicated isolated page tables in modern implementations to enhance
+security and isolation against buggy firmware implementations.</p>
+<h3 id="the-setwakeuptime-runtime-service">The
+<code>SetWakeupTime()</code> Runtime Service</h3>
+<p>UEFI standardizes access to the hardware Real-Time Clock through the
+<code>EFI_RUNTIME_SERVICES</code> table. To manage wakeup events, the
+specification defines two primary functions:</p>
+<ul>
+<li><code>GetWakeupTime(BOOLEAN *Enable, BOOLEAN *Pending, EFI_TIME *Time)</code></li>
+<li><code>SetWakeupTime(BOOLEAN Enable, EFI_TIME *Time)</code></li>
+</ul>
+<p>When scheduling an alarm, the kernel prepares an
+<code>EFI_TIME</code> structure populated with the target year, month,
+day, hour, minute, second, and timezone data. The kernel calls
+<code>SetWakeupTime()</code>, passing <code>TRUE</code> to enable the
+alarm along with the pointer to the target <code>EFI_TIME</code> struct,
+or <code>FALSE</code> with a <code>NULL</code> pointer to clear an
+existing alarm.</p>
+<p>Behind this abstraction, the platform-specific firmware handles the
+low-level communication with the hardware RTC or Power Management
+Integrated Circuit (PMIC), programming the appropriate alarm match
+registers and enabling the corresponding interrupt lines.</p>
+<h3 id="kernel-implementation-and-abstraction-layers">Kernel
+Implementation and Abstraction Layers</h3>
+<p>Operating system kernels abstract firmware calls behind standard
+user-space APIs so applications do not directly interact with UEFI
+interfaces.</p>
+<h4 id="linux-implementation">Linux Implementation</h4>
+<p>In Linux, this functionality is primarily handled by the
+<code>rtc-efi</code> driver within the RTC subsystem:</p>
+<ol type="1">
+<li><strong>User Space Interface:</strong> Applications or utilities
+(such as <code>rtcwake</code>) write an epoch timestamp to
+<code>/sys/class/rtc/rtcX/wakealarm</code>.</li>
+<li><strong>Subsystem Translation:</strong> The generic RTC framework
+verifies permissions, converts the target timestamp into standard
+date-time representations, and dispatches the request to the underlying
+driver via the <code>set_alarm</code> callback.</li>
+<li><strong>Firmware Invocation:</strong> The <code>rtc-efi</code>
+driver converts the values into an <code>EFI_TIME</code> struct and
+invokes the function pointer located at
+<code>efi.set_wakeup_time</code>.</li>
+<li><strong>Context Switching:</strong> Because UEFI runtime code is
+external to the kernel, Linux wraps the call in an execution context
+with interrupts disabled, a dedicated firmware stack, and specific page
+table mappings to safeguard the kernel space against memory
+corruptions.</li>
+</ol>
+<h4 id="windows-implementation">Windows Implementation</h4>
+<p>In Windows, the Hardware Abstraction Layer (HAL) acts as the
+intermediary. When a program creates a timer using the
+<code>CreateWaitableTimerEx()</code> API with the
+<code>CREATE_WAITABLE_TIMER_HIGH_RESOLUTION</code> or resume flags, the
+Windows Power Manager processes the request. If the system is entering a
+Modern Standby or ACPI S3/S4 sleep state, the HAL invokes the UEFI
+Runtime Services table directly to ensure the platform hardware triggers
+the system resume.</p>
+<h3 id="hardware-event-routing">Hardware Event Routing</h3>
+<p>Once <code>SetWakeupTime()</code> successfully executes:</p>
+<ol type="1">
+<li>The firmware sets the RTC hardware alarm registers.</li>
+<li>The RTC alarm interrupt line is routed to the platform's Advanced
+Configuration and Power Interface (ACPI) hardware logic or the primary
+interrupt controller.</li>
+<li>When the RTC counter matches the programmed alarm value, the RTC
+asserts an interrupt (such as an ACPI System Control Interrupt, or
+SCI).</li>
+<li>The platform power-management hardware detects the assertion,
+transitions the power delivery states back to full operation, and hands
+execution back to the kernel's resume vector.</li>
+</ol></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-kernels-use-uefi-runtime-services-for-wakeup-alarms';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

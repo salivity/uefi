@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Capsule Update Cryptographic Verification - uefi</title>
+    <meta name="description" content="A UEFI capsule update package relies on a multi-stage cryptographic pipeline to guarantee integrity, authenticity, and non-repudiation before modifying system firmware. By leveraging public-key cryptography, industry-standard digital signature formats, an">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-capsule-update-cryptographic-verification">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Capsule Update Cryptographic Verification - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-capsule-update-cryptographic-verification" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="A UEFI capsule update package relies on a multi-stage cryptographic pipeline to guarantee integrity, authenticity, and non-repudiation before modifying system firmware. By leveraging public-key cryptography, industry-standard digital signature formats, an" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-capsule-update-cryptographic-verification">UEFI Capsule
+Update Cryptographic Verification</h1>
+<p>A UEFI capsule update package relies on a multi-stage cryptographic
+pipeline to guarantee integrity, authenticity, and non-repudiation
+before modifying system firmware. By leveraging public-key cryptography,
+industry-standard digital signature formats, and a hardware-backed
+Platform Root of Trust, the platform ensures that only authentic,
+unmodified firmware images provided by the original equipment
+manufacturer (OEM) can be executed and flashed to the non-volatile
+storage.</p>
+<h3 id="1-capsule-structure-and-signature-packaging">1. Capsule
+Structure and Signature Packaging</h3>
+<p>Before delivery, the OEM packages the new firmware payload with an
+embedded cryptographic signature wrapper. Under the UEFI specification,
+this typically uses a PKCS #7 or Cryptographic Message Syntax (CMS)
+structure conforming to the UEFI
+<code>EFI_FIRMWARE_MANAGEMENT_PROTOCOL</code>. The payload package
+contains:</p>
+<ul>
+<li><strong>Capsule Header:</strong> Contains metadata defining the
+capsule's GUID, header size, flags, and image size.</li>
+<li><strong>Embedded Certificate / Signature Block:</strong> Holds the
+PKCS #7 SignedData structure containing the signer's X.509 certificate
+chain and the digital signature.</li>
+<li><strong>Firmware Payload:</strong> The actual binary image to be
+written to the flash ROM.</li>
+</ul>
+<h3 id="2-trust-anchor-anchoring">2. Trust Anchor Anchoring</h3>
+<p>Cryptographic verification requires an immutable reference point
+known as the Platform Root of Trust for Update (PRTU). During
+manufacturing, the OEM provisions a trusted public key or the
+cryptographic hash of that key into hardware-protected storage, such
+as:</p>
+<ul>
+<li>One-Time Programmable (OTP) fuses inside the SoC/CPU.</li>
+<li>A cryptographically locked segment of the SPI flash.</li>
+<li>A dedicated Platform Controller Hub (PCH) or Baseboard Management
+Controller (BMC) security block.</li>
+</ul>
+<p>This root key serves as the trust anchor against which all incoming
+update certificates are validated.</p>
+<h3 id="3-certificate-chain-authentication">3. Certificate Chain
+Authentication</h3>
+<p>When the system reboots into the update phase (typically during the
+Security (SEC) or Pre-EFI Initialization (PEI) phases), the platform
+update driver extracts the signature block from the capsule. The
+verification engine performs the following checks:</p>
+<ul>
+<li><strong>Chain of Trust Validation:</strong> The driver traverses the
+X.509 certificate hierarchy provided in the CMS block up to the root
+certificate.</li>
+<li><strong>Root Matching:</strong> The root certificate is compared
+against the hardware-anchored OEM public key. If the root does not match
+the immutable trust anchor, verification fails immediately.</li>
+<li><strong>Validity Checks:</strong> The system checks certificate
+attributes, including expiration, structural validity, and specific
+Extended Key Usage (EKU) fields indicating firmware update
+authorization.</li>
+</ul>
+<h3 id="4-payload-digest-verification">4. Payload Digest
+Verification</h3>
+<p>Once the signer's public key is authenticated, the system verifies
+that the firmware image has not been modified or corrupted:</p>
+<ol type="1">
+<li><strong>Hash Calculation:</strong> The verification engine hashes
+the raw binary payload using a secure cryptographic hashing algorithm
+(commonly SHA-256, SHA-384, or SHA-512).</li>
+<li><strong>Signature Decryption / Verification:</strong> The engine
+uses the authenticated public key to verify the digital signature
+(RSA-PSS, RSA PKCS#1 v1.5, or ECDSA) contained within the PKCS #7
+structure.</li>
+<li><strong>Digest Comparison:</strong> The decrypted digest is compared
+to the freshly calculated payload hash. A single-bit divergence causes
+the verification engine to reject the update.</li>
+</ol>
+<h3 id="5-anti-rollback-and-version-checking">5. Anti-Rollback and
+Version Checking</h3>
+<p>Cryptographic verification also guards against replay attacks where
+an attacker attempts to install an older, legitimately signed firmware
+version with known vulnerabilities.</p>
+<ul>
+<li>The capsule metadata contains an incremented security version
+number.</li>
+<li>The platform verifies this version against a hardware-based or
+NVRAM-based monotonic counter.</li>
+<li>If the version of the signed capsule is lower than the current
+platform minimum security version, the firmware update is rejected,
+regardless of the signature's validity.</li>
+</ul>
+<h3 id="6-execution-in-isolated-memory">6. Execution in Isolated
+Memory</h3>
+<p>All parsing and cryptographic verification operations occur in
+isolated, pre-boot execution environments—such as Authenticated Code
+Modules (ACM), System Management Mode (SMM), or isolated PEI memory.
+This prevents an untrusted runtime OS or malicious Direct Memory Access
+(DMA) devices from tampering with the capsule payload during or after
+the verification sequence. Once all checks pass, the payload is
+committed to the physical SPI flash.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-capsule-update-cryptographic-verification';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

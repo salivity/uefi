@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How Firmware Rootkits Bypass UEFI Security Controls - uefi</title>
+    <meta name="description" content="Firmware-level rootkits, commonly known as UEFI bootkits, subvert device security by embedding themselves into the lowest levels of system startup code before the operating system initializes. By executing in pre-boot environments, these threats can disab">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-firmware-rootkits-bypass-uefi-security-controls">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How Firmware Rootkits Bypass UEFI Security Controls - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-firmware-rootkits-bypass-uefi-security-controls" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Firmware-level rootkits, commonly known as UEFI bootkits, subvert device security by embedding themselves into the lowest levels of system startup code before the operating system initializes. By executing in pre-boot environments, these threats can disab" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-firmware-rootkits-bypass-uefi-security-controls">How
+Firmware Rootkits Bypass UEFI Security Controls</h1>
+<p>Firmware-level rootkits, commonly known as UEFI bootkits, subvert
+device security by embedding themselves into the lowest levels of system
+startup code before the operating system initializes. By executing in
+pre-boot environments, these threats can disable defensive software,
+establish persistence that survives disk reformatting and OS reinstalls,
+and hide their presence from security tools. This article examines the
+primary architectural techniques and vulnerabilities attackers leverage
+to circumvent Unified Extensible Firmware Interface (UEFI) defenses like
+Secure Boot, System Management Mode (SMM) protections, and SPI flash
+memory write locks.</p>
+<h3 id="exploiting-vulnerable-signed-bootloaders-byovd">Exploiting
+Vulnerable Signed Bootloaders (BYOVD)</h3>
+<p>Secure Boot is designed to prevent untrusted code execution by
+cryptographically validating the digital signature of every executable
+against authorized database keys (such as the <code>db</code> variable)
+embedded in NVRAM. Rather than attempting to break cryptographic
+algorithms, rootkits frequently exploit known vulnerabilities in
+legitimate, properly signed bootloaders and EFI binaries.</p>
+<p>This approach, known as Bring Your Own Vulnerable Driver (BYOVD) at
+the firmware level, involves replacing the operating system's bootloader
+with an older, vulnerable bootloader that is still signed by a trusted
+authority (such as Microsoft's Third-Party UEFI CA). Notable examples,
+such as the BootHole vulnerability in the GRUB2 bootloader and the
+BlackLotus bootkit exploiting CVE-2022-21894, allow attackers to execute
+arbitrary code during the boot chain while Secure Boot remains fully
+enabled and unaware of the breach.</p>
+<h3 id="manipulating-nvram-variables">Manipulating NVRAM Variables</h3>
+<p>UEFI stores configuration state and cryptographic trust databases in
+Non-Volatile Random-Access Memory (NVRAM). These include the Signature
+Database (<code>db</code>), Forbidden Signature Database
+(<code>dbx</code>), Key Exchange Key (<code>KEK</code>), and Platform
+Key (<code>PK</code>).</p>
+<p>If an attacker achieves kernel-level (Ring 0) privileges on a running
+system, they may attempt to alter these variables via standard UEFI
+runtime services (<code>SetVariable</code>). While protected variables
+require authorization via cryptographic signatures, implementation flaws
+or misconfigurations often allow local attackers to clear the
+<code>dbx</code> revocation list or append malicious public keys to the
+<code>db</code>. This allows the firmware to accept unauthorized,
+attacker-controlled bootloaders on subsequent reboots.</p>
+<h3 id="compromising-system-management-mode-smm">Compromising System
+Management Mode (SMM)</h3>
+<p>System Management Mode represents one of the most privileged
+execution rings in modern x86 architecture, running beneath the
+operating system and hypervisor (often referred to as "Ring -2"). SMM is
+invoked via System Management Interrupts (SMIs) and operates with
+complete access to physical memory, bypassing OS-level memory
+segmentation and virtualization-based security (VBS).</p>
+<p>Rootkits target vulnerabilities within SMI handlers—such as buffer
+overflows, pointer validation errors, and call-out vulnerabilities—to
+execute arbitrary code within the SMM execution space (SMRAM). Once an
+attacker establishes an SMM rootkit, they can suppress hardware-based
+write protections, read and alter hypervisor or OS memory dynamically,
+and disable system defenses without detection.</p>
+<h3 id="overriding-spi-flash-protections">Overriding SPI Flash
+Protections</h3>
+<p>UEFI firmware resides in non-volatile Serial Peripheral Interface
+(SPI) flash memory soldered to the motherboard. Chipsets feature
+hardware and firmware mechanisms designed to restrict unauthorized
+writes to this chip, specifically control registers such as
+<code>BIOS_CNTL</code> (BIOS Control Register), <code>SMM_BWP</code>
+(SMM BIOS Write Protect), and Protected Range (PR) registers.</p>
+<p>Firmware rootkits subvert these protections by:</p>
+<ul>
+<li><strong>Race Conditions:</strong> Exploiting time-of-check to
+time-of-use (TOCTOU) flaws (e.g., Speed Racer vulnerabilities) where an
+attacker rapidly attempts flash writes between the moment a write enable
+bit is set and the moment an SMI validates the request.</li>
+<li><strong>Misconfigurations:</strong> Leveraging OEM omissions where
+hardware write-protection bits like <code>BLE</code> (BIOS Lock Enable)
+or <code>SMM_BWP</code> were never enabled in the factory configuration,
+leaving the SPI flash open to modification directly from Ring 0.</li>
+</ul>
+<h3 id="attacking-pre-boot-file-parsers">Attacking Pre-Boot File
+Parsers</h3>
+<p>During the Driver Execution Environment (DXE) phase, the UEFI core
+loads drivers, initializes system hardware, and processes various data
+formats. Attackers have demonstrated the ability to compromise this
+early phase by targeting file format parsers that process non-essential
+assets, such as system logo images displayed during startup.</p>
+<p>Vulnerabilities like LogoFAIL demonstrate how placing a malformed
+image file (BMP, PNG, JPEG) into the EFI System Partition (ESP) or BIOS
+flash can trigger memory corruption within early image-parsing
+libraries. Because these parsers execute before the operational
+verification of subsequent boot components, memory corruption at this
+stage allows attackers to hijack the UEFI execution flow, bypass Secure
+Boot, and patch firmware in memory before OS handoff occurs.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-firmware-rootkits-bypass-uefi-security-controls';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

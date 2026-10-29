@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Shell bcfg Guide: Manage Boot Options - uefi</title>
+    <meta name="description" content="This article explains the purpose, functionality, and practical usage of the bcfg (Boot Configuration) utility found in the UEFI Shell. Readers will learn how this tool directly manipulates Non-Volatile RAM (NVRAM) boot variables to view, add, remove, and">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-shell-bcfg-guide-manage-boot-options">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Shell bcfg Guide: Manage Boot Options - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-shell-bcfg-guide-manage-boot-options" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article explains the purpose, functionality, and practical usage of the bcfg (Boot Configuration) utility found in the UEFI Shell. Readers will learn how this tool directly manipulates Non-Volatile RAM (NVRAM) boot variables to view, add, remove, and" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-shell-bcfg-guide-manage-boot-options">UEFI Shell bcfg
+Guide: Manage Boot Options</h1>
+<p>This article explains the purpose, functionality, and practical usage
+of the <code>bcfg</code> (Boot Configuration) utility found in the UEFI
+Shell. Readers will learn how this tool directly manipulates
+Non-Volatile RAM (NVRAM) boot variables to view, add, remove, and
+reorder boot and driver options without needing an active operating
+system.</p>
+<h2 id="what-is-the-bcfg-utility">What Is the bcfg Utility?</h2>
+<p>The <code>bcfg</code> command is an internal tool within the Unified
+Extensible Firmware Interface (UEFI) Shell designed to modify the
+firmware's boot and driver configuration tables. These configurations
+reside in NVRAM and determine the list of bootable devices, file paths
+to EFI applications (such as operating system bootloaders), and driver
+loading sequences.</p>
+<p>Because <code>bcfg</code> runs directly in the pre-boot firmware
+environment, it allows administrators to repair or configure boot
+targets when an operating system is unbootable, damaged, or not yet
+installed.</p>
+<h2 id="primary-functions-of-bcfg">Primary Functions of bcfg</h2>
+<p>The <code>bcfg</code> command targets two primary types of entries:
+<code>boot</code> (for OS loaders and boot options) and
+<code>driver</code> (for EFI drivers loaded prior to the OS).</p>
+<h3 id="1-inspecting-existing-boot-entries">1. Inspecting Existing Boot
+Entries</h3>
+<p>Using <code>bcfg</code> allows you to inspect current NVRAM boot
+records to verify paths, parameters, and entry indices.</p>
+<ul>
+<li><strong>Command:</strong> <code>bcfg boot dump</code></li>
+<li><strong>Purpose:</strong> Displays an indexed list of all configured
+boot targets, their descriptions, underlying device paths, and any
+optional parameters assigned to them.</li>
+</ul>
+<h3 id="2-adding-new-boot-entries">2. Adding New Boot Entries</h3>
+<p>When an OS installation fails to register its EFI binary, or when
+cloning a drive to a new system, firmware boot entries can disappear.
+The <code>bcfg</code> utility can manually register an EFI binary
+located on an accessible file system (typically an EFI System Partition,
+or ESP).</p>
+<ul>
+<li><strong>Command:</strong>
+<code>bcfg boot add &lt;Index&gt; &lt;Filepath&gt; "Description"</code></li>
+<li><strong>Purpose:</strong> Inserts a new boot option at a designated
+index. For instance,
+<code>bcfg boot add 0 fs0:\EFI\fedora\shimx64.efi "Fedora"</code>
+registers the Fedora bootloader as the primary boot target.</li>
+</ul>
+<h3 id="3-removing-stale-or-invalid-boot-entries">3. Removing Stale or
+Invalid Boot Entries</h3>
+<p>Over time, reinstalling operating systems or testing various
+distributions creates orphaned boot entries that point to non-existent
+files or drives.</p>
+<ul>
+<li><strong>Command:</strong>
+<code>bcfg boot rm &lt;Index&gt;</code></li>
+<li><strong>Purpose:</strong> Permanently deletes the boot option at the
+specified numerical index from the NVRAM table.</li>
+</ul>
+<h3 id="4-changing-boot-priority">4. Changing Boot Priority</h3>
+<p>System boot order is dictated by the numerical position of items in
+the boot list. The <code>bcfg</code> tool permits shifting these
+priorities without accessing the BIOS/UEFI GUI menus.</p>
+<ul>
+<li><strong>Command:</strong>
+<code>bcfg boot mv &lt;SourceIndex&gt; &lt;TargetIndex&gt;</code></li>
+<li><strong>Purpose:</strong> Moves an entry from its current position
+to a new position, updating the overall boot execution order.</li>
+</ul>
+<h2 id="common-use-cases-for-bcfg">Common Use Cases for bcfg</h2>
+<ul>
+<li><strong>Disaster Recovery:</strong> Recovering access to installed
+operating systems after a firmware update or battery pull resets NVRAM
+settings to factory defaults.</li>
+<li><strong>Dual-Boot Troubleshooting:</strong> Resolving boot priority
+conflicts between platforms (e.g., Windows Boot Manager and GRUB)
+directly at the firmware layer.</li>
+<li><strong>Automated Provisioning:</strong> Scripting deployment
+configurations via UEFI Shell scripts (<code>.nsh</code> files) during
+bare-metal server installations.</li>
+<li><strong>Driver Management:</strong> Loading custom hardware or
+file-system drivers (such as ext4 or NTFS drivers) into the UEFI
+environment prior to executing bootloaders.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-shell-bcfg-guide-manage-boot-options';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

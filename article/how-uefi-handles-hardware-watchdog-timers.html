@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Handles Hardware Watchdog Timers - uefi</title>
+    <meta name="description" content="This article provides an overview of how the Unified Extensible Firmware Interface (UEFI) initializes, configures, and manages hardware watchdog timers (WDTs) during the boot sequence. It explores the mechanisms UEFI uses to detect hangs during pre-boot e">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-handles-hardware-watchdog-timers">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Handles Hardware Watchdog Timers - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-handles-hardware-watchdog-timers" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article provides an overview of how the Unified Extensible Firmware Interface (UEFI) initializes, configures, and manages hardware watchdog timers (WDTs) during the boot sequence. It explores the mechanisms UEFI uses to detect hangs during pre-boot e" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-handles-hardware-watchdog-timers">How UEFI Handles
+Hardware Watchdog Timers</h1>
+<p>This article provides an overview of how the Unified Extensible
+Firmware Interface (UEFI) initializes, configures, and manages hardware
+watchdog timers (WDTs) during the boot sequence. It explores the
+mechanisms UEFI uses to detect hangs during pre-boot execution, the role
+of core architectural protocols, and the critical handoff
+procedures—such as disabling the timer or configuring ACPI
+tables—executed just before control passes to the operating system.</p>
+<p>During the earliest boot phases—the Security (SEC) and Pre-EFI
+Initialization (PEI) phases—the platform firmware must safeguard the
+system against hangs caused by uninitialized memory, faulty hardware, or
+bad configuration data. The firmware enables a bare-metal hardware
+watchdog timer, often located in the chipset (such as the Intel TCO
+watchdog) or a Baseboard Management Controller (BMC) via IPMI. If the
+system locks up before memory is trained, the hardware timer expires and
+asserts a hard reset.</p>
+<p>Once execution enters the Driver Execution Environment (DXE) phase,
+the firmware establishes the standardized UEFI Watchdog Timer service.
+This is managed by the <code>EFI_WATCHDOG_TIMER_ARCH_PROTOCOL</code>.
+The UEFI specification defines a boot services interface,
+<code>SetWatchdogTimer()</code>, which allows drivers or applications to
+arm, re-arm (pet), or disable the watchdog. By default, UEFI core
+implementations (such as EDK II) set a default timeout of five minutes
+to ensure the firmware does not hang indefinitely while waiting for slow
+devices, user interaction, or failed network boots.</p>
+<p>The architectural watchdog protocol links the generic UEFI API to the
+underlying platform-specific hardware driver. When the UEFI boot manager
+loads drivers or iterates through boot options, it routinely resets the
+countdown. If specialized hardware is present, such as an enterprise
+server's Super I/O or BMC watchdog, a platform-specific DXE driver
+programs the physical registers with appropriate timeouts, translating
+the UEFI <code>SetWatchdogTimer()</code> calls directly into hardware
+register writes or IPMI commands.</p>
+<p>The most critical stage occurs when the UEFI boot manager executes
+the OS loader, leading up to the invocation of
+<code>gBS-&gt;ExitBootServices()</code>. Under the standard UEFI
+specification, calling <code>ExitBootServices()</code> automatically
+terminates all standard Boot Services, which includes disabling the
+UEFI-managed watchdog timer via the architectural protocol. This ensures
+that a legacy operating system lacking watchdog drivers does not suffer
+unexpected reboots when the firmware timer runs out.</p>
+<p>For enterprise and mission-critical systems requiring uninterrupted
+watchdog coverage, UEFI utilizes the ACPI Watchdog Action Table (WDAT).
+Instead of simply disabling the physical watchdog during handoff, the
+firmware leaves the hardware timer running with an extended grace
+period. The firmware populates the WDAT table in system memory,
+detailing the physical I/O ports or memory-mapped registers,
+instructions, and bitmasks required to manage the timer. When the OS
+kernel boots, its native watchdog driver reads the WDAT, assumes control
+of the running hardware, and begins petting the timer without ever
+exposing the system to an unmonitored window.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-handles-hardware-watchdog-timers';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

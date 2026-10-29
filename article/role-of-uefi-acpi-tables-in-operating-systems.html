@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Role of UEFI ACPI Tables in Operating Systems - uefi</title>
+    <meta name="description" content="This article examines the critical function of Advanced Configuration and Power Interface (ACPI) tables supplied by UEFI firmware to the operating system during boot and runtime. It explains how these structured data tables bridge the gap between platform">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/role-of-uefi-acpi-tables-in-operating-systems">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Role of UEFI ACPI Tables in Operating Systems - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/role-of-uefi-acpi-tables-in-operating-systems" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article examines the critical function of Advanced Configuration and Power Interface (ACPI) tables supplied by UEFI firmware to the operating system during boot and runtime. It explains how these structured data tables bridge the gap between platform" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="role-of-uefi-acpi-tables-in-operating-systems">Role of UEFI ACPI
+Tables in Operating Systems</h1>
+<p>This article examines the critical function of Advanced Configuration
+and Power Interface (ACPI) tables supplied by UEFI firmware to the
+operating system during boot and runtime. It explains how these
+structured data tables bridge the gap between platform hardware and
+software, enabling hardware discovery, power state management, device
+configuration, and platform abstraction without requiring hardcoded,
+motherboard-specific operating system drivers.</p>
+<h2 id="what-are-acpi-tables-in-uefi">What Are ACPI Tables in UEFI?</h2>
+<p>When a computer boots, the Unified Extensible Firmware Interface
+(UEFI) initializes the motherboard, processor, memory, and essential
+peripherals. Because modern operating systems are designed to run across
+thousands of different motherboard configurations, they cannot rely on
+hardcoded hardware mappings.</p>
+<p>To solve this, UEFI constructs ACPI tables in system memory. These
+tables are standardized data structures containing detailed descriptions
+of the motherboard's architecture, integrated devices, power
+capabilities, and system interfaces.</p>
+<h2 id="how-the-uefi-to-os-handoff-works">How the UEFI-to-OS Handoff
+Works</h2>
+<p>During the platform initialization phase, the UEFI firmware builds
+the ACPI tables and creates a pointer structure known as the Root System
+Description Pointer (RSDP).</p>
+<p>When the operating system's bootloader executes:</p>
+<ol type="1">
+<li>The OS queries the UEFI system table to retrieve the RSDP
+address.</li>
+<li>The RSDP points to the Extended System Description Table (XSDT),
+which contains 64-bit physical memory addresses for all other ACPI
+tables on the system.</li>
+<li>Once the operating system transitions out of UEFI boot services, it
+takes ownership of the hardware using the ACPI tables as its master
+blueprint.</li>
+</ol>
+<h2 id="core-functions-of-acpi-tables">Core Functions of ACPI
+Tables</h2>
+<h3 id="1-hardware-discovery-and-enumeration">1. Hardware Discovery and
+Enumeration</h3>
+<p>Before an operating system can load appropriate drivers, it must
+identify what hardware is present. ACPI tables describe components that
+cannot be automatically discovered by traditional bus scans (such as PCI
+or USB enumeration). This includes system clocks, interrupt controllers,
+platform controllers, and non-pluggable embedded devices.</p>
+<h3 id="2-power-and-thermal-management">2. Power and Thermal
+Management</h3>
+<p>ACPI tables define the power management capabilities of both the
+system and individual devices:</p>
+<ul>
+<li><strong>Global System States (G-States and S-States):</strong> They
+inform the OS how to enter and wake from sleep, hibernation, and
+soft-off states (e.g., S3, S4, Modern Standby).</li>
+<li><strong>Device Power States (D-States):</strong> They specify how
+peripheral devices transition between fully operational and low-power
+idle states.</li>
+<li><strong>Processor Performance States (P-States and
+C-States):</strong> They define dynamic voltage and frequency scaling
+(DVFS) and CPU idle states to balance performance and energy
+consumption.</li>
+<li><strong>Thermal Zones:</strong> They map temperature sensors to
+cooling policies (e.g., controlling fan trip points or initiating
+thermal throttling).</li>
+</ul>
+<h3 id="3-execution-of-platform-logic-aml-and-asl">3. Execution of
+Platform Logic (AML and ASL)</h3>
+<p>Certain ACPI tables contain ACPI Machine Language (AML), a byte-code
+compiled from ACPI Source Language (ASL). The operating system includes
+a built-in AML interpreter. This allows the OS to execute
+vendor-specific routines—such as adjusting display brightness, detecting
+laptop lid closure, or handling hot-plug events—directly through
+standardized interfaces without custom low-level drivers.</p>
+<h2 id="critical-acpi-tables">Critical ACPI Tables</h2>
+<p>While a system may provide dozens of ACPI tables, several are
+essential for basic system operation:</p>
+<ul>
+<li><strong>FADT (Fixed ACPI Description Table):</strong> Contains
+fundamental platform configurations, power management profile flags, and
+pointers to the DSDT and FACS (Firmware ACPI Control Structure).</li>
+<li><strong>MADT (Multiple APIC Description Table):</strong> Outlines
+the processor architecture, describing all local APICs (Advanced
+Programmable Interrupt Controllers), I/O APICs, and interrupt routing
+required for multi-core processing.</li>
+<li><strong>DSDT (Differentiated System Description Table):</strong> The
+central ACPI database containing the base AML code that describes
+peripheral devices, power resources, and device control methods.</li>
+<li><strong>SSDT (Secondary System Description Table):</strong>
+Supplemental tables that expand on the DSDT, often used for add-in cards
+or dynamic platform features.</li>
+<li><strong>SRAT (System Resource Affinity Table):</strong> In
+high-performance and server systems, this table describes Non-Uniform
+Memory Access (NUMA) topologies, enabling the OS to optimize memory
+allocation and CPU thread scheduling.</li>
+</ul>
+<h2 id="summary">Summary</h2>
+<p>ACPI tables provided by UEFI serve as the universal communication
+contract between physical hardware and the operating system. By
+translating vendor-specific motherboard designs into standardized data
+tables and executable byte-code, they allow a single operating system
+image to reliably discover hardware, allocate resources, and handle
+power and thermal regulation across diverse computing platforms.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/role-of-uefi-acpi-tables-in-operating-systems';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

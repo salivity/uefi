@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Secure Boot Certificate Revocation Explained - uefi</title>
+    <meta name="description" content="Unified Extensible Firmware Interface (UEFI) firmware updates maintain platform integrity by updating internal revocation lists to block vulnerable or compromised cryptographic keys and binaries. When a bootloader, driver, or certificate is compromised, f">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-secure-boot-certificate-revocation-explained">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Secure Boot Certificate Revocation Explained - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-secure-boot-certificate-revocation-explained" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Unified Extensible Firmware Interface (UEFI) firmware updates maintain platform integrity by updating internal revocation lists to block vulnerable or compromised cryptographic keys and binaries. When a bootloader, driver, or certificate is compromised, f" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-secure-boot-certificate-revocation-explained">UEFI Secure
+Boot Certificate Revocation Explained</h1>
+<p>Unified Extensible Firmware Interface (UEFI) firmware updates
+maintain platform integrity by updating internal revocation lists to
+block vulnerable or compromised cryptographic keys and binaries. When a
+bootloader, driver, or certificate is compromised, firmware updates
+modify the UEFI Secure Boot Forbidden Signature Database
+(<code>dbx</code>) using authenticated variables. This article details
+the architecture of UEFI revocation lists, how updates are
+cryptographically authenticated, how delivery mechanisms deploy them,
+and the safeguards used to prevent replay attacks and system
+instability.</p>
+<h3 id="the-uefi-signature-architecture">The UEFI Signature
+Architecture</h3>
+<p>UEFI Secure Boot relies on a hierarchy of cryptographic databases
+stored in non-volatile random-access memory (NVRAM):</p>
+<ul>
+<li><strong>Platform Key (PK):</strong> Establishes trust between the
+platform owner and the firmware.</li>
+<li><strong>Key Exchange Key (KEK):</strong> Authorizes updates to the
+signature databases.</li>
+<li><strong>Signature Database (<code>db</code>):</strong> Contains
+authorized signing certificates, public keys, and cryptographic hashes
+of trusted boot assets.</li>
+<li><strong>Forbidden Signature Database (<code>dbx</code>):</strong>
+Contains the revocation list. Any binary whose signature or hash matches
+an entry in the <code>dbx</code> is blocked from executing during
+pre-boot, even if it is signed by a valid key in the
+<code>db</code>.</li>
+</ul>
+<h3 id="how-firmware-updates-apply-revocations">How Firmware Updates
+Apply Revocations</h3>
+<p>When a signing certificate or binary is compromised—such as in
+widespread vulnerabilities like BootHole or BlackLotus—the revocation
+process prevents affected components from being used to execute
+arbitrary code.</p>
+<ol type="1">
+<li><strong>Creation of Revocation Payloads:</strong> Certificate
+authorities (such as Microsoft, which signs most third-party UEFI
+binaries) generate an updated <code>dbx</code> binary payload containing
+the SHA-256 hashes of compromised binaries or the certificates
+themselves.</li>
+<li><strong>Cryptographic Signing:</strong> The update payload is
+wrapped in an authenticated variable format (typically a standard PKCS#7
+envelope). It must be signed by a key that chains back to the firmware's
+Key Exchange Key (KEK).</li>
+<li><strong>Firmware Validation:</strong> When the update is delivered
+to the system, the UEFI firmware inspects the payload. It verifies that
+the signature matches an authorized KEK before appending the new entries
+to the active <code>dbx</code>. If the signature check fails, the
+firmware discards the update.</li>
+<li><strong>Monotonic Counters:</strong> To prevent rollback
+attacks—where an attacker attempts to re-apply an older, smaller
+<code>dbx</code> payload—updates include a monotonic counter or
+timestamp. The firmware ensures that the incoming update version is
+strictly greater than the currently installed version.</li>
+</ol>
+<h3 id="delivery-mechanisms">Delivery Mechanisms</h3>
+<p>Revocation lists are typically delivered through two main
+pathways:</p>
+<ul>
+<li><strong>Operating System Updates:</strong> Modern operating systems
+can pass signed <code>dbx</code> updates directly to the firmware via
+runtime UEFI variables (using the <code>SetVariable()</code> API). In
+Windows, this occurs via Windows Update; in Linux, this is often handled
+by tools like <code>fwupd</code> or systemd-boot. The OS does not modify
+the database directly; it merely submits the signed blob to the firmware
+runtime services, which perform the authentication and commit the
+changes to NVRAM.</li>
+<li><strong>UEFI Capsule Updates:</strong> Hardware vendors can package
+revocation lists directly into system firmware/BIOS updates using the
+UEFI Capsule mechanism. The capsule is placed in memory or a dedicated
+system partition, and the platform applies the update across a reboot in
+a dedicated, secure execution environment.</li>
+</ul>
+<h3 id="constraints-and-failure-mitigations">Constraints and Failure
+Mitigations</h3>
+<p>Managing revocation lists introduces distinct engineering
+challenges:</p>
+<ul>
+<li><strong>NVRAM Capacity Limits:</strong> NVRAM space on flash chips
+is often limited to a few megabytes or less. As the <code>dbx</code>
+grows over time with thousands of revoked hashes, storage exhaustion can
+cause update failures or prevent other firmware settings from saving. To
+mitigate this, updates increasingly target signing certificates rather
+than individual file hashes whenever feasible, and vendors are gradually
+expanding dedicated NVRAM partitions.</li>
+<li><strong>Bootloader Incompatibilities:</strong> Applying a
+<code>dbx</code> update immediately prevents affected bootloaders from
+launching. To prevent systems from becoming unbootable, operating system
+vendors typically orchestrate updates by installing patched, newly
+signed bootloaders before applying the corresponding <code>dbx</code>
+update that invalidates the older versions.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-secure-boot-certificate-revocation-explained';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

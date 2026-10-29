@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Multi-Core Initialization in Early Boot Phases - uefi</title>
+    <meta name="description" content="Unified Extensible Firmware Interface (UEFI) manages multi-core and multi-threaded initialization through a strict division of labor between a single primary core and the remaining secondary cores across standardized boot phases. During the initial reset,">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-multi-core-initialization-in-early-boot-phases">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Multi-Core Initialization in Early Boot Phases - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-multi-core-initialization-in-early-boot-phases" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Unified Extensible Firmware Interface (UEFI) manages multi-core and multi-threaded initialization through a strict division of labor between a single primary core and the remaining secondary cores across standardized boot phases. During the initial reset," />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-multi-core-initialization-in-early-boot-phases">UEFI
+Multi-Core Initialization in Early Boot Phases</h1>
+<p>Unified Extensible Firmware Interface (UEFI) manages multi-core and
+multi-threaded initialization through a strict division of labor between
+a single primary core and the remaining secondary cores across
+standardized boot phases. During the initial reset, the platform
+designates one core as the Bootstrap Processor (BSP) to execute firmware
+sequentially, while all other cores—termed Application Processors
+(APs)—are held in a dormant state. As boot progresses, UEFI utilizes
+low-level interrupt signaling and the EFI MP Services Protocol to bring
+up secondary cores, synchronize processor states, run tasks in parallel,
+and safely park them before handing control to the operating system.</p>
+<h3 id="hardware-reset-and-the-bootstrap-processor">Hardware Reset and
+the Bootstrap Processor</h3>
+<p>When a multi-core system powers on, the processor hardware
+automatically conducts an election to establish the Bootstrap Processor
+(BSP). On x86 architectures, this is handled via hardware arbitration
+through the Local Advanced Programmable Interrupt Controller
+(LAPIC).</p>
+<p>The selected BSP begins fetching and executing firmware instructions
+from the reset vector. All remaining cores are designated as Application
+Processors (APs). By default, the hardware places APs into a
+wait-for-SIPI (Startup Inter-Processor Interrupt) state, halting their
+execution to prevent race conditions while system memory and core
+firmware components are unconfigured.</p>
+<h3 id="the-sec-security-phase">The SEC (Security) Phase</h3>
+<p>The SEC phase is the first phase of UEFI execution and runs
+exclusively on the BSP. Because physical system RAM is not yet
+available, the BSP sets up Cache-as-RAM (CAR) to establish a temporary
+stack for execution.</p>
+<p>During this phase, APs remain entirely dormant in their
+hardware-halted state. Restricting execution to the BSP ensures that CAR
+boundaries are not violated and avoids the complexity of multi-threaded
+cache manipulation before memory coherency is formally established.</p>
+<h3 id="the-pei-pre-efi-initialization-phase">The PEI (Pre-EFI
+Initialization) Phase</h3>
+<p>The primary role of the PEI phase is to discover and initialize main
+memory (DRAM). Execution remains predominantly single-threaded on the
+BSP.</p>
+<p>In modern platforms, early multi-processor awareness can occur toward
+the end of the PEI phase via an MP Pre-EFI Initialization Module (PEIM).
+If platform initialization requires early multi-core involvement—such as
+reading CPU topology, gathering Built-In Self-Test (BIST) results, or
+accelerating memory training—the MP PEIM uses basic interrupt signaling
+to wake the APs. However, persistent multi-threading remains limited
+until permanent DRAM is functional and the permanent memory map is
+installed.</p>
+<h3 id="the-dxe-driver-execution-environment-phase">The DXE (Driver
+Execution Environment) Phase</h3>
+<p>Comprehensive multi-core and multi-threading management is
+established during the DXE phase through the
+<code>EFI_MP_SERVICES_PROTOCOL</code>. The DXE Foundation loads an
+architecture-specific MP CPU driver to manage the APs
+systematically:</p>
+<ol type="1">
+<li><strong>Waking the APs (INIT-SIPI-SIPI Sequence):</strong> The BSP's
+MP driver allocates a memory buffer below the 1 MB boundary (the
+real-mode addressable space) containing an assembly trampoline. The BSP
+issues an INIT-SIPI-SIPI interrupt sequence through its LAPIC to the
+APs, pointing them to this trampoline.</li>
+<li><strong>Mode Transition:</strong> The APs wake up in 16-bit real
+mode, execute the trampoline code, switch to protected mode, enable
+paging, and transition to 64-bit long mode.</li>
+<li><strong>Establishing the Rendezvous Point:</strong> Each AP is
+assigned its own unique execution stack and enters a controlled,
+synchronized loop (rendezvous) managed by the firmware. Here, APs
+execute low-power <code>PAUSE</code> or <code>HLT</code> instructions,
+continuously checking for tasks assigned by the BSP.</li>
+</ol>
+<h3 id="multi-threading-model-and-task-dispatch">Multi-Threading Model
+and Task Dispatch</h3>
+<p>UEFI does not implement a preemptive, time-sliced scheduler for
+multi-threading. Instead, it relies on a cooperative master-worker
+dispatch model exposed by the <code>EFI_MP_SERVICES_PROTOCOL</code>.</p>
+<p>The BSP can direct tasks to APs using two primary services:</p>
+<ul>
+<li><strong><code>StartupAllAPs</code>:</strong> Directs all active
+secondary cores to execute a specified procedure concurrently.</li>
+<li><strong><code>StartupThisAP</code>:</strong> Directs a specific,
+individual AP to execute a target procedure.</li>
+</ul>
+<p>These dispatches can be blocking (where the BSP halts execution until
+the APs complete the work) or non-blocking (where the BSP continues
+other tasks while monitoring an event signal for completion). Firmware
+components utilize this mechanism for high-latency parallel operations,
+such as:</p>
+<ul>
+<li>Applying microcode updates across all logical cores
+simultaneously.</li>
+<li>Programming Model-Specific Registers (MSRs) that require identical
+configuration across all processors.</li>
+<li>Collecting thermal and power state data.</li>
+<li>Initializing core-specific virtualization or platform security
+features.</li>
+</ul>
+<h3 id="os-handoff-and-exitbootservices">OS Handoff and
+ExitBootServices</h3>
+<p>Before UEFI relinquishes control to the operating system bootloader,
+the system must transition out of its firmware multi-processing
+environment. When the operating system invokes
+<code>EFI_BOOT_SERVICES.ExitBootServices()</code>, the MP driver shuts
+down firmware-level dispatching.</p>
+<p>The APs are safely returned to a quiescent state—typically placed
+back into a wait-for-SIPI loop or parked using an ACPI-specified parking
+protocol or <code>MWAIT</code> loop. This leaves the secondary cores
+completely isolated and ready for the operating system kernel to
+initialize them according to its own native scheduling and
+multi-processing model.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-multi-core-initialization-in-early-boot-phases';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

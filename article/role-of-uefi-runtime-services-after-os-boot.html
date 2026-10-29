@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Role of UEFI Runtime Services After OS Boot - uefi</title>
+    <meta name="description" content="UEFI Runtime Services are a specialized set of firmware interfaces that remain active in system memory even after the operating system has fully initialized. Unlike Boot Services, which are discarded during the handoff to the OS to free up memory, Runtime">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/role-of-uefi-runtime-services-after-os-boot">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Role of UEFI Runtime Services After OS Boot - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/role-of-uefi-runtime-services-after-os-boot" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI Runtime Services are a specialized set of firmware interfaces that remain active in system memory even after the operating system has fully initialized. Unlike Boot Services, which are discarded during the handoff to the OS to free up memory, Runtime" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="role-of-uefi-runtime-services-after-os-boot">Role of UEFI
+Runtime Services After OS Boot</h1>
+<p>UEFI Runtime Services are a specialized set of firmware interfaces
+that remain active in system memory even after the operating system has
+fully initialized. Unlike Boot Services, which are discarded during the
+handoff to the OS to free up memory, Runtime Services bridge the gap
+between running software and underlying hardware. They provide the
+operating system with low-level capabilities to manage persistent
+configuration data, adjust hardware clocks, control system power states,
+and deploy firmware updates directly from the operating environment.</p>
+<h3 id="transition-from-boot-to-runtime">Transition from Boot to
+Runtime</h3>
+<p>During the startup process, the UEFI firmware initializes system
+hardware and loads the OS bootloader. Once the operating system kernel
+is ready to assume control of the computer's resources, it calls the
+<code>ExitBootServices()</code> function. This terminates all UEFI Boot
+Services, reclaiming that memory for the OS.</p>
+<p>However, the operating system preserves the memory regions containing
+UEFI Runtime Services and remaps their physical addresses to virtual
+memory addresses using the <code>SetVirtualAddressMap()</code> call.
+This ensures the kernel can invoke firmware routines safely during
+standard operation.</p>
+<h3 id="core-functions-of-runtime-services">Core Functions of Runtime
+Services</h3>
+<p>Runtime Services expose standardized functions defined by the UEFI
+specification. These functions are divided into several key operational
+areas:</p>
+<h4 id="1-non-volatile-variable-management">1. Non-Volatile Variable
+Management</h4>
+<p>The operating system constantly needs to read, write, and query
+platform settings stored in non-volatile storage (NVRAM). Runtime
+Services provide three primary APIs for this purpose:</p>
+<ul>
+<li><strong><code>GetVariable</code>:</strong> Reads the value of a
+specific firmware environment variable, such as the active boot order,
+Secure Boot status, or platform language settings.</li>
+<li><strong><code>SetVariable</code>:</strong> Modifies existing
+variables or creates new ones. Operating systems utilize this to alter
+the boot priority for the next reboot or install Secure Boot keys.</li>
+<li><strong><code>QueryVariableInfo</code>:</strong> Determines the
+remaining storage capacity and maximum variable size in the NVRAM to
+prevent storage exhaustion.</li>
+</ul>
+<h4 id="2-hardware-time-and-wakeup-management">2. Hardware Time and
+Wakeup Management</h4>
+<p>Operating systems maintain software-based clocks, but they
+synchronize with and schedule platform hardware using Runtime Time
+Services:</p>
+<ul>
+<li><strong><code>GetTime</code> and <code>SetTime</code>:</strong>
+Reads and writes the Real-Time Clock (RTC) on the motherboard, ensuring
+proper system time across power cycles.</li>
+<li><strong><code>GetWakeupTime</code> and
+<code>SetWakeupTime</code>:</strong> Enables the OS to configure
+hardware alarms that can wake a system from sleep or low-power states at
+a designated time.</li>
+</ul>
+<h4 id="3-power-management-and-system-resets">3. Power Management and
+System Resets</h4>
+<p>While Advanced Configuration and Power Interface (ACPI) handles most
+everyday power transitions, UEFI Runtime Services provide standard
+fallback mechanisms for system termination:</p>
+<ul>
+<li><strong><code>ResetSystem</code>:</strong> Executes direct hardware
+resets. The OS passes parameters indicating the reset type: cold reset
+(full power cycle), warm reset (reboot without cutting main power),
+shutdown (power off), or platform-specific resets.</li>
+</ul>
+<h4 id="4-capsule-based-firmware-updates">4. Capsule-Based Firmware
+Updates</h4>
+<p>UEFI provides a standardized method for operating systems to deliver
+firmware updates via Capsule Services:</p>
+<ul>
+<li><strong><code>UpdateCapsule</code>:</strong> Passes an update
+payload (capsule) from the OS to the firmware. The payload is stored in
+memory across a warm reboot, enabling the firmware to flash itself
+before the OS boots again.</li>
+<li><strong><code>QueryCapsuleCapabilities</code>:</strong> Checks
+whether the system firmware supports a specific update format and
+confirms that the payload fits within available memory.</li>
+</ul>
+<h3 id="importance-to-modern-operating-systems">Importance to Modern
+Operating Systems</h3>
+<p>By providing these functions, UEFI Runtime Services abstract away
+motherboard-specific hardware implementations. Operating system kernels
+do not require specialized drivers for every vendor's unique NVRAM chip
+or RTC controller. Instead, the OS relies on a uniform API to control
+essential platform configurations securely throughout its runtime.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/role-of-uefi-runtime-services-after-os-boot';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

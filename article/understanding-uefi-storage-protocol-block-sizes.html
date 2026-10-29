@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Understanding UEFI Storage Protocol Block Sizes - uefi</title>
+    <meta name="description" content="This article explores the critical role that block size attributes play when queried through Unified Extensible Firmware Interface (UEFI) storage protocols. It examines how UEFI discovers these parameters via interfaces such as EFIBLOCKIOPROTOCOL, how blo">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/understanding-uefi-storage-protocol-block-sizes">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Understanding UEFI Storage Protocol Block Sizes - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/understanding-uefi-storage-protocol-block-sizes" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article explores the critical role that block size attributes play when queried through Unified Extensible Firmware Interface (UEFI) storage protocols. It examines how UEFI discovers these parameters via interfaces such as EFIBLOCKIOPROTOCOL, how blo" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="understanding-uefi-storage-protocol-block-sizes">Understanding
+UEFI Storage Protocol Block Sizes</h1>
+<p>This article explores the critical role that block size attributes
+play when queried through Unified Extensible Firmware Interface (UEFI)
+storage protocols. It examines how UEFI discovers these parameters via
+interfaces such as <code>EFI_BLOCK_IO_PROTOCOL</code>, how block size
+dictates I/O memory allocation and data alignment, and why accurate
+block reporting is essential for supporting modern storage media like
+Advanced Format 4Kn and 512e drives during the pre-boot execution
+environment.</p>
+<h3 id="the-role-of-block-size-in-uefi-architecture">The Role of Block
+Size in UEFI Architecture</h3>
+<p>In UEFI firmware, low-level disk access is mediated primarily through
+the <code>EFI_BLOCK_IO_PROTOCOL</code> and its asynchronous counterpart,
+<code>EFI_BLOCK_IO2_PROTOCOL</code>. Within these protocols, the
+<code>EFI_BLOCK_IO_MEDIA</code> structure exposes hardware attributes to
+bootloaders, drivers, and diagnostic tools. The most critical property
+in this structure is <code>BlockSize</code>, which defines the logical
+block size of the underlying device in bytes.</p>
+<p>Unlike operating systems that possess full-featured storage stacks
+with dynamic sector translation layers, the pre-boot environment is
+minimal and relies heavily on exact hardware parameters. Querying the
+correct block size enables the firmware to establish the fundamental
+unit of measurement for all subsequent data transactions.</p>
+<h3 id="memory-buffer-allocation-and-transfer-integrity">Memory Buffer
+Allocation and Transfer Integrity</h3>
+<p>UEFI I/O services enforce strict rules on data transfers. When
+performing operations using <code>ReadBlocks</code> or
+<code>WriteBlocks</code>, the caller must supply a buffer size that is
+an exact multiple of the device's <code>BlockSize</code>. If an EFI
+application or OS loader submits a transfer size that does not cleanly
+align with this attribute, the protocol returns an
+<code>EFI_BAD_BUFFER_SIZE</code> error.</p>
+<p>Querying this attribute ensures that firmware routines allocate
+memory buffers of valid dimensions and maintain memory alignment
+required by the underlying host controller, such as AHCI or NVMe. This
+prevents partial-block read errors and eliminates buffer overflow or
+underflow conditions during critical read operations, such as loading
+the OS kernel or initial RAM disk (initrd).</p>
+<h3 id="handling-advanced-format-drives-512e-vs-4kn">Handling Advanced
+Format Drives: 512e vs. 4Kn</h3>
+<p>Storage media have largely transitioned from legacy 512-byte native
+sectors to Advanced Format drives utilizing 4096-byte (4K) sectors.
+These drives exist in two primary configurations:</p>
+<ol type="1">
+<li><strong>512 Emulation (512e):</strong> The physical media operates
+with 4096-byte sectors, but the controller firmware emulates 512-byte
+logical sectors.</li>
+<li><strong>4K Native (4Kn):</strong> Both logical and physical sectors
+are 4096 bytes.</li>
+</ol>
+<p>Through modern iterations of UEFI specifications, additional
+attributes such as <code>LogicalBlocksPerPhysicalBlock</code> and
+<code>LowestAlignedLba</code> complement the base
+<code>BlockSize</code>. Querying these values allows UEFI drivers
+to:</p>
+<ul>
+<li>Identify if the device is 4Kn or 512e.</li>
+<li>Prevent performance degradation caused by unaligned writes, which
+force 512e drives into expensive Read-Modify-Write (RMW) cycles during
+the boot phase.</li>
+<li>Prevent boot failures on 4Kn media, which reject any legacy software
+expecting hardcoded 512-byte boundaries.</li>
+</ul>
+<h3 id="partition-table-and-filesystem-compatibility">Partition Table
+and Filesystem Compatibility</h3>
+<p>The UEFI specification mandates support for the GUID Partition Table
+(GPT) and the FAT32 filesystem for the EFI System Partition (ESP). Both
+structures depend inherently on the logical block address (LBA) layout
+reported by the device:</p>
+<ul>
+<li><strong>GPT Structures:</strong> The Primary GPT Header always
+resides at LBA 1, and the Backup GPT resides at the final LBA of the
+disk. Calculating the exact byte offsets for these structures is
+directly derived from the queried <code>BlockSize</code>.</li>
+<li><strong>Filesystem Drivers:</strong> The FAT32 filesystem driver
+maps its clusters to logical sectors. If the driver misinterprets the
+sector size reported by <code>EFI_BLOCK_IO_PROTOCOL</code>, file path
+lookups and binary execution fail immediately due to incorrect cluster
+calculation.</li>
+</ul>
+<p>Accurately querying block size attributes through UEFI storage
+protocols ensures seamless transitions between firmware initialization,
+boot managers, and OS handoff across diverse storage technologies.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/understanding-uefi-storage-protocol-block-sizes';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

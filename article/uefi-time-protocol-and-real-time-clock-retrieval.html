@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Time Protocol and Real-Time Clock Retrieval - uefi</title>
+    <meta name="description" content="The Unified Extensible Firmware Interface (UEFI) provides standardized time management services that allow operating systems and pre-boot applications to access and synchronize with hardware clocks. This article explains the architectural function of UEFI">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-time-protocol-and-real-time-clock-retrieval">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Time Protocol and Real-Time Clock Retrieval - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-time-protocol-and-real-time-clock-retrieval" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Unified Extensible Firmware Interface (UEFI) provides standardized time management services that allow operating systems and pre-boot applications to access and synchronize with hardware clocks. This article explains the architectural function of UEFI" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-time-protocol-and-real-time-clock-retrieval">UEFI Time
+Protocol and Real-Time Clock Retrieval</h1>
+<p>The Unified Extensible Firmware Interface (UEFI) provides
+standardized time management services that allow operating systems and
+pre-boot applications to access and synchronize with hardware clocks.
+This article explains the architectural function of UEFI time services,
+detailing how protocols and interfaces retrieve Real-Time Clock (RTC)
+values, abstract low-level hardware registers, and deliver structured
+temporal data across system boot and runtime execution.</p>
+<h3 id="the-architectural-role-of-uefi-time-services">The Architectural
+Role of UEFI Time Services</h3>
+<p>In modern computing platforms, the hardware Real-Time Clock
+(RTC)—often integrated within the platform controller hub (PCH) or
+chipset and powered by a CMOS battery—tracks the calendar and wall-clock
+time continuously, even when the system is powered off. Directly
+accessing RTC registers (such as legacy I/O ports 0x70 and 0x71 on x86
+platforms) requires device-specific hardware knowledge and can cause
+concurrency issues between firmware and the operating system.</p>
+<p>UEFI solves this by implementing an abstraction layer composed of the
+<code>EFI_REAL_TIME_CLOCK_ARCH_PROTOCOL</code> during the Driver
+Execution Environment (DXE) phase, which exposes standardized runtime
+services: <code>GetTime()</code> and <code>SetTime()</code>.</p>
+<h3 id="the-retrieval-mechanism-gettime">The Retrieval Mechanism:
+<code>GetTime()</code></h3>
+<p>The primary mechanism for retrieving RTC values is the UEFI Runtime
+Service function <code>GetTime()</code>. When an application,
+bootloader, or operating system kernel requests the current time:</p>
+<ol type="1">
+<li><strong>Protocol Routing</strong>: The call is dispatched through
+the system runtime table to the platform-specific RTC driver that
+installed the <code>EFI_REAL_TIME_CLOCK_ARCH_PROTOCOL</code>.</li>
+<li><strong>Hardware Register Reading</strong>: The driver safely
+queries the physical RTC registers, handling chip-specific nuances such
+as checking the "Update In Progress" (UIP) flag to prevent reading
+volatile, transitioning state data.</li>
+<li><strong>Data Normalization</strong>: Raw values, typically stored in
+Binary-Coded Decimal (BCD) format within the RTC, are converted into
+standard binary integers.</li>
+<li><strong>Data Output</strong>: The driver populates the standardized
+<code>EFI_TIME</code> structure along with optional
+<code>EFI_TIME_CAPABILITIES</code> metadata.</li>
+</ol>
+<h3 id="the-efi_time-structure">The <code>EFI_TIME</code> Structure</h3>
+<p>Instead of returning raw counter ticks or unparsed BCD strings, the
+protocol organizes RTC values into the structured <code>EFI_TIME</code>
+format, which includes:</p>
+<ul>
+<li><strong>Year</strong>: The complete year (e.g., 2024).</li>
+<li><strong>Month</strong>: 1 to 12.</li>
+<li><strong>Day</strong>: 1 to 31.</li>
+<li><strong>Hour</strong>: 0 to 23.</li>
+<li><strong>Minute</strong>: 0 to 59.</li>
+<li><strong>Second</strong>: 0 to 59.</li>
+<li><strong>Nanosecond</strong>: 0 to 999,999,999 (if supported by
+hardware resolution).</li>
+<li><strong>TimeZone</strong>: Offset from UTC in minutes (or designated
+as unspecified).</li>
+<li><strong>Daylight</strong>: Flags defining whether daylight saving
+time is active or configured.</li>
+</ul>
+<h3 id="hardware-capability-reporting">Hardware Capability
+Reporting</h3>
+<p>Alongside the actual time values, the protocol queries and returns
+hardware capabilities through the <code>EFI_TIME_CAPABILITIES</code>
+structure. This interface provides critical context regarding the
+underlying RTC hardware, including:</p>
+<ul>
+<li><strong>Resolution</strong>: The granularity of the clock (measured
+in Hertz).</li>
+<li><strong>Accuracy</strong>: The drift and precision rating of the
+crystal oscillator (in parts per million).</li>
+<li><strong>SetsToZero</strong>: Indicates whether writing to the RTC
+clears sub-second registers.</li>
+</ul>
+<h3 id="persistence-into-operating-system-runtime">Persistence into
+Operating System Runtime</h3>
+<p>Unlike UEFI Boot Services, which are terminated and unloaded when the
+operating system assumes control via <code>ExitBootServices()</code>,
+Time Services belong to UEFI Runtime Services. This persistence ensures
+that the operating system can continue querying the RTC using
+<code>GetTime()</code> until it chooses to load its own native
+platform-specific drivers, ensuring continuity of accurate real-time
+data across the entire platform lifecycle.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-time-protocol-and-real-time-clock-retrieval';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

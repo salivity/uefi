@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How GRUB Uses UEFI Services to Load OS Kernels - uefi</title>
+    <meta name="description" content="Operating system boot loaders like the Grand Unified Bootloader (GRUB) serve as the bridge between system firmware and the operating system. In modern systems, GRUB acts as a Unified Extensible Firmware Interface (UEFI) application that relies on standard">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-grub-uses-uefi-services-to-load-os-kernels">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How GRUB Uses UEFI Services to Load OS Kernels - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-grub-uses-uefi-services-to-load-os-kernels" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Operating system boot loaders like the Grand Unified Bootloader (GRUB) serve as the bridge between system firmware and the operating system. In modern systems, GRUB acts as a Unified Extensible Firmware Interface (UEFI) application that relies on standard" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-grub-uses-uefi-services-to-load-os-kernels">How GRUB Uses
+UEFI Services to Load OS Kernels</h1>
+<p>Operating system boot loaders like the Grand Unified Bootloader
+(GRUB) serve as the bridge between system firmware and the operating
+system. In modern systems, GRUB acts as a Unified Extensible Firmware
+Interface (UEFI) application that relies on standardized UEFI services
+to access storage devices, manage system memory, verify security
+policies, and prepare the operating environment. This article explains
+the technical mechanics of how GRUB interacts with UEFI services to
+read, verify, and execute kernel images before transferring complete
+control of the machine to the operating system.</p>
+<h2 id="the-uefi-execution-environment">The UEFI Execution
+Environment</h2>
+<p>Unlike legacy BIOS systems that rely on 16-bit real-mode interrupts
+(such as INT 13h), UEFI provides a modular, 32-bit or 64-bit execution
+environment. GRUB is compiled as a standard PE/COFF executable (e.g.,
+<code>grubx64.efi</code>).</p>
+<p>When the system powers on, the UEFI Boot Manager locates the boot
+loader on the EFI System Partition (ESP) and loads it into memory. Upon
+initialization, the UEFI firmware passes two primary parameters to
+GRUB's entry point:</p>
+<ol type="1">
+<li><strong><code>EFI_HANDLE ImageHandle</code>:</strong> The
+firmware-assigned reference to the loaded GRUB binary itself.</li>
+<li><strong><code>EFI_SYSTEM_TABLE *SystemTable</code>:</strong> A
+pointer to the primary UEFI system table, which exposes pointers to
+console I/O, configuration tables, and two critical function suites:
+<strong>Boot Services</strong> and <strong>Runtime
+Services</strong>.</li>
+</ol>
+<p>GRUB stores the <code>SystemTable</code> pointer globally to query
+protocols and invoke firmware functions throughout the loading
+phase.</p>
+<h2 id="accessing-files-via-uefi-device-protocols">Accessing Files via
+UEFI Device Protocols</h2>
+<p>To locate and load a kernel image and its initial RAM disk
+(initramfs), GRUB must read storage devices. While GRUB contains
+internal filesystem drivers for formats like ext4, Btrfs, and XFS, it
+depends on UEFI services to interface directly with physical storage
+controllers.</p>
+<p>GRUB queries UEFI protocols using the <code>LocateHandleBuffer</code>
+and <code>OpenProtocol</code> functions from the Boot Services
+table:</p>
+<ul>
+<li><strong><code>EFI_BLOCK_IO_PROTOCOL</code>:</strong> Provides
+low-level block-based read and write operations across attached drives
+(SATA, NVMe, USB). GRUB uses this protocol to read raw partitions and
+apply its own embedded filesystem drivers.</li>
+<li><strong><code>EFI_SIMPLE_FILE_SYSTEM_PROTOCOL</code>:</strong>
+Exposes standard file operations (<code>Open</code>, <code>Read</code>,
+<code>Close</code>) for FAT-formatted partitions, particularly the EFI
+System Partition.</li>
+</ul>
+<p>By leveraging these protocols, GRUB locates the target kernel image
+(such as <code>vmlinuz</code>) specified in the GRUB configuration file
+(<code>grub.cfg</code>).</p>
+<h2 id="memory-allocation-for-the-kernel">Memory Allocation for the
+Kernel</h2>
+<p>The Linux kernel requires specific memory layout structures, such as
+page alignment and designated memory addresses for real-mode code, the
+64-bit kernel payload, and the initramfs.</p>
+<p>GRUB interacts with UEFI Boot Services memory management functions to
+secure these locations:</p>
+<ul>
+<li><strong><code>AllocatePages</code>:</strong> Allocates contiguous
+physical memory pages of specified types, such as
+<code>EfiLoaderData</code> or <code>EfiBootServicesData</code>.</li>
+<li><strong><code>GetMemoryMap</code>:</strong> Retrieves the system's
+current physical memory layout to identify reserved zones, ACPI tables,
+and usable RAM regions.</li>
+</ul>
+<p>GRUB reads the kernel image from storage into a newly allocated
+memory buffer, verifies the kernel's setup headers, and places the
+kernel code and initramfs at appropriate, conflict-free physical memory
+boundaries.</p>
+<h2 id="secure-boot-and-image-verification">Secure Boot and Image
+Verification</h2>
+<p>When UEFI Secure Boot is enabled, the firmware enforces integrity
+checks to prevent untrusted code execution. In many Linux distributions,
+the UEFI firmware loads a signed first-stage boot loader called
+<code>shim</code>, which verifies GRUB's digital signature using
+embedded keys or the Machine Owner Key (MOK) database.</p>
+<p>When GRUB subsequently loads the kernel image:</p>
+<ol type="1">
+<li>GRUB invokes the <code>EFI_SECURITY_ARCHITECTURAL_PROTOCOL</code> or
+custom interfaces exposed by <code>shim</code> to validate the kernel's
+cryptographic signature.</li>
+<li>If the signature matches a trusted database entry (such as
+Microsoft's third-party UEFI CA or a user-enrolled MOK), verification
+succeeds.</li>
+<li>If validation fails, GRUB halts execution and refuses to boot the
+untrusted binary.</li>
+</ol>
+<h2 id="terminating-boot-services-and-executing-the-kernel">Terminating
+Boot Services and Executing the Kernel</h2>
+<p>Once the kernel image and initramfs are placed into memory and
+configuration command-line arguments are established, UEFI Boot Services
+are no longer required. In fact, keeping them active would conflict with
+the operating system's own memory management and hardware drivers.</p>
+<p>The handoff occurs through a strict sequence:</p>
+<ol type="1">
+<li><strong>Obtain the Final Memory Map:</strong> GRUB executes
+<code>GetMemoryMap</code> to receive the final physical memory layout
+descriptor and a unique <code>MapKey</code>.</li>
+<li><strong>Exit Boot Services:</strong> GRUB calls
+<code>ExitBootServices(ImageHandle, MapKey)</code>. This call terminates
+all UEFI boot-time drivers, frees <code>EfiBootServicesCode</code> and
+<code>EfiBootServicesData</code> memory regions for OS use, and disables
+boot-phase hardware abstraction.</li>
+<li><strong>Pass Parameters:</strong> If <code>ExitBootServices</code>
+succeeds, GRUB constructs the boot parameters structure (such as
+<code>boot_params</code> or the <code>zeropage</code> in Linux x86_64)
+containing hardware information, memory maps, ACPI table pointers, and
+command-line arguments.</li>
+<li><strong>Jump to Kernel:</strong> GRUB performs an indirect jump to
+the kernel's 64-bit entry point, formally transferring CPU execution to
+the operating system.</li>
+</ol>
+<p>After this transition, the kernel assumes full hardware control,
+relying only on UEFI <strong>Runtime Services</strong> (such as NVRAM
+variable access and hardware clock management) via virtual address
+mapping provided by the operating system.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-grub-uses-uefi-services-to-load-os-kernels';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

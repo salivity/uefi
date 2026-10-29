@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How OS Detects UEFI vs Legacy BIOS Boot Mode - uefi</title>
+    <meta name="description" content="When a computer starts up, the operating system must identify whether it was initialized via legacy BIOS or native Unified Extensible Firmware Interface (UEFI) to properly communicate with hardware and manage low-level system services. This article explai">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-os-detects-uefi-vs-legacy-bios-boot-mode">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How OS Detects UEFI vs Legacy BIOS Boot Mode - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-os-detects-uefi-vs-legacy-bios-boot-mode" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="When a computer starts up, the operating system must identify whether it was initialized via legacy BIOS or native Unified Extensible Firmware Interface (UEFI) to properly communicate with hardware and manage low-level system services. This article explai" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-os-detects-uefi-vs-legacy-bios-boot-mode">How OS Detects
+UEFI vs Legacy BIOS Boot Mode</h1>
+<p>When a computer starts up, the operating system must identify whether
+it was initialized via legacy BIOS or native Unified Extensible Firmware
+Interface (UEFI) to properly communicate with hardware and manage
+low-level system services. This article explains how operating systems
+detect the underlying boot mode during the boot sequence and details the
+specific mechanisms used by Linux and Windows to verify the active
+firmware interface.</p>
+<h2 id="the-firmware-handshake-during-early-boot">The Firmware Handshake
+During Early Boot</h2>
+<p>The distinction between legacy BIOS and UEFI begins long before the
+operating system kernel is loaded. The firmware determines the initial
+execution environment, and the operating system detects this environment
+based on how control is transferred to the bootloader.</p>
+<ul>
+<li><strong>Legacy BIOS Handshake:</strong> In a legacy boot, the BIOS
+loads the first sector of the boot drive (the Master Boot Record, or
+MBR) into memory address <code>0x7C00</code> and executes it in 16-bit
+Real Mode. Communication with the hardware is handled through legacy
+BIOS interrupts (such as <code>INT 10h</code> for video and
+<code>INT 13h</code> for disk services). If the operating system starts
+via this pathway, it receives no UEFI-specific memory structures,
+signaling that the system is operating in legacy mode.</li>
+<li><strong>UEFI Handshake:</strong> UEFI executes pre-compiled 32-bit
+or 64-bit EFI application files directly from the EFI System Partition
+(ESP). Upon execution, UEFI passes a pointer to the <strong>UEFI System
+Table</strong> (<code>EFI_SYSTEM_TABLE</code>) directly to the
+bootloader. This table contains pointers to UEFI Boot Services and UEFI
+Runtime Services.</li>
+</ul>
+<p>If the operating system kernel receives the UEFI System Table pointer
+from the bootloader, it knows it was booted in native UEFI mode. If that
+pointer is absent, the kernel assumes a legacy BIOS environment.</p>
+<hr />
+<h2 id="how-linux-detects-the-boot-mode">How Linux Detects the Boot
+Mode</h2>
+<p>During the early initialization phase, the Linux kernel checks for
+the presence of the EFI System Table passed by the bootloader.</p>
+<h3 id="1-the-sysfirmwareefi-directory">1. The
+<code>/sys/firmware/efi</code> Directory</h3>
+<p>If the Linux kernel boots under UEFI, it initializes the EFI runtime
+subsystem and creates the <code>/sys/firmware/efi</code> directory in
+the virtual sysfs filesystem.</p>
+<ul>
+<li>If <code>/sys/firmware/efi</code> exists and contains subdirectories
+like <code>efivars</code>, the system is running in <strong>UEFI
+mode</strong>.</li>
+<li>If the directory is absent, the system was booted in <strong>legacy
+BIOS mode</strong>.</li>
+</ul>
+<h3 id="2-kernel-boot-logs-dmesg">2. Kernel Boot Logs (dmesg)</h3>
+<p>Early during the boot process, the kernel logs the detected firmware
+interface. Commands like <code>dmesg | grep -i efi</code> will reveal
+log entries such as <code>efi: EFI v2.xx by...</code> if UEFI was
+detected, or indicate no EFI configuration if running under BIOS.</p>
+<hr />
+<h2 id="how-windows-detects-the-boot-mode">How Windows Detects the Boot
+Mode</h2>
+<p>Windows determines its boot mode through the Windows Boot Manager
+(<code>bootmgr</code> or <code>bootmgfw.efi</code>) and stores this
+information in system variables accessible by the kernel and
+administrative tools.</p>
+<h3 id="1-system-information-msinfo32">1. System Information
+(<code>msinfo32</code>)</h3>
+<p>Windows queries the hardware abstraction layer (HAL) to determine if
+EFI runtime services are functional. If valid, the <strong>BIOS
+Mode</strong> field in the System Information tool reports
+<code>UEFI</code>; otherwise, it reports <code>Legacy</code>.</p>
+<h3 id="2-windows-boot-environment-detection">2. Windows Boot
+Environment Detection</h3>
+<p>During installation and boot setup, the Windows setup engine runs the
+internal detection routine <code>Callback_BootEnvironmentDetect</code>.
+It writes the detected boot mode to setup logs (such as
+<code>setupact.log</code>), explicitly stating whether the boot
+environment is <code>EFI</code> or <code>BIOS</code>.</p>
+<h3 id="3-the-getfirmwaretype-api">3. The <code>GetFirmwareType</code>
+API</h3>
+<p>Windows provides the Win32 API function <code>GetFirmwareType</code>.
+Software can call this API to programmatically receive an enumeration
+result:</p>
+<ul>
+<li><code>FirmwareTypeBios</code> (Legacy)</li>
+<li><code>FirmwareTypeUefi</code> (Native UEFI)</li>
+<li><code>FirmwareTypeUnknown</code></li>
+</ul>
+<hr />
+<h2 id="key-differences-at-runtime">Key Differences at Runtime</h2>
+<p>Once booted, the OS maintains awareness of the firmware mode through
+the following differences:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">Feature</th>
+<th style="text-align: left;">Legacy BIOS</th>
+<th style="text-align: left;">Native UEFI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Handoff Mechanism</strong></td>
+<td style="text-align: left;">16-bit MBR / Interrupt Vectors</td>
+<td style="text-align: left;">PE/COFF Executable + System Table
+Pointer</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>NVRAM Variables</strong></td>
+<td style="text-align: left;">Unavailable (Stored in
+CMOS/Proprietary)</td>
+<td style="text-align: left;">Available via UEFI Runtime Services</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Partition
+Requirement</strong></td>
+<td style="text-align: left;">MBR partition scheme</td>
+<td style="text-align: left;">GPT partition scheme with an EFI System
+Partition</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Kernel Interface</strong></td>
+<td style="text-align: left;">Standard ACPI tables only</td>
+<td style="text-align: left;">ACPI tables plus EFI Runtime Services</td>
+</tr>
+</tbody>
+</table>
+<p>By inspecting whether firmware runtime pointers exist and whether the
+bootloader passed an active EFI System Table, the operating system
+definitively identifies the active boot mode.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-os-detects-uefi-vs-legacy-bios-boot-mode';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

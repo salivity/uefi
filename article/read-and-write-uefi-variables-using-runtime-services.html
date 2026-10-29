@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Read and Write UEFI Variables Using Runtime Services - uefi</title>
+    <meta name="description" content="This article provides an overview of how software interacts with Unified Extensible Firmware Interface (UEFI) NVRAM variables through UEFI Runtime Services. It explains the core firmware interfaces—GetVariable and SetVariable—and demonstrates how both nat">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/read-and-write-uefi-variables-using-runtime-services">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Read and Write UEFI Variables Using Runtime Services - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/read-and-write-uefi-variables-using-runtime-services" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article provides an overview of how software interacts with Unified Extensible Firmware Interface (UEFI) NVRAM variables through UEFI Runtime Services. It explains the core firmware interfaces—GetVariable and SetVariable—and demonstrates how both nat" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="read-and-write-uefi-variables-using-runtime-services">Read and
+Write UEFI Variables Using Runtime Services</h1>
+<p>This article provides an overview of how software interacts with
+Unified Extensible Firmware Interface (UEFI) NVRAM variables through
+UEFI Runtime Services. It explains the core firmware
+interfaces—<code>GetVariable</code> and <code>SetVariable</code>—and
+demonstrates how both native UEFI applications and operating
+system-level applications query, create, update, and delete these
+variables across Linux and Windows environments.</p>
+<h2 id="the-core-uefi-runtime-services-apis">The Core UEFI Runtime
+Services APIs</h2>
+<p>UEFI exposes its variable interface through the
+<code>EFI_RUNTIME_SERVICES</code> table, which remains resident in
+memory even after the operating system boots via the
+<code>ExitBootServices()</code> transition. Two primary function
+pointers handle variable operations:</p>
+<ul>
+<li><strong><code>GetVariable</code></strong>: Retrieves the data
+payload, size, and attributes of a specified variable name and vendor
+GUID.</li>
+<li><strong><code>SetVariable</code></strong>: Creates a new variable,
+updates an existing variable's payload, or deletes a variable by passing
+a data size of zero.</li>
+</ul>
+<p>Both functions require an identifying name (a null-terminated UTF-16
+string) and a Vendor GUID (<code>EFI_GUID</code>), which prevents
+namespace collisions between hardware vendors and OS bootloaders.</p>
+<h3 id="key-variable-attributes">Key Variable Attributes</h3>
+<p>When writing variables, applications must define bitmask attributes
+that dictate lifecycle and accessibility:</p>
+<ul>
+<li><code>EFI_VARIABLE_NON_VOLATILE</code> (0x00000001): Stores the
+variable in persistent flash memory across power cycles.</li>
+<li><code>EFI_VARIABLE_BOOTSERVICE_ACCESS</code> (0x00000002): Makes the
+variable accessible during the pre-boot phase.</li>
+<li><code>EFI_VARIABLE_RUNTIME_ACCESS</code> (0x00000004): Allows the
+variable to be read or written by the OS kernel and runtime
+applications. Without this flag, the variable disappears from view after
+<code>ExitBootServices()</code>.</li>
+<li><code>EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS</code>
+(0x00000020): Requires a cryptographic signature and timestamp to
+modify, typically used for Secure Boot keys like <code>PK</code>,
+<code>KEK</code>, and <code>db</code>.</li>
+</ul>
+<h2 id="native-uefi-applications-c--edk-ii">Native UEFI Applications (C
+/ EDK II)</h2>
+<p>Within native UEFI executables (such as bootloaders or diagnostics
+run from the UEFI Shell), the runtime services table is accessed
+globally via the <code>gRT</code> pointer provided by the EDK II
+environment.</p>
+<h3 id="reading-a-variable">Reading a Variable</h3>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>EFI_STATUS Status<span class="op">;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>UINTN DataSize <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>VOID <span class="op">*</span>Buffer <span class="op">=</span> NULL<span class="op">;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>EFI_GUID VendorGuid <span class="op">=</span> SOME_VENDOR_GUID<span class="op">;</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">// Step 1: Query the required buffer size</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>Status <span class="op">=</span> gRT<span class="op">-&gt;</span>GetVariable<span class="op">(</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">L&quot;MyVariable&quot;</span><span class="op">,</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="op">&amp;</span>VendorGuid<span class="op">,</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    NULL<span class="op">,</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    <span class="op">&amp;</span>DataSize<span class="op">,</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    NULL</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="op">(</span>Status <span class="op">==</span> EFI_BUFFER_TOO_SMALL<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    Buffer <span class="op">=</span> AllocatePool<span class="op">(</span>DataSize<span class="op">);</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    Status <span class="op">=</span> gRT<span class="op">-&gt;</span>GetVariable<span class="op">(</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>        <span class="st">L&quot;MyVariable&quot;</span><span class="op">,</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>        <span class="op">&amp;</span>VendorGuid<span class="op">,</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>        NULL<span class="op">,</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>        <span class="op">&amp;</span>DataSize<span class="op">,</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>        Buffer</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>    <span class="op">);</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<h3 id="writing-a-variable">Writing a Variable</h3>
+<div class="sourceCode" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>UINT32 Value <span class="op">=</span> <span class="dv">42</span><span class="op">;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>UINT32 Attributes <span class="op">=</span> EFI_VARIABLE_NON_VOLATILE <span class="op">|</span> </span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>                    EFI_VARIABLE_BOOTSERVICE_ACCESS <span class="op">|</span> </span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>                    EFI_VARIABLE_RUNTIME_ACCESS<span class="op">;</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>Status <span class="op">=</span> gRT<span class="op">-&gt;</span>SetVariable<span class="op">(</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">L&quot;MyVariable&quot;</span><span class="op">,</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="op">&amp;</span>VendorGuid<span class="op">,</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    Attributes<span class="op">,</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">sizeof</span><span class="op">(</span>Value<span class="op">),</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="op">&amp;</span>Value</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span></code></pre></div>
+<h2 id="os-level-application-access">OS-Level Application Access</h2>
+<p>User-space applications cannot directly invoke firmware memory
+addresses due to CPU privilege separation (Ring 3 vs. Ring 0) and
+virtual memory paging. Instead, operating system kernels provide
+wrappers around the firmware calls.</p>
+<h3 id="linux-efivarfs-and-libefivar">Linux: <code>efivarfs</code> and
+<code>libefivar</code></h3>
+<p>On modern Linux systems, the kernel maps UEFI Runtime Services
+through the <code>efivarfs</code> pseudo-filesystem, typically mounted
+at <code>/sys/firmware/efi/efivars/</code>.</p>
+<p>Variables are represented as files formatted as
+<code>[VariableName]-[VendorGUID]</code>. The first 4 bytes of each file
+represent a 32-bit bitmask of the variable attributes, followed
+immediately by the binary data payload.</p>
+<ul>
+<li><strong>Reading</strong>: An application opens the file, reads the
+first 4 bytes to determine attributes, and reads the remaining bytes to
+extract the payload.</li>
+<li><strong>Writing</strong>: An application writes the 4-byte attribute
+header followed by the binary payload to the file. Deletion is handled
+using <code>unlink()</code> or writing a 0-byte payload.</li>
+<li><strong>Immutable Protection</strong>: By default, the Linux kernel
+sets the <code>chattr +i</code> (immutable) attribute on critical
+variables to prevent accidental deletion or corruption. Applications
+must strip this attribute using
+<code>ioctl(fd, FS_IOC_SETFLAGS, ...)</code> before writing
+updates.</li>
+</ul>
+<p>User-space C applications typically use <code>libefivar</code> to
+abstract these low-level file and <code>ioctl</code> operations.</p>
+<h3 id="windows-win32-firmware-apis">Windows: Win32 Firmware APIs</h3>
+<p>Windows exposes direct system calls that invoke
+<code>GetVariable</code> and <code>SetVariable</code> through the
+Windows kernel's Hardware Abstraction Layer (HAL).</p>
+<p>User-space applications utilize two primary functions in
+<code>kernel32.dll</code>:</p>
+<ul>
+<li><code>GetFirmwareEnvironmentVariableExW()</code></li>
+<li><code>SetFirmwareEnvironmentVariableExW()</code></li>
+</ul>
+<h4 id="implementation-requirements">Implementation Requirements</h4>
+<ol type="1">
+<li><strong>Privileges</strong>: The calling process must hold the
+<code>SE_SYSTEM_ENVIRONMENT_NAME</code> privilege. This requires
+administrator elevation and explicit privilege token adjustment via
+<code>AdjustTokenPrivileges()</code>.</li>
+<li><strong>GUID Format</strong>: The Vendor GUID must be passed as a
+string enclosed in curly braces (e.g.,
+<code>"{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"</code>).</li>
+</ol>
+<h4 id="windows-c-example">Windows C++ Example</h4>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;windows.h&gt;</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;iostream&gt;</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> WriteVariable<span class="op">()</span> <span class="op">{</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Elevate privileges to SE_SYSTEM_ENVIRONMENT_NAME before calling</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">const</span> <span class="dt">wchar_t</span><span class="op">*</span> varName <span class="op">=</span> <span class="st">L&quot;MyVariable&quot;</span><span class="op">;</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">const</span> <span class="dt">wchar_t</span><span class="op">*</span> varGuid <span class="op">=</span> <span class="st">L&quot;{12345678-1234-1234-1234-123456789abc}&quot;</span><span class="op">;</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    DWORD data <span class="op">=</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    DWORD attributes <span class="op">=</span> VARIABLE_ATTRIBUTE_NON_VOLATILE <span class="op">|</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>                       VARIABLE_ATTRIBUTE_BOOTSERVICE_ACCESS <span class="op">|</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>                       VARIABLE_ATTRIBUTE_RUNTIME_ACCESS<span class="op">;</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    BOOL success <span class="op">=</span> SetFirmwareEnvironmentVariableExW<span class="op">(</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>        varName<span class="op">,</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>        varGuid<span class="op">,</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>        <span class="op">&amp;</span>data<span class="op">,</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>        <span class="kw">sizeof</span><span class="op">(</span>data<span class="op">),</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>        attributes</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    <span class="op">);</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(!</span>success<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>        <span class="bu">std::</span>cerr <span class="op">&lt;&lt;</span> <span class="st">&quot;Failed to write: &quot;</span> <span class="op">&lt;&lt;</span> GetLastError<span class="op">()</span> <span class="op">&lt;&lt;</span> <span class="bu">std::</span>endl<span class="op">;</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<h2 id="operational-safeguards-and-limitations">Operational Safeguards
+and Limitations</h2>
+<ul>
+<li><strong>Flash Wear</strong>: UEFI variables reside in NOR flash
+memory. NOR flash supports a limited number of erase cycles (typically
+10,000 to 100,000). Applications should minimize write frequency to
+prevent hardware wear.</li>
+<li><strong>Garbage Collection</strong>: Firmware flash storage is small
+(often 64 KB to a few megabytes shared across all system variables).
+Appending or overwriting variables without firmware garbage collection
+can lead to <code>EFI_OUT_OF_RESOURCES</code> errors.</li>
+<li><strong>Runtime Paging Changes</strong>: On x86_64 systems, when an
+OS transitions to virtual memory, it invokes
+<code>SetVirtualAddressMap()</code>. At this point, the firmware re-maps
+its pointers, ensuring that calls made via the OS kernel's HAL or
+drivers remain valid. Applications must always route operations through
+OS-provided interfaces rather than cached physical pointers.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/read-and-write-uefi-variables-using-runtime-services';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

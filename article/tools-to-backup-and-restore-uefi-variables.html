@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tools to Backup and Restore UEFI Variables - uefi</title>
+    <meta name="description" content="Managing Unified Extensible Firmware Interface (UEFI) variables is critical for maintaining boot order, Secure Boot keys, and hardware configurations. This article provides a direct overview of the primary command-line utilities, kernel interfaces, and op">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/tools-to-backup-and-restore-uefi-variables">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Tools to Backup and Restore UEFI Variables - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/tools-to-backup-and-restore-uefi-variables" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Managing Unified Extensible Firmware Interface (UEFI) variables is critical for maintaining boot order, Secure Boot keys, and hardware configurations. This article provides a direct overview of the primary command-line utilities, kernel interfaces, and op" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="tools-to-backup-and-restore-uefi-variables">Tools to Backup and
+Restore UEFI Variables</h1>
+<p>Managing Unified Extensible Firmware Interface (UEFI) variables is
+critical for maintaining boot order, Secure Boot keys, and hardware
+configurations. This article provides a direct overview of the primary
+command-line utilities, kernel interfaces, and operating system tools
+used to back up and restore UEFI non-volatile memory (NVRAM) variable
+states directly from within Linux and Windows environments.</p>
+<h3 id="linux-tools-and-interfaces">Linux Tools and Interfaces</h3>
+<p><strong>1. The <code>efivarfs</code> Filesystem</strong> Modern Linux
+kernels expose UEFI variables through the <code>efivarfs</code> kernel
+module, typically mounted at <code>/sys/firmware/efi/efivars</code>.
+Each variable is represented as a distinct file containing attributes
+and data.</p>
+<ul>
+<li><p><strong>Backup:</strong> You can back up variables using standard
+file-copy commands or archives. For example:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tar</span> <span class="at">-czvf</span> uefi_vars_backup.tar.gz /sys/firmware/efi/efivars/</span></code></pre></div></li>
+<li><p><strong>Restore:</strong> Restoring via <code>efivarfs</code>
+requires care. Many variables have immutable file attributes applied by
+the kernel to prevent accidental corruption. Before writing a file back
+to this directory, the immutable attribute must be cleared using
+<code>chattr -i &lt;filename&gt;</code>, the data written back, and the
+attribute restored with
+<code>chattr +i &lt;filename&gt;</code>.</p></li>
+</ul>
+<p><strong>2. The <code>efivar</code> CLI Utility</strong> The
+<code>efivar</code> tool is a dedicated userspace utility for
+manipulating UEFI variables without manually interacting with raw file
+nodes.</p>
+<ul>
+<li><p><strong>Backup:</strong> It can export the raw binary contents of
+specific variables using:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">efivar</span> <span class="at">-n</span> <span class="op">&lt;</span>GUID-VariableName<span class="op">&gt;</span> --export <span class="op">&gt;</span> variable_backup.bin</span></code></pre></div></li>
+<li><p><strong>Restore:</strong> Variables can be imported back into
+NVRAM using the <code>--import</code> flag:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">efivar</span> <span class="at">--import</span> variable_backup.bin</span></code></pre></div></li>
+</ul>
+<p><strong>3. Canonical Firmware Test Suite (FWTS)</strong> The
+<code>fwts</code> tool includes tests and utilities designed to dump
+UEFI tables and variable states. Running <code>fwts uefidump</code>
+dumps the entire contents of UEFI NVRAM variables into a human-readable
+and structured log format, useful for auditing and state tracking.</p>
+<hr />
+<h3 id="windows-tools-and-interfaces">Windows Tools and Interfaces</h3>
+<p><strong>1. OEM Deployment and Configuration Utilities</strong>
+Windows does not provide a native, full-featured CLI tool for raw NVRAM
+variable dumping and restoring equivalent to <code>efivarfs</code>.
+Instead, the most reliable way to back up and restore UEFI
+configurations is through manufacturer-specific tools:</p>
+<ul>
+<li><strong>Dell Command | Configure:</strong> Allows administrators to
+export the entire UEFI/BIOS settings profile to a <code>.cctk</code>
+file and re-apply it across systems.</li>
+<li><strong>HP BIOS Configuration Utility (BCU):</strong> Captures
+current firmware states into a text configuration file and reapplies
+them using native Windows commands.</li>
+<li><strong>Lenovo BIOS Deployment Tool:</strong> Offers scriptable WMI
+interfaces to read, save, and apply BIOS/UEFI variable states.</li>
+</ul>
+<p><strong>2. Windows API via PowerShell</strong> Windows exposes the
+<code>GetFirmwareEnvironmentVariable</code> and
+<code>SetFirmwareEnvironmentVariable</code> Win32 APIs. Administrators
+with <code>SE_SYSTEM_ENVIRONMENT_NAME</code> privileges can utilize
+custom PowerShell scripts or C/C++ utilities leveraging these functions
+to read and write arbitrary variable states. Built-in PowerShell cmdlets
+like <code>Get-SecureBootUEFI</code> allow read-only export of specific
+Secure Boot-related variables.</p>
+<hr />
+<h3 id="key-considerations-during-restoration">Key Considerations During
+Restoration</h3>
+<ul>
+<li><strong>Volatile vs. Non-Volatile:</strong> UEFI variables have
+attribute flags (e.g., runtime access, boot service access,
+non-volatile). Tools must preserve these original attributes during
+restoration, or the firmware may discard the variable on reboot.</li>
+<li><strong>Hardware-Bound Variables:</strong> Restoring variables
+across different motherboard models or differing firmware versions can
+lead to boot failure, as certain variables contain platform-specific
+memory mappings or hardware references.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/tools-to-backup-and-restore-uefi-variables';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

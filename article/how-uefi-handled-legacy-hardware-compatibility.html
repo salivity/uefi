@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Handled Legacy Hardware Compatibility - uefi</title>
+    <meta name="description" content="During the transition from the traditional Basic Input/Output System (BIOS) to the Unified Extensible Firmware Interface (UEFI) in the mid-to-late 2000s, the computing industry faced a major challenge: ensuring that decades of existing hardware and 16-bit">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-handled-legacy-hardware-compatibility">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Handled Legacy Hardware Compatibility - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-handled-legacy-hardware-compatibility" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="During the transition from the traditional Basic Input/Output System (BIOS) to the Unified Extensible Firmware Interface (UEFI) in the mid-to-late 2000s, the computing industry faced a major challenge: ensuring that decades of existing hardware and 16-bit" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-handled-legacy-hardware-compatibility">How UEFI Handled
+Legacy Hardware Compatibility</h1>
+<p>During the transition from the traditional Basic Input/Output System
+(BIOS) to the Unified Extensible Firmware Interface (UEFI) in the
+mid-to-late 2000s, the computing industry faced a major challenge:
+ensuring that decades of existing hardware and 16-bit operating systems
+remained functional. To avoid breaking ecosystem compatibility, hardware
+vendors, motherboard manufacturers, and the Unified EFI Forum
+implemented bridging mechanisms, primarily through the Compatibility
+Support Module (CSM), hybrid firmware architectures, and phased
+implementation classes.</p>
+<h3 id="the-compatibility-support-module-csm">The Compatibility Support
+Module (CSM)</h3>
+<p>The primary tool for preserving legacy support was the Compatibility
+Support Module (CSM). Embedded directly into UEFI firmware
+implementations, CSM acted as an emulation layer that provided
+traditional 16-bit BIOS interfaces, including real-mode interrupt calls
+like <code>INT 10h</code> for video and <code>INT 13h</code> for disk
+operations.</p>
+<p>When CSM was enabled, the platform could initialize legacy devices,
+execute legacy Option ROMs, and boot operating systems that lacked
+native UEFI support, such as Windows XP and older Linux distributions.
+This allowed motherboard manufacturers to adopt modern UEFI codebases
+without forcing consumers and enterprises to abandon legacy
+components.</p>
+<h3 id="hybrid-option-roms-for-add-in-cards">Hybrid Option ROMs for
+Add-In Cards</h3>
+<p>Expansion cards—especially graphics cards, RAID controllers, and
+network adapters—relied on onboard firmware called Option ROMs to
+initialize during the boot process. Traditional cards contained 16-bit
+x86 machine code incompatible with native 64-bit UEFI environments.</p>
+<p>To address this, hardware manufacturers engineered hybrid Option
+ROMs. These dual-architecture ROMs bundled both legacy 16-bit code and
+modern UEFI bytecode (EFI Byte Code or native UEFI driver binaries) on
+the same EEPROM chip. During boot, firmware detected whether the system
+was running in native UEFI mode or CSM mode and executed the
+corresponding payload.</p>
+<h3 id="the-uefi-platform-class-system">The UEFI Platform Class
+System</h3>
+<p>To manage the transition logically, the industry categorized hardware
+platforms into four distinct UEFI classes:</p>
+<ul>
+<li><strong>Class 0:</strong> Traditional legacy BIOS systems without
+UEFI code.</li>
+<li><strong>Class 1:</strong> Early implementations where UEFI was used
+entirely behind the scenes, presenting only a legacy BIOS interface to
+the OS.</li>
+<li><strong>Class 2:</strong> The hybrid workhorse of the transition
+era. These systems featured full UEFI capabilities alongside a
+selectable CSM, giving users and system builders manual control over
+whether to boot in UEFI mode, legacy mode, or an automatic fallback
+mode.</li>
+<li><strong>Class 3:</strong> Pure UEFI systems with CSM entirely
+removed, requiring all attached hardware and OS bootloaders to natively
+support UEFI.</li>
+</ul>
+<p>Class 2 motherboards dominated consumer and enterprise markets for
+over a decade, providing a safety net while the supply chain updated
+components to modern standards.</p>
+<h3 id="drive-partitioning-and-boot-fallbacks">Drive Partitioning and
+Boot Fallbacks</h3>
+<p>Storage handling also required dual-path routing. Legacy BIOS systems
+required the Master Boot Record (MBR) partitioning scheme, while UEFI
+introduced the GUID Partition Table (GPT). Firmware vendors designed
+boot managers capable of scanning attached drives to identify whether an
+active MBR boot sector or an EFI System Partition (ESP) was present. If
+a user connected an older MBR drive containing an existing installation,
+the firmware automatically invoked CSM routines to proceed without
+requiring data migration.</p>
+<p>By combining software emulation via CSM, dual-architecture Option
+ROMs, and the phased Class 2 standard, the industry averted widespread
+hardware obsolescence, smoothly bridging the gap until native UEFI
+hardware became the universal standard.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-handled-legacy-hardware-compatibility';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Depex in DXE Driver Dispatching - uefi</title>
+    <meta name="description" content="The Dependency Expression (Depex) language in the Unified Extensible Firmware Interface (UEFI) is a specialized grammar that dictates the precise execution order of Driver Execution Environment (DXE) drivers. Because UEFI firmware is inherently modular an">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-depex-in-dxe-driver-dispatching">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Depex in DXE Driver Dispatching - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-depex-in-dxe-driver-dispatching" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Dependency Expression (Depex) language in the Unified Extensible Firmware Interface (UEFI) is a specialized grammar that dictates the precise execution order of Driver Execution Environment (DXE) drivers. Because UEFI firmware is inherently modular an" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-depex-in-dxe-driver-dispatching">UEFI Depex in DXE Driver
+Dispatching</h1>
+<p>The Dependency Expression (Depex) language in the Unified Extensible
+Firmware Interface (UEFI) is a specialized grammar that dictates the
+precise execution order of Driver Execution Environment (DXE) drivers.
+Because UEFI firmware is inherently modular and distributed across
+independent binaries within Firmware Volumes (FVs), drivers frequently
+depend on protocols produced by other drivers before they can function.
+The Depex language provides the DXE Dispatcher with the conditional
+logic required to evaluate whether a driver’s functional prerequisites
+have been met in the protocol database, preventing premature execution,
+dependency deadlocks, and system initialization failures.</p>
+<h3 id="the-role-and-purpose-of-depex">The Role and Purpose of
+Depex</h3>
+<p>During the DXE phase, the platform discovers hardware and initializes
+core system services. DXE drivers are typically self-contained
+PE32/PE32+ images that expose interfaces called protocols. Many drivers
+require access to specific protocols produced by underlying silicon or
+bus drivers; for instance, a generic storage driver cannot initialize
+without an underlying controller protocol.</p>
+<p>The Depex grammar solves this ordering problem. Instead of relying on
+hardcoded, platform-specific initialization sequences, driver developers
+embed a Depex section directly into the driver’s Firmware File System
+(FFS) file. This decouples individual drivers from static build orders
+and allows dynamic, modular dispatch based purely on protocol
+availability.</p>
+<h3 id="architecture-and-syntax">Architecture and Syntax</h3>
+<p>A Depex expression is compiled from source code into a compact,
+stack-based bytecode format interpreted by the DXE Dispatcher. The
+grammar functions similarly to Reverse Polish Notation (RPN) and
+consists of:</p>
+<ul>
+<li><strong>GUIDs:</strong> 128-bit identifiers representing the
+specific protocols required by the driver.</li>
+<li><strong>Logical Operators:</strong> Instructions such as
+<code>AND</code>, <code>OR</code>, and <code>NOT</code> used to
+construct complex conditional requirements.</li>
+<li><strong>Terminal Statements:</strong> Operators such as
+<code>END</code>, which marks the conclusion of the expression, and
+boolean constants like <code>TRUE</code> or <code>FALSE</code>. A driver
+with a <code>TRUE</code> expression signals that it has no protocol
+prerequisites and can execute immediately upon discovery.</li>
+</ul>
+<h3 id="how-the-dxe-dispatcher-evaluates-depex">How the DXE Dispatcher
+Evaluates Depex</h3>
+<p>The DXE Dispatcher operates as a state machine that systematically
+moves through Firmware Volumes in iterative passes:</p>
+<ol type="1">
+<li><strong>Discovery:</strong> The dispatcher discovers driver binaries
+and parses their embedded <code>EFI_SECTION_DXE_DEPEX</code>
+metadata.</li>
+<li><strong>Stack-Based Evaluation:</strong> For each driver waiting in
+the queue, the dispatcher processes the compiled Depex bytecode against
+the global UEFI Protocol Database. It pushes boolean results onto an
+internal stack—evaluating <code>TRUE</code> if a referenced protocol
+GUID is registered and <code>FALSE</code> if it is absent.</li>
+<li><strong>Execution (Dispatch):</strong> If the final evaluation of
+the expression yields <code>TRUE</code>, the dispatcher loads the
+driver's image into memory, invokes its entry point, and marks the
+driver as dispatched.</li>
+<li><strong>Dispatcher Loop:</strong> As newly executed drivers register
+their own protocols, the dispatcher triggers another pass through the
+un-dispatched queue. This re-evaluates previously unsatisfied Depex
+expressions until no further drivers can be dispatched.</li>
+</ol>
+<h3 id="interaction-with-the-a-priori-file">Interaction with the A
+Priori File</h3>
+<p>While Depex handles dynamic ordering, firmware designers occasionally
+need foundational architectural protocols initialized before standard
+dependency resolution begins. The DXE Dispatcher supports an optional
+<code>A Priori</code> list—a special file within a Firmware Volume that
+specifies an explicit, pre-Depex execution list. Drivers enumerated in
+the <code>A Priori</code> list bypass their normal Depex evaluation and
+run first, ensuring the core infrastructure required to register initial
+protocols and run the dispatcher itself is firmly established.</p>
+<h3 id="system-impact">System Impact</h3>
+<p>Through the Depex language, the UEFI framework achieves deterministic
+hardware initialization while maintaining strict driver isolation. It
+eliminates race conditions during boot, minimizes memory overhead by
+ensuring drivers load only when ready, and allows hardware vendors to
+produce portable, independent drivers that integrate reliably across
+diverse platform architectures.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-depex-in-dxe-driver-dispatching';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

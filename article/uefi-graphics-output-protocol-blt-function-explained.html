@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Graphics Output Protocol Blt Function Explained - uefi</title>
+    <meta name="description" content="The UEFI Graphics Output Protocol (GOP) provides a runtime and boot-time interface for displaying graphical content prior to the operating system loading its native graphics drivers. Within this protocol, the Blt (Block Transfer) function serves as the pr">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-graphics-output-protocol-blt-function-explained">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Graphics Output Protocol Blt Function Explained - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-graphics-output-protocol-blt-function-explained" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The UEFI Graphics Output Protocol (GOP) provides a runtime and boot-time interface for displaying graphical content prior to the operating system loading its native graphics drivers. Within this protocol, the Blt (Block Transfer) function serves as the pr" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-graphics-output-protocol-blt-function-explained">UEFI
+Graphics Output Protocol Blt Function Explained</h1>
+<p>The UEFI Graphics Output Protocol (GOP) provides a runtime and
+boot-time interface for displaying graphical content prior to the
+operating system loading its native graphics drivers. Within this
+protocol, the <code>Blt</code> (Block Transfer) function serves as the
+primary mechanism for manipulating blocks of pixels on the screen. This
+article explains the architectural purpose of the <code>Blt</code>
+function, its key operations, and why UEFI firmware and bootloaders rely
+on it for display management.</p>
+<h3 id="purpose-of-the-blt-function">Purpose of the Blt Function</h3>
+<p>The primary purpose of the <code>Blt</code> function is to provide an
+abstracted, hardware-independent method for reading, writing, and
+copying rectangular areas of pixels on a display device. Before full
+operating system device drivers are initialized, firmware and
+bootloaders need a reliable way to render graphical user interfaces,
+boot logos, text consoles, and status bars.</p>
+<p>While GOP also provides access to a raw linear framebuffer,
+interacting directly with memory addresses can introduce compatibility
+issues due to variations in pixel formats, color depth, and
+memory-mapping architectures. The <code>Blt</code> function abstracts
+these complexities, allowing developers to manipulate standard 32-bit
+color data (<code>EFI_GRAPHICS_OUTPUT_BLT_PIXEL</code>) without directly
+managing hardware-specific video memory layouts.</p>
+<h3 id="blt-operations">Blt Operations</h3>
+<p>The <code>Blt</code> function executes different graphical tasks
+based on the specified <code>EFI_GRAPHICS_OUTPUT_BLT_OPERATION</code>
+parameter:</p>
+<ul>
+<li><strong>Video Fill (<code>EfiBltVideoFill</code>):</strong> Fills a
+specified rectangular area on the display with a single, uniform color.
+This is typically used for clearing the screen, drawing solid
+backgrounds, or rendering simple rectangular UI elements.</li>
+<li><strong>Buffer to Video (<code>EfiBltBufferToVideo</code>):</strong>
+Copies an image stored in system memory (the Blt buffer) directly to a
+target coordinate on the display. This operation is essential for
+rendering pre-rendered assets such as operating system logos, complex
+icons, and software-rendered fonts.</li>
+<li><strong>Video to Blt Buffer
+(<code>EfiBltVideoToBltBuffer</code>):</strong> Reads a rectangular
+region of pixels from the display and copies it into a system memory
+buffer. This is commonly used for capturing screenshots or saving
+background areas before drawing temporary overlays like pop-up
+dialogs.</li>
+<li><strong>Video to Video (<code>EfiBltVideoToVideo</code>):</strong>
+Copies a block of pixels directly from one location on the screen to
+another. This is heavily utilized for hardware-accelerated scrolling in
+graphical terminal emulators or moving interface elements efficiently
+without transferring data back through system memory.</li>
+</ul>
+<h3 id="advantages-over-direct-framebuffer-writes">Advantages Over
+Direct Framebuffer Writes</h3>
+<p>By using the <code>Blt</code> function, UEFI applications benefit
+from automatic format translation. The standard Blt pixel structure uses
+an 8-bit per channel Red-Green-Blue-Reserved layout. If the underlying
+hardware display is configured for a different color representation
+(such as Blue-Green-Red-Reserved or a non-standard bitmask), the GOP
+implementation handles the color channel translation transparently.
+Additionally, implementations may utilize underlying hardware
+acceleration features if available in the firmware, resulting in faster
+visual updates than unoptimized direct memory access.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-graphics-output-protocol-blt-function-explained';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

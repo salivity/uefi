@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Test UEFI Storage Driver Compliance - uefi</title>
+    <meta name="description" content="Firmware engineers ensure storage driver compliance against the UEFI specification through a structured verification process that combines the official UEFI Self-Certification Test (SCT) suite, protocol-level validation, stress testing, and operating syst">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-to-test-uefi-storage-driver-compliance">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How to Test UEFI Storage Driver Compliance - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-to-test-uefi-storage-driver-compliance" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Firmware engineers ensure storage driver compliance against the UEFI specification through a structured verification process that combines the official UEFI Self-Certification Test (SCT) suite, protocol-level validation, stress testing, and operating syst" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-to-test-uefi-storage-driver-compliance">How to Test UEFI
+Storage Driver Compliance</h1>
+<p>Firmware engineers ensure storage driver compliance against the UEFI
+specification through a structured verification process that combines
+the official UEFI Self-Certification Test (SCT) suite, protocol-level
+validation, stress testing, and operating system boot handoff checks.
+This article outlines the primary methodologies, standardized tools, and
+testing procedures engineers use to validate that UEFI storage
+drivers—such as those for NVMe, SATA AHCI, and UFS—function reliably,
+manage system resources correctly, and adhere strictly to the UEFI
+standard.</p>
+<h3 id="1-uefi-self-certification-test-sct-suite">1. UEFI
+Self-Certification Test (SCT) Suite</h3>
+<p>The primary tool for verifying compliance is the UEFI SCT, an
+automated test harness maintained by the UEFI Forum. Engineers execute
+the SCT directly within the UEFI Shell to run assertions against the
+interfaces exposed by the storage driver. The SCT checks:</p>
+<ul>
+<li><strong>Protocol Compliance:</strong> Verifies standard storage
+protocols, including <code>EFI_BLOCK_IO_PROTOCOL</code>,
+<code>EFI_BLOCK_IO2_PROTOCOL</code> (for asynchronous operations),
+<code>EFI_DISK_IO_PROTOCOL</code>, and
+<code>EFI_STORAGE_SECURITY_COMMAND_PROTOCOL</code>.</li>
+<li><strong>API Invariants:</strong> Validates that parameters, return
+statuses, buffer alignments, and boundary conditions match the exact
+signatures and expected behaviors documented in the UEFI
+Specification.</li>
+<li><strong>Failure Code Accuracy:</strong> Ensures the driver returns
+standard status codes (such as <code>EFI_DEVICE_ERROR</code>,
+<code>EFI_INVALID_PARAMETER</code>, or <code>EFI_NO_MEDIA</code>) under
+deliberate fault conditions rather than hanging or returning
+non-standard values.</li>
+</ul>
+<h3 id="2-uefi-driver-model-validation">2. UEFI Driver Model
+Validation</h3>
+<p>Storage drivers must conform to the standard UEFI Driver Binding
+Model. Engineers evaluate compliance using built-in UEFI Shell commands
+and specialized test scripts that invoke:</p>
+<ul>
+<li><strong>Supported():</strong> Verifies that the driver correctly
+probes hardware controllers and claims only compatible devices without
+claiming foreign handles.</li>
+<li><strong>Start():</strong> Tests whether the driver initializes
+hardware, allocates memory pools, establishes event queues, and installs
+the required child handles and protocols properly.</li>
+<li><strong>Stop():</strong> Verifies clean teardown. Engineers
+repeatedly start and stop the driver to ensure all child handles are
+uninstalled, interrupt/timer events are closed, and memory buffers are
+freed without leaks.</li>
+</ul>
+<h3 id="3-asynchronous-io-and-queue-handling">3. Asynchronous I/O and
+Queue Handling</h3>
+<p>Modern storage devices rely heavily on non-blocking and queued
+operations via <code>EFI_BLOCK_IO2_PROTOCOL</code>. Firmware engineers
+test this functionality by:</p>
+<ul>
+<li>Triggering concurrent read and write tokens to verify that command
+queues do not deadlock or drop transactions.</li>
+<li>Checking that notification events (<code>EFI_EVENT</code>) signal
+completion accurately and invoke registered callbacks.</li>
+<li>Simulating hardware timeouts to confirm that the driver can abort
+transactions or reset submission/completion queues gracefully.</li>
+</ul>
+<h3 id="4-boundary-alignment-and-stress-testing">4. Boundary, Alignment,
+and Stress Testing</h3>
+<p>Engineers employ targeted synthetic workloads to verify robust
+handling of irregular access patterns:</p>
+<ul>
+<li><strong>Buffer Alignment:</strong> Testing transfers across
+non-standard memory boundaries, such as buffers unaligned to the drive’s
+logical block addressing (LBA) size or controller DMA boundary
+constraints.</li>
+<li><strong>Extreme LBA Access:</strong> Issuing read and write requests
+to LBA 0, the final addressable LBA of the drive, and out-of-range
+blocks to verify bounds-checking.</li>
+<li><strong>Heavy Concurrent Load:</strong> Executing sustained read,
+write, and flush operations across extended durations to detect
+edge-case race conditions and memory corruption.</li>
+</ul>
+<h3 id="5-os-handoff-and-exitbootservices-verification">5. OS Handoff
+and ExitBootServices Verification</h3>
+<p>A compliant UEFI storage driver must safely transition control to the
+operating system:</p>
+<ul>
+<li><strong>ExitBootServices() Cleanliness:</strong> The driver must
+register an event callback for
+<code>EVT_SIGNAL_EXIT_BOOT_SERVICES</code> to disable active DMA
+engines, clear hardware interrupts, and neutralize controller states so
+that incoming operating system native drivers inherit clean
+hardware.</li>
+<li><strong>OS Installation and Boot:</strong> Engineers validate
+end-to-end functionality by installing and booting major operating
+systems (e.g., Linux, Windows) from the target drive using their native
+EFI bootloaders.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-to-test-uefi-storage-driver-compliance';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

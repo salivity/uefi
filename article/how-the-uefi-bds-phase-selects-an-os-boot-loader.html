@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How the UEFI BDS Phase Selects an OS Boot Loader - uefi</title>
+    <meta name="description" content="The Boot Device Selection (BDS) phase is the final stage of the Unified Extensible Firmware Interface (UEFI) initialization environment before control transfers to an operating system. During this phase, the firmware evaluates hardware and policy configur">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-the-uefi-bds-phase-selects-an-os-boot-loader">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How the UEFI BDS Phase Selects an OS Boot Loader - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-the-uefi-bds-phase-selects-an-os-boot-loader" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Boot Device Selection (BDS) phase is the final stage of the Unified Extensible Firmware Interface (UEFI) initialization environment before control transfers to an operating system. During this phase, the firmware evaluates hardware and policy configur" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-the-uefi-bds-phase-selects-an-os-boot-loader">How the UEFI
+BDS Phase Selects an OS Boot Loader</h1>
+<p>The Boot Device Selection (BDS) phase is the final stage of the
+Unified Extensible Firmware Interface (UEFI) initialization environment
+before control transfers to an operating system. During this phase, the
+firmware evaluates hardware and policy configuration, consults globally
+defined non-volatile variables, and identifies the correct operating
+system loader binary to execute. This article details the sequential
+mechanisms BDS uses to determine, validate, and launch the designated OS
+loader from connected storage media.</p>
+<h2 id="initialization-of-the-bds-architectural-protocol">Initialization
+of the BDS Architectural Protocol</h2>
+<p>Once the Driver Execution Environment (DXE) phase completes hardware
+initialization and creates the required core protocol interfaces, it
+invokes the BDS Architectural Protocol
+(<code>EFI_BDS_ARCH_PROTOCOL</code>). BDS initializes the platform
+console devices (such as displays and keyboards) and connects drivers to
+target block devices (like NVMe, SATA, and USB controllers) using the
+UEFI Driver Model, ensuring the file systems containing OS loaders are
+accessible.</p>
+<h2 id="querying-nvram-boot-variables">Querying NVRAM Boot
+Variables</h2>
+<p>The core decision-making process in BDS relies on specific global
+environment variables stored in non-volatile RAM (NVRAM):</p>
+<ol type="1">
+<li><strong><code>BootNext</code></strong>: BDS checks if this optional
+variable is set. It contains a single 16-bit integer pointing directly
+to an override boot option (e.g., <code>Boot0003</code>). If present,
+the firmware prioritizes this boot option and deletes the
+<code>BootNext</code> variable immediately to prevent boot loops.</li>
+<li><strong><code>BootOrder</code></strong>: If <code>BootNext</code>
+does not exist or fails to boot, BDS reads <code>BootOrder</code>. This
+variable contains an ordered array of 16-bit integers (e.g.,
+<code>0001</code>, <code>0002</code>, <code>0000</code>) representing
+the user- or vendor-defined priority of available boot candidates.</li>
+<li><strong><code>Boot####</code></strong>: For each index defined in
+<code>BootOrder</code>, BDS looks up the corresponding
+<code>Boot####</code> variable (e.g., <code>Boot0001</code>). This
+variable maps to an <code>EFI_LOAD_OPTION</code> structure, which
+contains:
+<ul>
+<li>Attributes indicating whether the entry is active or hidden.</li>
+<li>A human-readable description (e.g., "Windows Boot Manager" or
+"ubuntu").</li>
+<li>An <code>EFI_DEVICE_PATH_PROTOCOL</code> structure pointing directly
+to the partition GUID and the file path of the OS loader (such as
+<code>\EFI\Microsoft\Boot\bootmgfw.efi</code>).</li>
+<li>Optional platform-specific arguments passed to the loader.</li>
+</ul></li>
+</ol>
+<h2 id="device-path-resolution-and-media-verification">Device Path
+Resolution and Media Verification</h2>
+<p>BDS processes each entry in <code>BootOrder</code> sequentially:</p>
+<ol type="1">
+<li><strong>Path Traversal</strong>: BDS parses the
+<code>EFI_DEVICE_PATH_PROTOCOL</code> inside the active
+<code>Boot####</code> option, resolving hardware buses, disk partitions
+(matched via GPT partition UUIDs), and target directories.</li>
+<li><strong>File Availability</strong>: BDS interacts with the
+<code>EFI_SIMPLE_FILE_SYSTEM_PROTOCOL</code> on the target partition
+(the EFI System Partition, or ESP) to verify that the file exists and is
+readable.</li>
+<li><strong>Failure Handling</strong>: If the target storage device is
+disconnected, the partition is missing, or the binary is not found, BDS
+abandons that entry and immediately proceeds to the next candidate in
+<code>BootOrder</code>.</li>
+</ol>
+<h2 id="the-default-fallback-boot-path">The Default Fallback Boot
+Path</h2>
+<p>When non-volatile entries are invalid, exhausted, or a removable
+medium (such as a USB flash drive) without a pre-registered NVRAM entry
+is inserted, BDS falls back to the default removable media path defined
+by the UEFI specification:</p>
+<p><code>\EFI\BOOT\BOOT&lt;ARCH&gt;.EFI</code></p>
+<p>The architecture token (<code>&lt;ARCH&gt;</code>) varies based on
+the target processor:</p>
+<ul>
+<li><strong>x86-64</strong>: <code>\EFI\BOOT\BOOTX64.EFI</code></li>
+<li><strong>AArch64 (ARM 64-bit)</strong>:
+<code>\EFI\BOOT\BOOTAA64.EFI</code></li>
+<li><strong>IA-32</strong>: <code>\EFI\BOOT\BOOTIA32.EFI</code></li>
+<li><strong>RISC-V 64-bit</strong>:
+<code>\EFI\BOOT\BOOTRISCV64.EFI</code></li>
+</ul>
+<p>If a file exists at this path on a formatted FAT32 partition, BDS
+treats it as a valid OS loader candidate.</p>
+<h2 id="security-validation-and-execution">Security Validation and
+Execution</h2>
+<p>Once a valid loader binary path is identified—either through NVRAM
+variables or the default fallback path—BDS executes the following
+operations:</p>
+<ol type="1">
+<li><strong>Image Loading</strong>: BDS invokes the UEFI Boot Service
+<code>gBS-&gt;LoadImage()</code>. This loads the PE/COFF-formatted
+executable into system memory and assigns it an image handle.</li>
+<li><strong>Secure Boot Verification</strong>: If UEFI Secure Boot is
+enabled, the firmware's security subsystem intercepts execution to
+verify the binary against the authorized signature database
+(<code>db</code>), ensuring it is not revoked in the forbidden database
+(<code>dbx</code>). If verification fails, BDS aborts loading and
+advances to the next entry in <code>BootOrder</code>.</li>
+<li><strong>Execution</strong>: If verification succeeds, BDS calls
+<code>gBS-&gt;StartImage()</code>. This passes execution control to the
+operating system loader, concluding the role of the BDS phase.</li>
+</ol></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-the-uefi-bds-phase-selects-an-os-boot-loader';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

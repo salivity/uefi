@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How Hypervisors Pass Configuration via UEFI Variables - uefi</title>
+    <meta name="description" content="This article provides an overview of how modern hypervisors utilize Unified Extensible Firmware Interface (UEFI) variables to deliver custom configuration data to guest operating systems. By leveraging virtualized Non-Volatile RAM (NVRAM), hypervisors can">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-hypervisors-pass-configuration-via-uefi-variables">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How Hypervisors Pass Configuration via UEFI Variables - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-hypervisors-pass-configuration-via-uefi-variables" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article provides an overview of how modern hypervisors utilize Unified Extensible Firmware Interface (UEFI) variables to deliver custom configuration data to guest operating systems. By leveraging virtualized Non-Volatile RAM (NVRAM), hypervisors can" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-hypervisors-pass-configuration-via-uefi-variables">How
+Hypervisors Pass Configuration via UEFI Variables</h1>
+<p>This article provides an overview of how modern hypervisors utilize
+Unified Extensible Firmware Interface (UEFI) variables to deliver custom
+configuration data to guest operating systems. By leveraging virtualized
+Non-Volatile RAM (NVRAM), hypervisors can stage early-boot configuration
+settings, cloud-init metadata, and network provisions directly into
+guest memory space. The following sections break down the underlying
+architecture, the variable injection process, variable attributes, and
+how guest operating systems access this data post-boot.</p>
+<h3 id="the-role-of-virtualized-nvram">The Role of Virtualized
+NVRAM</h3>
+<p>In a physical machine, UEFI variables reside in non-volatile flash
+memory (SPI flash) on the motherboard. Hypervisors like QEMU/KVM,
+Hyper-V, and VMware ESXi emulate this behavior using virtual flash
+devices.</p>
+<p>In QEMU/KVM with OVMF (Open Virtual Machine Firmware), for example,
+UEFI execution relies on two distinct images:</p>
+<ol type="1">
+<li><strong>The Code Image (<code>OVMF_CODE.fd</code>):</strong>
+Contains the read-only executable UEFI firmware.</li>
+<li><strong>The Variables Image (<code>OVMF_VARS.fd</code>):</strong>
+Acts as a virtual flash drive (<code>pflash</code>) representing the
+NVRAM storage where UEFI variables persist across reboots.</li>
+</ol>
+<p>To supply custom data to a guest, the hypervisor creates an
+instance-specific copy of this variable file for each virtual
+machine.</p>
+<h3 id="injecting-configuration-data">Injecting Configuration Data</h3>
+<p>Hypervisors pass custom data into this environment primarily through
+two methods:</p>
+<ul>
+<li><strong>Pre-boot Image Modification:</strong> The virtualization
+orchestrator reads the guest's template <code>VARS</code> file and
+writes custom key-value pairs directly into the binary structure before
+starting the VM process. Tools and libraries (such as
+<code>virt-fw-vars</code> or python-based UEFI variable editors) parse
+the variable store format and insert custom entries.</li>
+<li><strong>Hypervisor Injection via Firmware Interfaces:</strong> Some
+platforms support firmware communication channels (such as QEMU's
+<code>fw_cfg</code> interface). The hypervisor passes raw configuration
+payloads over this synthetic bus, and a custom build of the UEFI
+firmware reads this data during early initialization, subsequently
+registering it as standard UEFI variables via internal firmware
+services.</li>
+</ul>
+<h3 id="variable-structure-namespaces-and-attributes">Variable
+Structure: Namespaces and Attributes</h3>
+<p>UEFI variables do not rely on simple string names alone; they are
+scoped using a combination of a string name and a unique 128-bit Vendor
+GUID (Globally Unique Identifier). This design prevents namespace
+collisions between hardware vendors, operating systems, and
+hypervisor-specific metadata.</p>
+<p>When creating a variable for guest consumption, the hypervisor
+assigns specific bitmask attributes:</p>
+<ul>
+<li><strong><code>EFI_VARIABLE_NON_VOLATILE</code> (NV):</strong>
+Ensures the variable survives power cycles and reboots.</li>
+<li><strong><code>EFI_VARIABLE_BOOTSERVICE_ACCESS</code> (BS):</strong>
+Allows the UEFI firmware and bootloaders to access the data before the
+operating system kernel takes over.</li>
+<li><strong><code>EFI_VARIABLE_RUNTIME_ACCESS</code> (RT):</strong>
+Crucial for hypervisor-to-OS communication. This flag directs the UEFI
+firmware to map the variable into runtime memory that remains accessible
+after the kernel invokes <code>ExitBootServices()</code>.</li>
+</ul>
+<p>Without <code>EFI_VARIABLE_RUNTIME_ACCESS</code>, the guest operating
+system cannot read the custom configuration data once the kernel
+initializes.</p>
+<h3 id="retrieving-data-in-the-guest-operating-system">Retrieving Data
+in the Guest Operating System</h3>
+<p>Once the guest operating system boots, it queries the runtime
+services preserved by the firmware to retrieve the injected data.</p>
+<h4 id="linux-environments">Linux Environments</h4>
+<p>The Linux kernel exposes UEFI runtime services via the
+<code>efivarfs</code> filesystem, typically mounted automatically at
+<code>/sys/firmware/efi/efivars/</code>.</p>
+<p>Variables appear as files formatted as
+<code>[VariableName]-[VendorGUID]</code>. The first four bytes of each
+file contain the 32-bit attribute mask, while the remaining bytes
+contain the actual payload. Guest applications, such as custom bootstrap
+scripts or provisioning agents, can read this payload directly:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Example path for a custom hypervisor variable</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span> /sys/firmware/efi/efivars/HypervisorConfig-12345678-1234-1234-1234-123456789abc <span class="kw">|</span> <span class="fu">tail</span> <span class="at">-c</span> +5</span></code></pre></div>
+<p>Linux tools such as <code>efivar</code> or <code>efibootmgr</code>
+can also interact with these entries using standard system calls.</p>
+<h4 id="windows-environments">Windows Environments</h4>
+<p>Windows provides native Win32 APIs for interacting with firmware
+environments. Applications running with administrator privileges
+(<code>SE_SYSTEM_ENVIRONMENT_NAME</code>) invoke:</p>
+<ul>
+<li><code>GetFirmwareEnvironmentVariableExW()</code>: Retrieves the
+variable's value, GUID, and attribute flags.</li>
+</ul>
+<h3 id="common-use-cases">Common Use Cases</h3>
+<p>Passing configuration through UEFI variables eliminates the need for
+secondary synthetic devices, emulated CD-ROM drives (such as traditional
+<code>cloud-init</code> ISO attachments), or early network dependency.
+Common applications include:</p>
+<ul>
+<li>Supplying network configuration (static IPs, gateways) before
+network interfaces are brought online.</li>
+<li>Delivering cloud-init user-data and meta-data payloads.</li>
+<li>Passing cryptographically signed identity certificates or hardware
+tokens to prove VM identity to internal guest agents.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-hypervisors-pass-configuration-via-uefi-variables';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>
