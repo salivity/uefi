@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Variable Attributes Govern Persistence - uefi</title>
+    <meta name="description" content="UEFI variables store system configuration and state data across different phases of system initialization and operating system operation. This article explains how specific variable attributes—primarily EFIVARIABLEBOOTSERVICEACCESS, EFIVARIABLERUNTIMEACCE">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-variable-attributes-govern-persistence">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Variable Attributes Govern Persistence - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-variable-attributes-govern-persistence" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI variables store system configuration and state data across different phases of system initialization and operating system operation. This article explains how specific variable attributes—primarily EFIVARIABLEBOOTSERVICEACCESS, EFIVARIABLERUNTIMEACCE" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-variable-attributes-govern-persistence">How UEFI
+Variable Attributes Govern Persistence</h1>
+<p>UEFI variables store system configuration and state data across
+different phases of system initialization and operating system
+operation. This article explains how specific variable
+attributes—primarily <code>EFI_VARIABLE_BOOTSERVICE_ACCESS</code>,
+<code>EFI_VARIABLE_RUNTIME_ACCESS</code>, and
+<code>EFI_VARIABLE_NON_VOLATILE</code>—define the lifecycle,
+accessibility windows, and persistence of data across system boots and
+runtime execution.</p>
+<h2 id="the-role-of-uefi-variable-attributes">The Role of UEFI Variable
+Attributes</h2>
+<p>When a UEFI variable is created using the <code>SetVariable()</code>
+interface, it is assigned a 32-bit bitmask of attributes. These
+attributes explicitly dictate where the variable resides, how long it
+survives, and which execution phases can read or modify it.</p>
+<p>Persistence and access are governed by three primary flags:</p>
+<ul>
+<li><code>EFI_VARIABLE_NON_VOLATILE</code> (NV)</li>
+<li><code>EFI_VARIABLE_BOOTSERVICE_ACCESS</code> (BS)</li>
+<li><code>EFI_VARIABLE_RUNTIME_ACCESS</code> (RT)</li>
+</ul>
+<p>While persistence across power cycles strictly depends on
+non-volatile storage, access permissions dictate whether the data can
+actually be read, altered, or preserved across execution boundaries.</p>
+<h2 id="understanding-the-attributes">Understanding the Attributes</h2>
+<h3 id="efi_variable_non_volatile-nv">EFI_VARIABLE_NON_VOLATILE
+(NV)</h3>
+<p>The <code>NV</code> attribute directly controls hardware
+persistence.</p>
+<ul>
+<li><strong>Present:</strong> The variable is committed to persistent
+storage, typically the SPI flash chip alongside the firmware. It
+survives power loss, system reboots, and firmware updates unless
+explicitly deleted.</li>
+<li><strong>Absent:</strong> The variable is volatile and resides
+entirely in system RAM. It is lost immediately upon a power cycle or
+platform reset.</li>
+</ul>
+<h3
+id="efi_variable_bootservice_access-bs">EFI_VARIABLE_BOOTSERVICE_ACCESS
+(BS)</h3>
+<p>The <code>BS</code> attribute defines variable visibility during the
+pre-boot phase.</p>
+<ul>
+<li>It grants access to the variable while UEFI Boot Services are
+active.</li>
+<li>These services are available to UEFI drivers, the Driver Execution
+Environment (DXE), Boot Device Selection (BDS), and OS bootloaders up
+until the operating system takes control.</li>
+</ul>
+<h3 id="efi_variable_runtime_access-rt">EFI_VARIABLE_RUNTIME_ACCESS
+(RT)</h3>
+<p>The <code>RT</code> attribute defines variable visibility after Boot
+Services have terminated.</p>
+<ul>
+<li>Once an operating system bootloader calls
+<code>ExitBootServices()</code>, Boot Services code and data are
+discarded or reclaimed by the OS.</li>
+<li>Variables with the <code>RT</code> flag remain mapped into memory
+and accessible to the operating system kernel via UEFI Runtime Services
+(such as <code>/sys/firmware/efi/efivars</code> in Linux or
+<code>GetFirmwareEnvironmentVariable</code> in Windows).</li>
+</ul>
+<h2 id="attribute-dependency-rules">Attribute Dependency Rules</h2>
+<p>The UEFI Specification defines strict rules governing how these flags
+can be combined:</p>
+<ol type="1">
+<li><strong>Runtime Access Requires Boot Service Access:</strong> An
+attribute combination of <code>RT</code> without <code>BS</code> is
+invalid. A variable cannot be exposed to the OS at runtime if it was not
+also exposed during boot services. If a caller passes <code>RT</code>
+without <code>BS</code> to <code>SetVariable()</code>, the firmware
+rejects the operation with <code>EFI_INVALID_PARAMETER</code>.</li>
+<li><strong>Access Windows vs. Storage Media:</strong> <code>BS</code>
+and <code>RT</code> do not determine whether a variable survives a
+reboot; they only dictate the time frame during which the variable's
+interface can be called. However, to persist a change made from the
+running OS, the variable must include both <code>NV</code> and
+<code>RT</code> (and consequently <code>BS</code>).</li>
+</ol>
+<h2 id="common-attribute-combinations-and-persistence-behaviors">Common
+Attribute Combinations and Persistence Behaviors</h2>
+<h3 id="1-boot-service-only-bs">1. Boot Service Only (BS)</h3>
+<ul>
+<li><strong>Persistence:</strong> Volatile (lost on reboot).</li>
+<li><strong>Access Window:</strong> Available strictly before
+<code>ExitBootServices()</code>.</li>
+<li><strong>Use Case:</strong> Passing temporary parameters between DXE
+drivers or conveying initialization state between the firmware and the
+OS bootloader.</li>
+</ul>
+<h3 id="2-boot-service--non-volatile-bs--nv">2. Boot Service +
+Non-Volatile (BS | NV)</h3>
+<ul>
+<li><strong>Persistence:</strong> Non-volatile (persists across reboots
+in SPI flash).</li>
+<li><strong>Access Window:</strong> Pre-boot only. It becomes completely
+invisible once the OS kernel initializes.</li>
+<li><strong>Use Case:</strong> Internal firmware settings, hardware
+initialization profiles, and secure parameters that the OS should
+neither read nor tamper with directly.</li>
+</ul>
+<h3 id="3-boot-service--runtime-access-bs--rt">3. Boot Service + Runtime
+Access (BS | RT)</h3>
+<ul>
+<li><strong>Persistence:</strong> Volatile (lost on reboot).</li>
+<li><strong>Access Window:</strong> Accessible during pre-boot and
+throughout the OS runtime.</li>
+<li><strong>Use Case:</strong> Ephemeral runtime coordination between
+the OS and firmware, such as diagnostic logs or dynamic memory
+allocation tables that do not need to survive a power cycle.</li>
+</ul>
+<h3 id="4-boot-service--runtime-access--non-volatile-bs--rt--nv">4. Boot
+Service + Runtime Access + Non-Volatile (BS | RT | NV)</h3>
+<ul>
+<li><strong>Persistence:</strong> Non-volatile (persists across reboots
+in SPI flash).</li>
+<li><strong>Access Window:</strong> Permanently available in both
+pre-boot and runtime environments.</li>
+<li><strong>Use Case:</strong> Global system settings configured by the
+OS or user, including <code>BootOrder</code>, <code>BootNext</code>,
+Secure Boot keys (<code>PK</code>, <code>KEK</code>, <code>db</code>),
+and platform setup options.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-variable-attributes-govern-persistence';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How the DXE Dispatcher Coordinates UEFI Drivers - uefi</title>
+    <meta name="description" content="The Driver Execution Environment (DXE) Dispatcher is the core engine within the UEFI DXE phase responsible for discovering, evaluating, and executing DXE drivers. It coordinates driver execution by traversing Firmware Volumes (FVs), evaluating individual">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-the-dxe-dispatcher-coordinates-uefi-drivers">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How the DXE Dispatcher Coordinates UEFI Drivers - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-the-dxe-dispatcher-coordinates-uefi-drivers" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Driver Execution Environment (DXE) Dispatcher is the core engine within the UEFI DXE phase responsible for discovering, evaluating, and executing DXE drivers. It coordinates driver execution by traversing Firmware Volumes (FVs), evaluating individual" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-the-dxe-dispatcher-coordinates-uefi-drivers">How the DXE
+Dispatcher Coordinates UEFI Drivers</h1>
+<p>The Driver Execution Environment (DXE) Dispatcher is the core engine
+within the UEFI DXE phase responsible for discovering, evaluating, and
+executing DXE drivers. It coordinates driver execution by traversing
+Firmware Volumes (FVs), evaluating individual driver Dependency
+Expressions (DEPEX) against a dynamic protocol database, and executing
+valid drivers in iterative passes until all boot dependencies are
+satisfied. This mechanism guarantees that hardware initialization and
+architectural services occur in the correct, deterministic order
+regardless of the physical storage order of the drivers in flash
+memory.</p>
+<h3 id="firmware-volume-discovery-and-the-a-priori-list">Firmware Volume
+Discovery and the A Priori List</h3>
+<p>Before dynamic dependency resolution begins, the DXE Dispatcher scans
+available Firmware Volumes for executable PE32/PE32+ driver images.</p>
+<p>If a Firmware Volume contains an optional file known as the <strong>A
+Priori list</strong>, the Dispatcher processes it first. The A Priori
+file contains an explicit, hardcoded list of driver GUIDs. The
+Dispatcher executes these listed drivers strictly in the sequence
+defined by the file, bypassing their normal dependency expressions. This
+ensures that fundamental architectural components—such as CPU
+architectural protocols, memory allocation services, and system timer
+infrastructure—are initialized before the general dispatch algorithm
+commences.</p>
+<h3 id="dependency-expressions-depex">Dependency Expressions
+(DEPEX)</h3>
+<p>Drivers not governed by an A Priori list must declare their
+prerequisites using a Dependency Expression (DEPEX). Embedded in a
+specific section of the driver's executable binary
+(<code>EFI_SECTION_DXE_DEPEX</code>), a DEPEX is a small bytecode
+sequence composed of boolean logic operators (<code>AND</code>,
+<code>OR</code>, <code>NOT</code>) and protocol GUIDs.</p>
+<p>A DEPEX dictates the environmental conditions required before the
+driver can safely run. For example, a PCI host controller driver might
+require the CPU I/O Protocol and Metronome Architectural Protocol to
+exist before its entry point can be invoked. If a driver has no
+dependencies, its DEPEX section evaluates unconditionally to
+<code>TRUE</code>.</p>
+<h3 id="the-dispatch-loop-execution-model">The Dispatch Loop Execution
+Model</h3>
+<p>The DXE Dispatcher employs an iterative state machine to process
+non-A Priori drivers:</p>
+<ol type="1">
+<li><strong>Discovery and State Tracking:</strong> The Dispatcher
+maintains an internal database of all discovered drivers across all
+accessible Firmware Volumes. Each driver is assigned a state, typically
+progressing from <em>Unprocessed</em> to <em>Scheduled</em>,
+<em>Initialized</em>, or <em>Failed</em>.</li>
+<li><strong>Evaluation Pass:</strong> The Dispatcher iterates through
+the list of uninitialized drivers and evaluates each driver's DEPEX
+bytecode against the current UEFI Protocol Database.</li>
+<li><strong>Execution:</strong> When a driver's DEPEX evaluates to
+<code>TRUE</code>, the Dispatcher:
+<ul>
+<li>Loads the driver image into system memory via the
+<code>LoadImage()</code> boot service.</li>
+<li>Invokes the driver's entry point using the <code>StartImage()</code>
+boot service.</li>
+<li>Monitors the return status. As the driver executes, it typically
+installs new protocols into the protocol database using
+<code>InstallProtocolInterface()</code> or
+<code>InstallMultipleProtocolInterfaces()</code>.</li>
+</ul></li>
+<li><strong>Re-evaluation (Iterative Loop):</strong> The addition of new
+protocols to the database changes the system state. Consequently, the
+Dispatcher restarts or continues the evaluation pass, as previously
+unsatisfied DEPEX expressions for other pending drivers may now evaluate
+to <code>TRUE</code>.</li>
+</ol>
+<h3 id="termination-and-hand-off-to-bds">Termination and Hand-off to
+BDS</h3>
+<p>The dispatch loop repeats until a "fixed point" is reached—a complete
+pass over all remaining drivers yields no new DEPEX evaluations that
+evaluate to <code>TRUE</code>.</p>
+<p>Once no further drivers can be dispatched:</p>
+<ul>
+<li><strong>Firmware Volume Extensions:</strong> If a newly dispatched
+driver produces a protocol that exposes an additional Firmware Volume
+(such as a compressed payload or external storage), the Dispatcher
+mounts the volume, discovers the newly accessible drivers, and resumes
+the dispatch loop.</li>
+<li><strong>Hand-off:</strong> When all discovered Firmware Volumes are
+fully processed and all solvable drivers have executed, the DXE
+Dispatcher invokes the architectural protocol that launches the Boot
+Device Selection (BDS) phase, transferring control to the platform boot
+manager. Any drivers with unsatisfied dependencies remain
+unexecuted.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-the-dxe-dispatcher-coordinates-uefi-drivers';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

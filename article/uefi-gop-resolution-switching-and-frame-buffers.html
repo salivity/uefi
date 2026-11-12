@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI GOP Resolution Switching and Frame Buffers - uefi</title>
+    <meta name="description" content="The Unified Extensible Firmware Interface (UEFI) relies on the Graphics Output Protocol (GOP) to manage pre-boot display capabilities, replacing legacy BIOS INT 10h video services. GOP provides an architecture-independent interface that enables firmware a">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-gop-resolution-switching-and-frame-buffers">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI GOP Resolution Switching and Frame Buffers - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-gop-resolution-switching-and-frame-buffers" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Unified Extensible Firmware Interface (UEFI) relies on the Graphics Output Protocol (GOP) to manage pre-boot display capabilities, replacing legacy BIOS INT 10h video services. GOP provides an architecture-independent interface that enables firmware a" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-gop-resolution-switching-and-frame-buffers">UEFI GOP
+Resolution Switching and Frame Buffers</h1>
+<p>The Unified Extensible Firmware Interface (UEFI) relies on the
+Graphics Output Protocol (GOP) to manage pre-boot display capabilities,
+replacing legacy BIOS INT 10h video services. GOP provides an
+architecture-independent interface that enables firmware and bootloaders
+to query display capabilities, switch display modes, and manage linear
+frame buffer allocations. This article details the mechanics of how GOP
+enumerates modes, executes resolution switches, allocates and structures
+linear frame buffers, and prepares the graphical handoff to the
+operating system.</p>
+<h3 id="understanding-the-graphics-output-protocol">Understanding the
+Graphics Output Protocol</h3>
+<p>The <code>EFI_GRAPHICS_OUTPUT_PROTOCOL</code> (GOP) is an interface
+exposed by UEFI video drivers to provide basic 2D display functionality.
+Unlike complex runtime graphics drivers, GOP is designed to be
+lightweight, deterministic, and hardware-agnostic. It abstracts the
+underlying display controller hardware while exposing two primary
+mechanisms for displaying imagery: direct memory access to a flat,
+linear frame buffer and software-driven block transfers through the
+<code>Blt</code> (Block Transfer) function.</p>
+<h3 id="resolution-enumeration-and-switching">Resolution Enumeration and
+Switching</h3>
+<p>Display resolution management in GOP is structured around mode
+indices, configuration structures, and explicit protocol functions.</p>
+<ol type="1">
+<li><p><strong>Mode Enumeration (<code>QueryMode</code>)</strong>:
+Before a resolution switch occurs, the firmware or bootloader must
+determine what display modes the hardware supports. GOP achieves this
+via the <code>QueryMode()</code> interface:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>EFI_STATUS QueryMode <span class="op">(</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  IN  EFI_GRAPHICS_OUTPUT_PROTOCOL          <span class="op">*</span>This<span class="op">,</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  IN  UINT32                                ModeNumber<span class="op">,</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  OUT UINTN                                 <span class="op">*</span>SizeOfInfo<span class="op">,</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  OUT EFI_GRAPHICS_OUTPUT_MODE_INFORMATION <span class="op">**</span>Info</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span></code></pre></div>
+<p>Iterating from <code>0</code> to <code>Mode-&gt;MaxMode - 1</code>
+populates an <code>EFI_GRAPHICS_OUTPUT_MODE_INFORMATION</code> structure
+for each index. This structure defines:</p>
+<ul>
+<li><strong>HorizontalResolution and VerticalResolution</strong>: The
+visible pixel dimensions (e.g., 1920x1080).</li>
+<li><strong>PixelFormat</strong>: The color ordering (e.g.,
+<code>PixelBlueGreenRedReserved8BitPerColor</code>,
+<code>PixelRedGreenBlueReserved8BitPerColor</code>, or
+<code>PixelBitMask</code>).</li>
+<li><strong>PixelsPerScanLine</strong>: The stride or pitch of the
+buffer, which accounts for hardware memory alignment requirements that
+may exceed the horizontal resolution.</li>
+</ul></li>
+<li><p><strong>Mode Switching (<code>SetMode</code>)</strong>: To change
+the resolution, the consumer invokes <code>SetMode()</code>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>EFI_STATUS SetMode <span class="op">(</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  IN EFI_GRAPHICS_OUTPUT_PROTOCOL <span class="op">*</span>This<span class="op">,</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  IN UINT32                       ModeNumber</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span></code></pre></div>
+<p>When <code>SetMode()</code> is called, the underlying driver
+interacts directly with the GPU or display controller hardware:</p>
+<ul>
+<li>It reprograms internal pixel clocks, phase-locked loops (PLLs), and
+timing controllers (CRTCs) to match the timing parameters (front porch,
+back porch, sync pulses) of the requested resolution.</li>
+<li>It updates the active display plane configurations to scale or
+center the image as required by the panel.</li>
+<li>It updates the global <code>EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE</code>
+structure to reflect the new geometry and hardware addresses.</li>
+</ul></li>
+</ol>
+<h3 id="frame-buffer-allocation-and-management">Frame Buffer Allocation
+and Management</h3>
+<p>The GOP frame buffer is a contiguous block of physical memory mapped
+directly to the display hardware.</p>
+<h4 id="allocation-mechanism">Allocation Mechanism</h4>
+<p>GOP does not use standard heap allocations (such as
+<code>AllocatePool</code>) for the active display surface. Instead, the
+frame buffer is generally backed by one of two memory models:</p>
+<ul>
+<li><strong>Discrete GPUs</strong>: The frame buffer resides within the
+video memory (VRAM) mapped into the CPU's physical address space through
+a PCI Base Address Register (BAR). The UEFI driver configures this MMIO
+(Memory-Mapped I/O) aperture during PCI bus enumeration.</li>
+<li><strong>Integrated Graphics Processors (iGPUs)</strong>: The system
+firmware reserves a slice of host system RAM—often referred to as Stolen
+Memory or Unified Memory Architecture (UMA)—configured via system
+registers early in the platform initialization (PEI) phase.</li>
+</ul>
+<h4 id="memory-mapping-and-attributes">Memory Mapping and
+Attributes</h4>
+<p>The pointer to this space is exposed directly to consumers via
+<code>This-&gt;Mode-&gt;FrameBufferBase</code>, typed as an
+<code>EFI_PHYSICAL_ADDRESS</code>, along with
+<code>This-&gt;Mode-&gt;FrameBufferSize</code>.</p>
+<p>To maximize performance, this range is typically mapped with a
+<strong>Write-Combining (WC)</strong> or <strong>Uncacheable
+(UC)</strong> memory attribute in the CPU page tables or Memory Type
+Range Registers (MTRRs). Write-combining allows the CPU to coalesce
+sequential writes to the frame buffer into full cache-line bursts,
+mitigating memory bus bottlenecks without requiring the overhead of
+standard CPU cache coherency protocols.</p>
+<h4 id="frame-buffer-invalidation-during-resolution-switching">Frame
+Buffer Invalidation During Resolution Switching</h4>
+<p>A critical architectural behavior of GOP is that the frame buffer
+address and layout are not guaranteed to remain static across resolution
+changes. When <code>SetMode()</code> executes:</p>
+<ul>
+<li>The base address (<code>FrameBufferBase</code>) may change if the
+GPU hardware driver uses distinct internal memory segments for different
+display pipelines or modes.</li>
+<li>The buffer size (<code>FrameBufferSize</code>) increases or
+decreases according to the new vertical resolution and
+<code>PixelsPerScanLine</code>.</li>
+<li>Any existing content inside the frame buffer is considered
+invalidated or undefined; hardware may wipe the buffer or map a new
+offset entirely.</li>
+</ul>
+<p>Because of this behavior, bootloaders and UEFI applications must
+never cache the <code>FrameBufferBase</code> address across calls to
+<code>SetMode()</code>. The active base pointer must always be re-read
+from <code>This-&gt;Mode</code> immediately following a mode switch.</p>
+<h3 id="direct-frame-buffer-writing-vs-blt-operations">Direct Frame
+Buffer Writing vs. Blt Operations</h3>
+<p>UEFI GOP supports two methods for modifying screen content:</p>
+<ul>
+<li><strong>Direct Linear Access</strong>: Software writes directly to
+<code>FrameBufferBase</code> using pointer arithmetic based on the
+<code>PixelsPerScanLine</code> stride: <span
+class="math display">\[\text{Pixel Offset} = (Y \times
+\text{PixelsPerScanLine} + X) \times \text{BytesPerPixel}\]</span> This
+is the fastest method for full-screen drawing and is typically used by
+modern OS bootloaders to render graphical splash screens.</li>
+<li><strong>Protocol-Driven Blt (<code>Blt</code>)</strong>: GOP
+includes a <code>Blt()</code> function to copy data to and from video
+hardware, perform screen-to-screen copies, and execute solid color
+fills. While convenient and guaranteed to work on hardware operating in
+restricted modes (such as <code>PixelBltOnly</code>), software-based
+direct writes generally supersede <code>Blt()</code> due to the function
+call overhead associated with rendering complex interfaces.</li>
+</ul>
+<h3 id="os-handoff-and-transition">OS Handoff and Transition</h3>
+<p>When the bootloader completes execution and calls
+<code>ExitBootServices()</code>, GOP transitions out of scope. The UEFI
+driver ceases execution, and all GOP protocol interfaces are destroyed.
+However, the physical frame buffer hardware configuration established by
+the final <code>SetMode()</code> invocation persists.</p>
+<p>The bootloader packages the active <code>FrameBufferBase</code>,
+dimensions, stride, and pixel format into boot parameter structures
+(such as ACPI tables or kernel boot parameters like Linux's
+<code>screen_info</code>). The operating system's kernel uses this
+configuration to drive a flicker-free visual console until its own
+native, accelerated GPU display drivers can be initialized.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-gop-resolution-switching-and-frame-buffers';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

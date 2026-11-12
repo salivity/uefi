@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Decompress Protocol in Firmware Images - uefi</title>
+    <meta name="description" content="This article explains the critical role of the Unified Extensible Firmware Interface (UEFI) Decompress protocol in modern boot processes, detailing how system firmware manages storage constraints by unpacking executable binaries. By serving as a standardi">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-decompress-protocol-in-firmware-images">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Decompress Protocol in Firmware Images - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-decompress-protocol-in-firmware-images" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article explains the critical role of the Unified Extensible Firmware Interface (UEFI) Decompress protocol in modern boot processes, detailing how system firmware manages storage constraints by unpacking executable binaries. By serving as a standardi" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-decompress-protocol-in-firmware-images">UEFI Decompress
+Protocol in Firmware Images</h1>
+<p>This article explains the critical role of the Unified Extensible
+Firmware Interface (UEFI) Decompress protocol in modern boot processes,
+detailing how system firmware manages storage constraints by unpacking
+executable binaries. By serving as a standardized bridge between tightly
+packed storage and memory execution, the UEFI Decompress protocol
+enables platforms to unpack and dispatch compressed Firmware Volumes
+(FVs) during system initialization, balancing platform ROM limitations
+with rich pre-boot functionality.</p>
+<h3 id="the-purpose-of-firmware-compression">The Purpose of Firmware
+Compression</h3>
+<p>Modern hardware platforms require an extensive array of
+initialization drivers, hardware setup routines, diagnostic tools, and
+boot managers before transferring control to an operating system.
+However, motherboard flash memory (typically SPI NOR flash) has strict
+physical size constraints due to cost and board layout limits.</p>
+<p>To overcome these constraints, hardware vendors compress UEFI
+drivers, applications, and core libraries within firmware volumes.
+Compressing these binaries allows significantly more functionality to
+fit onto a standard 16 MB or 32 MB flash chip. However, the processor
+cannot execute compressed code directly from flash. It must be unpacked
+into system RAM, which is where the UEFI Decompress protocol becomes
+essential.</p>
+<h3 id="core-architecture-of-the-uefi-decompress-protocol">Core
+Architecture of the UEFI Decompress Protocol</h3>
+<p>The UEFI Decompress protocol, formally identified as
+<code>EFI_DECOMPRESS_PROTOCOL</code>, provides a unified interface for
+decompressing data blocks using standard decompression algorithms
+defined by the UEFI Specification.</p>
+<p>The protocol exposes two primary member functions:</p>
+<ul>
+<li><strong><code>GetInfo()</code></strong>: Inspects the compressed
+data stream to determine the size of the uncompressed output buffer and
+the size of any temporary scratch buffer required during the
+decompression routine. This allows the calling firmware component to
+allocate the exact memory buffers needed before processing.</li>
+<li><strong><code>Decompress()</code></strong>: Reads the compressed
+input stream, uses the allocated scratch space for intermediate
+calculations, and reconstructs the original uncompressed binary into the
+target destination buffer.</li>
+</ul>
+<p>The standardized algorithm natively mandated by the UEFI
+specification relies on a variant of Lempel-Ziv-Storer-Szymanski (LZSS)
+combined with adaptive Huffman coding, optimized to execute efficiently
+in resource-constrained environments.</p>
+<h3 id="the-unpacking-and-execution-workflow">The Unpacking and
+Execution Workflow</h3>
+<p>The extraction and execution of compressed firmware images follow a
+precise sequence during the boot phase, typically orchestrated during
+the transition between the Pre-EFI Initialization (PEI) phase and the
+Driver Execution Environment (DXE) phase:</p>
+<ol type="1">
+<li><strong>Discovery</strong>: The firmware detects a section within a
+Firmware Volume marked with the section type
+<code>EFI_SECTION_COMPRESSION</code>.</li>
+<li><strong>Buffer Allocation</strong>: The Firmware Volume dispatch
+engine invokes <code>GetInfo()</code> to evaluate the size requirements
+for the target buffer and scratch memory. The firmware then requests
+system memory allocations (via standard boot service memory allocation
+functions).</li>
+<li><strong>Extraction</strong>: The <code>Decompress()</code> function
+runs, unpacking the raw PE32/PE32+/COFF image from flash memory into the
+newly allocated system RAM.</li>
+<li><strong>Authentication and Relocation</strong>: Once decompressed
+into RAM, security checks (such as Secure Boot signature verification or
+cryptographic hashing) inspect the uncompressed image, and internal
+relocation fix-ups are applied.</li>
+<li><strong>Dispatch</strong>: The DXE dispatcher transfers control to
+the entry point of the decompressed driver, allowing it to initialize
+hardware or introduce additional platform protocols.</li>
+</ol>
+<h3 id="performance-and-reliability-benefits">Performance and
+Reliability Benefits</h3>
+<p>Using a dedicated decompression protocol offers several system
+advantages beyond raw space reduction:</p>
+<ul>
+<li><strong>Bus Bandwidth Optimization</strong>: Reading smaller,
+compressed blocks across slower external buses (such as SPI) and
+decompressing them in high-speed RAM can often yield faster boot times
+than reading uncompressed, larger binaries directly from slow
+storage.</li>
+<li><strong>Standardization</strong>: By abstracting the decompression
+logic behind an architectural protocol, the UEFI core decouples
+individual drivers from needing bespoke unpacking logic, keeping base
+drivers lightweight.</li>
+<li><strong>Modularity</strong>: Firmware developers can replace or
+augment the default decompression mechanisms with custom algorithms
+(such as platform-specific Tiano or custom LZMA protocols) without
+altering how the firmware volume dispatcher discovers and loads target
+images.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-decompress-protocol-in-firmware-images';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

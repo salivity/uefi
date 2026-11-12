@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Firmware Downgrade Attacks and Security Risks - uefi</title>
+    <meta name="description" content="UEFI firmware downgrade attacks, commonly referred to as rollback attacks, represent a critical threat where an attacker reverts a system&#39;s firmware to a previous, officially signed version containing known vulnerabilities. This article outlines how these">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-firmware-downgrade-attacks-and-security-risks">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Firmware Downgrade Attacks and Security Risks - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-firmware-downgrade-attacks-and-security-risks" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI firmware downgrade attacks, commonly referred to as rollback attacks, represent a critical threat where an attacker reverts a system&#39;s firmware to a previous, officially signed version containing known vulnerabilities. This article outlines how these" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-firmware-downgrade-attacks-and-security-risks">UEFI
+Firmware Downgrade Attacks and Security Risks</h1>
+<p>UEFI firmware downgrade attacks, commonly referred to as rollback
+attacks, represent a critical threat where an attacker reverts a
+system's firmware to a previous, officially signed version containing
+known vulnerabilities. This article outlines how these attacks bypass
+standard validation mechanisms and details the primary security risks
+they introduce, including persistent bootkit execution, the
+circumvention of Secure Boot, and the compromise of hardware-level
+isolation.</p>
+<h3 id="re-exposure-to-known-vulnerabilities">Re-exposure to Known
+Vulnerabilities</h3>
+<p>The primary objective of a downgrade attack is to reintroduce patched
+vulnerabilities into the system. While modern UEFI firmware receives
+regular updates to patch high-severity flaws, older versions remain
+cryptographically signed by the original vendor. If the device lacks
+robust anti-rollback protections, an attacker with local or privileged
+access can flash an older firmware image. This revives previously
+mitigated flaws—such as buffer overflows, memory corruption issues, or
+improper access controls—which can then be exploited to gain deeper
+system control.</p>
+<h3 id="circumvention-of-secure-boot">Circumvention of Secure Boot</h3>
+<p>Secure Boot is designed to verify the digital signature of every
+piece of boot software, including firmware drivers and the operating
+system kernel. However, because older firmware binaries are legitimately
+signed by the vendor's private key, Secure Boot accepts them as
+authentic. Attackers exploit this behavior to disable Secure Boot
+entirely, manipulate the signature verification logic, or execute
+unverified pre-boot code without triggering system warnings.</p>
+<h3 id="installation-of-undetectable-bootkits">Installation of
+Undetectable Bootkits</h3>
+<p>By successfully downgrading firmware, attackers can execute code at
+the lowest levels of the computing architecture, often targeting the
+System Management Mode (SMM) or the initial boot phases. This capability
+facilitates the installation of firmware bootkits. Operating beneath the
+operating system and hypervisor, bootkits are virtually invisible to
+endpoint detection and response (EDR) software, antivirus utilities, and
+standard administrative audits.</p>
+<h3 id="subversion-of-operating-system-protections">Subversion of
+Operating System Protections</h3>
+<p>Firmware initializes the hardware and configures the environment in
+which the operating system runs. If an attacker gains control during
+this stage via a downgrade attack, they can undermine critical operating
+system security features before they are initialized. This includes
+disabling:</p>
+<ul>
+<li>Hypervisor-Protected Code Integrity (HVCI)</li>
+<li>Kernel Patch Protection (PatchGuard)</li>
+<li>Virtualization-Based Security (VBS)</li>
+<li>Full-disk encryption protections, such as BitLocker, by intercepting
+decryption keys released by the Trusted Platform Module (TPM)</li>
+</ul>
+<h3 id="long-term-persistence-and-remediation-challenges">Long-Term
+Persistence and Remediation Challenges</h3>
+<p>Firmware-level compromises achieve ultimate persistence. Because the
+malicious state resides inside the motherboard’s SPI flash memory,
+standard remediation strategies—such as reformatting storage drives,
+reinstalling the operating system, or swapping hard disks—fail to
+eliminate the threat. Remediating a compromised, downgraded firmware
+environment often requires manual out-of-band reprogramming, hardware
+replacement, or specialized vendor flashing tools that enforce
+cryptographic revocation lists (such as the UEFI Revocation List, or
+DBX).</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-firmware-downgrade-attacks-and-security-risks';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

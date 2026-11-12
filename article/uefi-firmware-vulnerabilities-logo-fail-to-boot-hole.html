@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Firmware Vulnerabilities: LogoFAIL to BootHole - uefi</title>
+    <meta name="description" content="This article provides an overview of notable Unified Extensible Firmware Interface (UEFI) vulnerabilities that have fundamentally undermined modern platform security. As the critical software bridge between computer hardware and the operating system, UEFI">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-firmware-vulnerabilities-logo-fail-to-boot-hole">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Firmware Vulnerabilities: LogoFAIL to BootHole - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-firmware-vulnerabilities-logo-fail-to-boot-hole" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article provides an overview of notable Unified Extensible Firmware Interface (UEFI) vulnerabilities that have fundamentally undermined modern platform security. As the critical software bridge between computer hardware and the operating system, UEFI" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-firmware-vulnerabilities-logofail-to-boothole">UEFI
+Firmware Vulnerabilities: LogoFAIL to BootHole</h1>
+<p>This article provides an overview of notable Unified Extensible
+Firmware Interface (UEFI) vulnerabilities that have fundamentally
+undermined modern platform security. As the critical software bridge
+between computer hardware and the operating system, UEFI firmware
+initializes components and enforces Secure Boot. When this layer is
+compromised, attackers can deploy persistent rootkits and bootkits that
+execute prior to the operating system, completely blinding conventional
+security controls. The following sections examine the mechanics and
+impact of high-profile vulnerabilities including BootHole, LogoFAIL,
+BlackLotus, and PixieFAIL.</p>
+<h2 id="boothole-cve-2020-10713">BootHole (CVE-2020-10713)</h2>
+<p>Discovered in 2020, BootHole was a buffer overflow vulnerability
+identified in the GRUB2 bootloader’s parsing engine for its
+configuration file (<code>grub.cfg</code>). Because standard UEFI Secure
+Boot implementations trusted the Microsoft third-party Certificate
+Authority (CA) used to sign GRUB2 binaries, the flaw had massive reach
+across virtually all modern Linux distributions and Windows devices
+using dual-boot setups.</p>
+<p>An attacker with administrative or physical access could modify the
+plain-text <code>grub.cfg</code> file stored within the unencrypted EFI
+System Partition (ESP). During the boot process, GRUB2 failed to
+properly validate the length of input parameters, leading to arbitrary
+code execution in the pre-boot environment. This allowed malicious
+payloads to run with full hardware privileges while maintaining the
+facade of a valid Secure Boot state. Mitigating BootHole required
+updating the Secure Boot Forbidden Signature Database (DBX) to revoke
+vulnerable GRUB binaries, a complex process that risked unbootable
+systems if improperly applied.</p>
+<h2 id="logofail">LogoFAIL</h2>
+<p>Unveiled in late 2023 by researchers at Binarly, LogoFAIL represented
+a widespread supply chain vulnerability affecting major Independent BIOS
+Vendors (IBVs) including Insyde, AMI, and Phoenix. The flaw was not
+located in a core cryptographic validation routine, but rather in the
+image-parsing libraries used to display graphical logos during the
+Power-On Self-Test (POST) phase.</p>
+<p>OEMs frequently load custom boot images (such as JPEG, PNG, BMP, or
+GIF formats) from the EFI System Partition. LogoFAIL demonstrated that
+many UEFI vendors integrated flawed, legacy image-parsing code lacking
+basic memory safety checks. By placing a maliciously crafted image file
+into the ESP, an attacker could trigger heap or stack overflows during
+early firmware execution—specifically during the Driver Execution
+Environment (DXE) phase. This gave attackers execution control before
+the OS kernel or hypervisor initialized, completely bypassing Secure
+Boot and operating system-level integrity verifications.</p>
+<h2 id="blacklotus-cve-2022-21894--baton-drop">BlackLotus
+(CVE-2022-21894 / Baton Drop)</h2>
+<p>BlackLotus is one of the first publicly recognized in-the-wild UEFI
+bootkits capable of bypassing Secure Boot on fully patched Windows 11
+systems. It relied on CVE-2022-21894 (colloquially known as "Baton
+Drop"), a vulnerability in the standard Windows Boot Manager
+(<code>bootmgfw.efi</code>).</p>
+<p>Although Microsoft released a patch for the flaw, vulnerable versions
+of the boot manager remained signed by Microsoft’s trusted keys.
+BlackLotus exploited this gap through a technique known as a downgrade
+(or rollback) attack:</p>
+<ol type="1">
+<li>The malware replaced the existing boot manager with an older,
+vulnerable, yet legitimately signed version.</li>
+<li>It exploited CVE-2022-21894 to manipulate serial console settings,
+gaining arbitrary code execution in the boot phase.</li>
+<li>Once running, it disabled Hypervisor-Protected Code Integrity
+(HVCI), bypassed Windows Defender, and disabled BitLocker
+mechanisms.</li>
+</ol>
+<p>Because the vulnerable boot binaries could not be instantly revoked
+globally without extensive firmware testing, the attack surface remained
+active for months after the initial vulnerability disclosure.</p>
+<h2 id="pixiefail">PixieFAIL</h2>
+<p>Discovered in early 2024, PixieFAIL is a collection of nine
+vulnerabilities (ranging from CVE-2023-45229 to CVE-2023-45237)
+affecting the Tianocore EDK II NetworkPkg. This package provides the
+network stack used in UEFI environments to support Network Booting (PXE
+boot) over IPv6.</p>
+<p>The vulnerabilities involved flaws such as integer underflows, buffer
+overflows, and infinite loops in the handling of DHCPv6 and ICMPv6
+packets. Because the UEFI network stack operates without modern exploit
+mitigations like Address Space Layout Randomization (ASLR) or stack
+canaries, remote attackers on the same local network could execute
+arbitrary code on a booting machine by sending malformed network
+packets. This attack vector posed a severe threat to enterprise data
+centers and bare-metal cloud infrastructure that rely on automated,
+remote provisioning.</p>
+<h2 id="system-management-mode-smm-vulnerabilities">System Management
+Mode (SMM) Vulnerabilities</h2>
+<p>Beyond boot-loader flaws, recurring vulnerabilities targeting System
+Management Mode (SMM)—often referred to as "Ring -2"—represent a
+critical class of firmware flaws. SMM is an ultra-privileged CPU state
+designed for system management and power handling, operating beneath
+both the operating system and the hypervisor.</p>
+<p>Prominent issues, such as those cataloged in InsydeH2O and AMI
+firmware throughout 2021 and 2022, revealed that improper validation of
+communication buffers between the operating system and SMM handlers (SMI
+Handlers) allowed privilege escalation. Attackers who gained operating
+system root privileges could leverage these flaws to overwrite protected
+flash memory, disable hardware-level write protection, and establish
+permanent persistence that persists even across full hard drive
+replacements.</p>
+<h2 id="the-structural-challenge-of-firmware-security">The Structural
+Challenge of Firmware Security</h2>
+<p>These vulnerabilities highlight systemic challenges inherent to UEFI
+security:</p>
+<ul>
+<li><strong>Lack of Modern Mitigations:</strong> Pre-boot environments
+historically lacked memory protections standard in modern operating
+systems, including ASLR, Data Execution Prevention (DEP), and stack
+cookies.</li>
+<li><strong>Complex Supply Chains:</strong> Firmware is built on
+reference code passed from chipmakers (e.g., Intel, AMD) to IBVs (e.g.,
+AMI, Insyde), then to OEMs (e.g., Dell, HP, Lenovo), leading to
+multi-month latency in patch distribution.</li>
+<li><strong>Revocation Limits:</strong> Revoking vulnerable binaries
+requires updating the on-chip NVRAM DBX list. The size of this list is
+hardware-limited, and mistakes in revocation can permanently brick
+hardware or prevent systems from booting legitimate software.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-firmware-vulnerabilities-logo-fail-to-boot-hole';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

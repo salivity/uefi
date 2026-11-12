@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Handling of Sector Sizes Larger Than 512 Bytes - uefi</title>
+    <meta name="description" content="Modern storage drives have largely transitioned from the traditional 512-byte sector architecture to Advanced Format standards, most notably 4K Native (4Kn) media. This article examines how the Unified Extensible Firmware Interface (UEFI) natively handles">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-handling-of-sector-sizes-larger-than-512-bytes">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Handling of Sector Sizes Larger Than 512 Bytes - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-handling-of-sector-sizes-larger-than-512-bytes" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Modern storage drives have largely transitioned from the traditional 512-byte sector architecture to Advanced Format standards, most notably 4K Native (4Kn) media. This article examines how the Unified Extensible Firmware Interface (UEFI) natively handles" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-handling-of-sector-sizes-larger-than-512-bytes">UEFI
+Handling of Sector Sizes Larger Than 512 Bytes</h1>
+<p>Modern storage drives have largely transitioned from the traditional
+512-byte sector architecture to Advanced Format standards, most notably
+4K Native (4Kn) media. This article examines how the Unified Extensible
+Firmware Interface (UEFI) natively handles logical sector sizes larger
+than 512 bytes. It covers the architectural mechanics of UEFI storage
+protocols, how partition tables adapt to larger block sizes, and the
+practical implications for system bootability and file systems.</p>
+<p>Unlike legacy BIOS—which fundamentally relied on hardcoded 512-byte
+sector assumptions, Master Boot Record (MBR) structures, and INT 13h
+interrupt routines—UEFI was designed from the beginning to be agnostic
+of underlying storage geometries. It achieves this decoupling through
+modular firmware device drivers and standardized abstract
+interfaces.</p>
+<h3 id="the-block-io-protocol">The Block I/O Protocol</h3>
+<p>UEFI interacts with storage devices through the
+<code>EFI_BLOCK_IO_PROTOCOL</code> (and the expanded
+<code>EFI_BLOCK_IO2_PROTOCOL</code> for asynchronous operations). Rather
+than assuming a fixed geometry, the firmware queries the storage
+controller during the Driver Execution Environment (DXE) phase.</p>
+<p>The protocol exposes an internal data structure called
+<code>EFI_BLOCK_IO_MEDIA</code>, which contains key metadata about the
+attached disk:</p>
+<ul>
+<li><strong><code>BlockSize</code></strong>: This field dynamically
+reports the drive’s logical block size in bytes (e.g., 512, 2048, or
+4096).</li>
+<li><strong><code>LastBlock</code></strong>: This field defines the
+highest Logical Block Address (LBA) on the device, calculating total
+capacity alongside <code>BlockSize</code>.</li>
+<li><strong><code>LogicalPartition</code></strong>: Indicates whether
+the protocol instance represents an entire physical device or a
+sub-partition.</li>
+</ul>
+<p>When a UEFI driver or an operating system bootloader issues
+<code>ReadBlocks</code> or <code>WriteBlocks</code> requests, the buffer
+size must be an exact multiple of the reported <code>BlockSize</code>,
+and addressing is conducted strictly via LBAs. Because the firmware
+reads this property directly from the hardware, it handles 4Kn drives
+natively without needing translation layers.</p>
+<h3 id="guid-partition-table-gpt-alignment">GUID Partition Table (GPT)
+Alignment</h3>
+<p>UEFI mandates the GUID Partition Table (GPT) format for boot disks,
+which natively supports variable logical block sizes:</p>
+<ul>
+<li><strong>LBA Addressing</strong>: GPT structures are defined by LBA
+numbers rather than byte offsets. LBA 0 hosts the Protective MBR, LBA 1
+contains the Primary GPT Header, and subsequent LBAs store the Partition
+Entry Array.</li>
+<li><strong>4Kn Scaling</strong>: On a 4Kn drive, LBA 1 is located at
+byte offset 4096 rather than byte offset 512. The GPT header and entries
+scale to fill the larger sectors, preventing misalignment and
+eliminating the Read-Modify-Write (RMW) performance penalty inherent to
+512-byte emulation (512e).</li>
+</ul>
+<h3 id="file-system-and-boot-considerations">File System and Boot
+Considerations</h3>
+<p>For a system to boot from a drive with sector sizes exceeding 512
+bytes, the entire boot path must support the media's native block
+size:</p>
+<ol type="1">
+<li><strong>The EFI System Partition (ESP)</strong>: The UEFI
+specification requires the ESP to use a variant of the FAT file system
+(typically FAT32 for hard disks). On 4Kn disks, the FAT file system's
+cluster size must be equal to or a multiple of the 4096-byte sector
+size. UEFI FAT drivers allocate memory buffers aligned to the device’s
+native sector boundary.</li>
+<li><strong>512e vs. 4Kn</strong>: Drives utilizing 512e present a
+512-byte logical sector to the firmware while operating on 4096-byte
+physical sectors internally. UEFI treats 512e drives as standard
+512-byte media. On true 4Kn drives, UEFI communicates purely in
+4096-byte logical units.</li>
+<li><strong>Firmware and OS Loaders</strong>: Both the UEFI
+implementation and the secondary bootloader (such as Windows Boot
+Manager or GRUB2) must query <code>EFI_BLOCK_IO_MEDIA.BlockSize</code>
+and avoid hardcoded 512-byte buffer allocations. Modern 64-bit operating
+systems fully support UEFI booting from native 4Kn drives, provided the
+platform firmware conforms to UEFI Specification 2.0 or higher.</li>
+</ol></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-handling-of-sector-sizes-larger-than-512-bytes';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

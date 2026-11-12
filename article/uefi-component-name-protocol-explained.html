@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Component Name Protocol Explained - uefi</title>
+    <meta name="description" content="The Unified Extensible Firmware Interface (UEFI) Component Name protocol provides a standardized mechanism for UEFI drivers to expose human-readable names for themselves and the hardware controllers they manage. This article explains the primary functions">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-component-name-protocol-explained">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Component Name Protocol Explained - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-component-name-protocol-explained" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Unified Extensible Firmware Interface (UEFI) Component Name protocol provides a standardized mechanism for UEFI drivers to expose human-readable names for themselves and the hardware controllers they manage. This article explains the primary functions" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-component-name-protocol-explained">UEFI Component Name
+Protocol Explained</h1>
+<p>The Unified Extensible Firmware Interface (UEFI) Component Name
+protocol provides a standardized mechanism for UEFI drivers to expose
+human-readable names for themselves and the hardware controllers they
+manage. This article explains the primary functions of the protocol, how
+it manages driver and controller identification, its support for
+international localization, and its practical importance within the UEFI
+pre-boot environment.</p>
+<p>In the UEFI architecture, drivers, devices, and buses are identified
+internally using programmatic handles, binary protocols, and Globally
+Unique Identifiers (GUIDs). While optimal for firmware execution, these
+numerical identifiers are indecipherable to end users and system
+administrators. The <code>EFI_COMPONENT_NAME2_PROTOCOL</code> (along
+with its predecessor, <code>EFI_COMPONENT_NAME_PROTOCOL</code>) bridges
+this gap by allowing a driver to attach localized, plain-text
+descriptions directly to its handles.</p>
+<p>The protocol provides two primary member functions to retrieve
+descriptive strings:</p>
+<ul>
+<li><strong>GetDriverName:</strong> Returns a human-readable name for
+the driver itself, such as "Intel Gigabit Ethernet Network Driver" or
+"AHCI SATA Controller Driver." This describes the software component
+executing in the firmware.</li>
+<li><strong>GetControllerName:</strong> Returns a plain-text name for a
+specific device or child controller managed by the driver, such as "PCI
+Gigabit Network Connection" or "Port 0: Samsung SSD 980." This allows
+individual peripheral instances to be clearly distinguished.</li>
+</ul>
+<p>A critical feature of the Component Name protocol is native support
+for localization. The protocol defines a <code>SupportedLanguages</code>
+attribute, which lists the language codes the driver can provide. When
+querying <code>GetDriverName</code> or <code>GetControllerName</code>,
+the caller specifies the desired language tag based on RFC 4646
+standards (such as <code>en-US</code>, <code>fr-FR</code>, or
+<code>zh-Hans</code>). If the requested language is supported, the
+protocol returns the localized string; otherwise, it returns an
+unsupported error, allowing the caller to fall back to a default
+language.</p>
+<p>The modern <code>EFI_COMPONENT_NAME2_PROTOCOL</code> replaced the
+original <code>EFI_COMPONENT_NAME_PROTOCOL</code> to modernize language
+handling. The original protocol utilized three-character ISO 639-2
+language codes (such as <code>eng</code>), whereas
+<code>EFI_COMPONENT_NAME2_PROTOCOL</code> aligns with newer UEFI
+specifications by using flexible RFC 4646 language tags.</p>
+<p>In practice, the Component Name protocol is heavily utilized across
+the pre-boot ecosystem. Firmware setup utilities (the BIOS configuration
+screen) query this protocol to display meaningful device names in boot
+order menus and hardware health monitors. Additionally, the UEFI Shell
+relies on it to populate the output of diagnostic commands like
+<code>drivers</code>, <code>devices</code>, and <code>dh</code> (dump
+handle), transforming raw hexadecimal addresses into readable
+diagnostics that make debugging and system administration feasible.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-component-name-protocol-explained';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI HOB List: PEI to DXE Hand-Off Explained - uefi</title>
+    <meta name="description" content="In the Unified Extensible Firmware Interface (UEFI) architecture, the Hand-Off Block (HOB) list serves as the vital communication bridge between the Pre-EFI Initialization (PEI) phase and the Driver Execution Environment (DXE) phase. Because the PEI phase">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-hob-list-pei-to-dxe-hand-off-explained">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI HOB List: PEI to DXE Hand-Off Explained - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-hob-list-pei-to-dxe-hand-off-explained" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="In the Unified Extensible Firmware Interface (UEFI) architecture, the Hand-Off Block (HOB) list serves as the vital communication bridge between the Pre-EFI Initialization (PEI) phase and the Driver Execution Environment (DXE) phase. Because the PEI phase" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-hob-list-pei-to-dxe-hand-off-explained">UEFI HOB List: PEI
+to DXE Hand-Off Explained</h1>
+<p>In the Unified Extensible Firmware Interface (UEFI) architecture, the
+Hand-Off Block (HOB) list serves as the vital communication bridge
+between the Pre-EFI Initialization (PEI) phase and the Driver Execution
+Environment (DXE) phase. Because the PEI phase executes in an
+environment with limited resources and initializes the system's physical
+memory, it must transfer its discoveries, system states, and
+configuration data to the DXE phase, which operates in a standard, fully
+initialized memory environment. This article examines the architectural
+purpose, key components, and fundamental significance of the HOB list in
+ensuring a seamless UEFI boot sequence.</p>
+<h2 id="the-architectural-gap-between-pei-and-dxe">The Architectural Gap
+Between PEI and DXE</h2>
+<p>During early platform initialization, the PEI phase executes under
+severe constraints, often using processor cache as temporary RAM
+(Cache-as-RAM or CAR). The primary goal of PEI is to configure core
+platform hardware, detect and initialize system RAM, and locate the DXE
+core.</p>
+<p>Once physical RAM is initialized, the PEI phase must transition
+execution to the DXE phase. However, PEI’s temporary execution
+environment is torn down during this process, destroying the PEI stack
+and transient data. The HOB list solves this fundamental problem: before
+exiting, PEI creates the HOB list in newly discovered, permanent system
+RAM to pass critical platform states forward to DXE.</p>
+<h2 id="key-functions-and-significance-of-the-hob-list">Key Functions
+and Significance of the HOB List</h2>
+<p>The HOB list is an array of data structures allocated contiguously in
+memory, terminated by an end-of-list marker. Its significance is defined
+by several core functions:</p>
+<ul>
+<li><strong>Describing the Physical Memory Map:</strong> The DXE phase
+has no inherent knowledge of the platform's physical memory layout. PEI
+uses Resource Descriptor HOBs to define system memory, memory-mapped
+I/O, reserved regions, and firmware storage. Without this data, the DXE
+memory manager cannot initialize the system's permanent memory
+allocation tables.</li>
+<li><strong>Locating Firmware Volumes:</strong> DXE consists of
+independent modular drivers that must be discovered and executed. PEI
+passes Firmware Volume (FV) HOBs, which point to the flash regions
+containing the DXE drivers and their dependency expressions, allowing
+the DXE Dispatcher to begin execution.</li>
+<li><strong>Communicating Boot Mode:</strong> Platforms boot under
+different circumstances, such as a cold boot, a warm reset, a firmware
+update, or an ACPI S3 resume. Boot Mode HOBs inform the DXE phase of the
+current path so it can bypass redundant driver initialization during
+resume states or enter maintenance modes when required.</li>
+<li><strong>Encapsulating Silicon and Platform Configurations:</strong>
+Modern chipsets require early silicon initialization data to be
+available later in the boot process. Through GUID Extension HOBs,
+hardware vendors can pass proprietary data structures—such as memory
+timings, CPU microcode status, and platform-specific policies—directly
+from silicon-specific PEI modules (PEIMs) to their corresponding DXE
+drivers.</li>
+</ul>
+<h2 id="unidirectional-flow-and-data-integrity">Unidirectional Flow and
+Data Integrity</h2>
+<p>Architecturally, the HOB list enforces a strictly unidirectional flow
+of information. The PEI phase produces the HOB list, and the DXE phase
+consumes it.</p>
+<p>Once the DXE core takes control, the HOB list becomes essentially
+read-only. DXE modules can query the HOB list using the HOB Services
+Table to parse platform configurations, but they do not use HOBs for
+dynamic inter-driver communication. Instead, DXE relies on UEFI
+Protocols. Eventually, the DXE phase converts necessary HOB data into
+standard UEFI Memory Maps and runtime configurations, ensuring that
+lower-level hardware discovery is safely transitioned into standard UEFI
+interfaces before handing control to the operating system
+bootloader.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-hob-list-pei-to-dxe-hand-off-explained';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

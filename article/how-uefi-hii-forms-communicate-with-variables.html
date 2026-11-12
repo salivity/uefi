@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI HII Forms Communicate with Variables - uefi</title>
+    <meta name="description" content="In Unified Extensible Firmware Interface (UEFI) development, Human Interface Infrastructure (HII) forms provide a visual setup interface, while underlying non-volatile (NVRAM) variables store the actual system configuration. This article explains how HII">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-hii-forms-communicate-with-variables">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI HII Forms Communicate with Variables - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-hii-forms-communicate-with-variables" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="In Unified Extensible Firmware Interface (UEFI) development, Human Interface Infrastructure (HII) forms provide a visual setup interface, while underlying non-volatile (NVRAM) variables store the actual system configuration. This article explains how HII" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-hii-forms-communicate-with-variables">How UEFI HII
+Forms Communicate with Variables</h1>
+<p>In Unified Extensible Firmware Interface (UEFI) development, Human
+Interface Infrastructure (HII) forms provide a visual setup interface,
+while underlying non-volatile (NVRAM) variables store the actual system
+configuration. This article explains how HII configuration forms bind
+to, extract from, and write back to underlying UEFI variables through
+Visual Forms Representation (VFR) definitions, Variable Stores, and the
+Config Routing architecture.</p>
+<h3 id="the-foundation-the-varstore-definition-in-vfr">The Foundation:
+The Varstore Definition in VFR</h3>
+<p>Communication begins inside the Visual Forms Representation (VFR)
+file. Before any visual element (such as a checkbox, numeric field, or
+dropdown) can store or retrieve data, developers declare a storage
+mechanism known as a Variable Store.</p>
+<p>There are two primary types of variable stores used for UEFI variable
+interaction:</p>
+<ul>
+<li><strong><code>efivarstore</code></strong>: Explicitly maps to a
+standard UEFI variable backed by a GUID, variable name, and a C-style
+structure.</li>
+<li><strong><code>varstore</code></strong>: Defines an internal buffer
+or structure, which relies on driver-level protocols to bridge the data
+to physical storage.</li>
+</ul>
+<p>A typical <code>efivarstore</code> declaration links an internal C
+structure directly to the UEFI variable name and vendor GUID:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>efivarstore MY_CONFIG_DATA<span class="op">,</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    attribute <span class="op">=</span> EFI_VARIABLE_NON_VOLATILE <span class="op">|</span> EFI_VARIABLE_BOOTSERVICE_ACCESS <span class="op">|</span> EFI_VARIABLE_RUNTIME_ACCESS<span class="op">,</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    name  <span class="op">=</span> MyConfigVar<span class="op">,</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    guid  <span class="op">=</span> MY_CONFIG_GUID<span class="op">;</span></span></code></pre></div>
+<h3 id="element-level-data-binding">Element-Level Data Binding</h3>
+<p>Individual form elements within the VFR script specify which field of
+the structure they represent. Using the <code>varid</code> keyword (or
+direct member referencing), an input control binds directly to an offset
+within the declared <code>efivarstore</code>.</p>
+<p>For example:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>checkbox varid <span class="op">=</span> MyConfigVar<span class="op">.</span>EnableFeature<span class="op">,</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    prompt   <span class="op">=</span> STRING_TOKEN<span class="op">(</span>STR_ENABLE_FEATURE<span class="op">),</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    help     <span class="op">=</span> STRING_TOKEN<span class="op">(</span>STR_ENABLE_FEATURE_HELP<span class="op">),</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    flags    <span class="op">=</span> <span class="dv">0</span><span class="op">,</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    key      <span class="op">=</span> QUESTION_ID_ENABLE_FEATURE<span class="op">,</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>endcheckbox<span class="op">;</span></span></code></pre></div>
+<p>The VFR compiler translates this into internal IFR (Internal Forms
+Representation) binary opcodes containing the variable GUID, variable
+name, and the specific byte offset and size corresponding to the struct
+field.</p>
+<h3 id="the-underlying-protocols">The Underlying Protocols</h3>
+<p>Two core protocols govern the communication pipeline between the
+rendered form and the underlying variable:</p>
+<ol type="1">
+<li><strong><code>EFI_HII_CONFIG_ROUTING_PROTOCOL</code></strong>: A
+central service provided by the UEFI HII framework. It handles the
+translation, routing, and packaging of configuration data requests
+between the setup browser and configuration drivers.</li>
+<li><strong><code>EFI_HII_CONFIG_ACCESS_PROTOCOL</code></strong>: A
+driver-specific protocol produced by the driver that owns the form. It
+implements callback functions required to handle variable data queries
+and submissions.</li>
+</ol>
+<h3 id="the-read-path-extracting-data-into-forms">The Read Path:
+Extracting Data into Forms</h3>
+<p>When the UEFI Setup Browser renders a configuration page, it must
+populate form fields with active configuration data:</p>
+<ol type="1">
+<li><strong>Browser Request</strong>: The browser queries the
+<code>EFI_HII_CONFIG_ROUTING_PROTOCOL</code> to obtain the current
+values for the form's questions.</li>
+<li><strong>Calling <code>ExtractConfig()</code></strong>: The routing
+service routes the request to the owning driver’s
+<code>EFI_HII_CONFIG_ACCESS_PROTOCOL.ExtractConfig()</code> function,
+passing a configuration request string.</li>
+<li><strong>Variable Retrieval</strong>: Inside
+<code>ExtractConfig()</code>, the driver calls the UEFI runtime service
+<code>gRT-&gt;GetVariable()</code> to read the serialized structure from
+NVRAM.</li>
+<li><strong>Payload Generation</strong>: The driver copies the variable
+data into a Configuration Response string (or standard binary block) and
+returns it to the routing engine.</li>
+<li><strong>Display</strong>: The browser parses the retrieved bytes
+according to the element's offset and renders the current values on
+screen.</li>
+</ol>
+<h3 id="the-write-path-committing-user-changes">The Write Path:
+Committing User Changes</h3>
+<p>When a user modifies a setting and saves changes (or exits the setup
+utility):</p>
+<ol type="1">
+<li><strong>Browser Submission</strong>: The browser constructs a
+Configuration Request string containing the altered byte offsets and
+values, then delivers it to the routing protocol.</li>
+<li><strong>Calling <code>RouteConfig()</code></strong>: The routing
+engine invokes the driver’s
+<code>EFI_HII_CONFIG_ACCESS_PROTOCOL.RouteConfig()</code> callback
+function.</li>
+<li><strong>Data Deserialization</strong>: The driver validates the
+incoming configuration string and updates its local copy of the
+configuration structure.</li>
+<li><strong>Hardware or Variable Persistence</strong>: The driver calls
+<code>gRT-&gt;SetVariable()</code> to write the updated data structure
+back to NVRAM, using the appropriate vendor GUID, variable name, and
+persistence attributes.</li>
+</ol>
+<h3 id="default-handling-via-browser-fallback">Default Handling via
+Browser Fallback</h3>
+<p>If a driver does not implement custom logic in
+<code>EFI_HII_CONFIG_ACCESS_PROTOCOL</code>, or if the form relies
+directly on standard standard-compliant variables, the Setup Browser can
+use the routing protocol's default handling. In this mode, the routing
+service directly invokes <code>gRT-&gt;GetVariable()</code> and
+<code>gRT-&gt;SetVariable()</code> to satisfy the offsets specified by
+the form's <code>efivarstore</code> definition without driver
+intervention.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-hii-forms-communicate-with-variables';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Managed Network Protocol vs Simple Network Protocol in UEFI - uefi</title>
+    <meta name="description" content="In the Unified Extensible Firmware Interface (UEFI) networking architecture, the Simple Network Protocol (SNP) and the Managed Network Protocol (MNP) represent two foundational layers of the network driver stack. While both operate near the hardware level">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/managed-network-protocol-vs-simple-network-protocol-in-uefi">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Managed Network Protocol vs Simple Network Protocol in UEFI - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/managed-network-protocol-vs-simple-network-protocol-in-uefi" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="In the Unified Extensible Firmware Interface (UEFI) networking architecture, the Simple Network Protocol (SNP) and the Managed Network Protocol (MNP) represent two foundational layers of the network driver stack. While both operate near the hardware level" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1
+id="managed-network-protocol-vs-simple-network-protocol-in-uefi">Managed
+Network Protocol vs Simple Network Protocol in UEFI</h1>
+<p>In the Unified Extensible Firmware Interface (UEFI) networking
+architecture, the Simple Network Protocol (SNP) and the Managed Network
+Protocol (MNP) represent two foundational layers of the network driver
+stack. While both operate near the hardware level, SNP provides a
+direct, exclusive, low-level interface to the Network Interface Card
+(NIC), whereas MNP serves as a multiplexing abstraction layer sitting
+directly above SNP to allow multiple network consumers to share that
+single physical interface.</p>
+<h3 id="the-role-of-simple-network-protocol-snp">The Role of Simple
+Network Protocol (SNP)</h3>
+<p>The Simple Network Protocol
+(<code>EFI_SIMPLE_NETWORK_PROTOCOL</code>) provides raw access to the
+physical network controller. It is the direct driver interface to the
+network device, responsible for initializing the hardware, managing link
+states, configuring MAC addresses, and transmitting or receiving raw
+Ethernet frames.</p>
+<p>Because SNP directly interacts with the hardware, it is designed for
+a single consumer. It does not natively support multi-client access; if
+an application or driver takes control of an SNP instance, no other
+network protocol or application in the firmware environment can
+concurrently send or receive frames on that interface without
+conflicting. Furthermore, SNP operates largely synchronously or through
+basic polling mechanisms, leaving buffer queueing and dispatching to
+higher layers.</p>
+<h3 id="the-role-of-managed-network-protocol-mnp">The Role of Managed
+Network Protocol (MNP)</h3>
+<p>The Managed Network Protocol
+(<code>EFI_MANAGED_NETWORK_PROTOCOL</code> and its accompanying service
+binding protocol,
+<code>EFI_MANAGED_NETWORK_SERVICE_BINDING_PROTOCOL</code>) acts as an
+intermediate layer between SNP and higher-level protocols such as IPv4,
+IPv6, and ARP.</p>
+<p>The primary purpose of MNP is multiplexing and demultiplexing. It
+abstracts the single underlying SNP device by generating multiple
+virtual "child" handles. Each child instance can be configured
+independently, allowing different protocol drivers to operate
+simultaneously over a single network card without interfering with one
+another.</p>
+<h3 id="key-architectural-differences">Key Architectural
+Differences</h3>
+<ul>
+<li><strong>Single vs. Multiple Consumers:</strong> SNP supports only
+one consumer at a time, binding directly to the hardware. MNP utilizes
+the UEFI Service Binding mechanism to instantiate multiple child
+handles, enabling concurrent consumers (such as an IPv4 stack, an IPv6
+stack, and diagnostic tools) over the same NIC.</li>
+<li><strong>Packet Filtering and Demultiplexing:</strong> SNP delivers
+raw frames to its single caller without protocol-aware routing. MNP
+actively inspects incoming frames, filtering and routing them to the
+correct child instance based on configured criteria such as Ethernet
+frame type, MAC address, promiscuous mode flags, and VLAN tags.</li>
+<li><strong>Asynchronous Token-Based I/O:</strong> MNP utilizes an
+asynchronous completion-token model
+(<code>EFI_MANAGED_NETWORK_COMPLETION_TOKEN</code>) for packet
+transmission and reception, allowing non-blocking I/O and event-driven
+packet delivery. SNP relies on simpler, direct transmit and receive
+buffer calls.</li>
+<li><strong>VLAN and Group Configuration:</strong> MNP handles Virtual
+LAN (VLAN) tagging and untagging transparently for upper-layer protocols
+and manages multicast filter groups across its various child instances,
+whereas SNP only supports the hardware-level configuration of the NIC's
+physical filters.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/managed-network-protocol-vs-simple-network-protocol-in-uefi';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

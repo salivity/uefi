@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Unit Test UEFI Modules in QEMU - uefi</title>
+    <meta name="description" content="Developing Unified Extensible Firmware Interface (UEFI) drivers and applications traditionally requires flashing firmware onto physical target boards, a process that is slow, difficult to automate, and prone to bricking hardware. To accelerate development">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-to-unit-test-uefi-modules-in-qemu">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How to Unit Test UEFI Modules in QEMU - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-to-unit-test-uefi-modules-in-qemu" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Developing Unified Extensible Firmware Interface (UEFI) drivers and applications traditionally requires flashing firmware onto physical target boards, a process that is slow, difficult to automate, and prone to bricking hardware. To accelerate development" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-to-unit-test-uefi-modules-in-qemu">How to Unit Test UEFI
+Modules in QEMU</h1>
+<p>Developing Unified Extensible Firmware Interface (UEFI) drivers and
+applications traditionally requires flashing firmware onto physical
+target boards, a process that is slow, difficult to automate, and prone
+to bricking hardware. To accelerate development, firmware engineers
+unit-test UEFI modules off-target using emulators like QEMU combined
+with the Open Virtual Machine Firmware (OVMF) build from the EDK II
+project. This article explains the core architecture, tooling, and
+execution strategies developers use to run automated, hardware-free UEFI
+tests within an emulated environment.</p>
+<h3 id="1-the-core-architecture-edk-ii-and-ovmf">1. The Core
+Architecture: EDK II and OVMF</h3>
+<p>UEFI modules depend on architectural protocols, boot services, and
+runtime services that standard operating systems do not natively expose
+to user space. To test these modules accurately:</p>
+<ul>
+<li><strong>EDK II (TianoCore):</strong> The standard open-source
+implementation of UEFI. It includes platform descriptions, module code,
+and testing frameworks.</li>
+<li><strong>OVMF (Open Virtual Machine Firmware):</strong> A sub-project
+of EDK II that compiles UEFI firmware specifically targeted to run as
+the BIOS/firmware layer inside QEMU (x86_64, IA32, and ARM/AArch64
+variants).</li>
+</ul>
+<p>By compiling OVMF, developers create virtual flash images
+(<code>OVMF_CODE.fd</code> and <code>OVMF_VARS.fd</code>) that provide a
+complete, conformant UEFI pre-boot environment inside QEMU without
+physical silicon.</p>
+<h3 id="2-building-modules-as-standalone-test-applications">2. Building
+Modules as Standalone Test Applications</h3>
+<p>Most developers leverage the <strong>EDK II Unit Test
+Framework</strong>, which is built on top of standard test paradigms
+(often utilizing or mirroring GoogleTest and CUnit). Tests are usually
+compiled as UEFI Shell applications (<code>.efi</code> binaries) rather
+than raw DXE (Driver Execution Environment) or PEI (Pre-EFI
+Initialization) drivers, allowing them to:</p>
+<ul>
+<li>Run dynamically inside an emulated UEFI Shell.</li>
+<li>Access core system tables and invoke protocol functions
+directly.</li>
+<li>Assert behavior, verify memory buffers, and mock missing hardware
+dependencies via mock protocols.</li>
+</ul>
+<h3 id="3-creating-the-emulated-test-harness">3. Creating the Emulated
+Test Harness</h3>
+<p>To test automatically, QEMU must boot the firmware, load the test
+binary, execute it, and return the result back to the host system.</p>
+<h4 id="a-staging-test-binaries">A. Staging Test Binaries</h4>
+<p>Developers place the compiled <code>.efi</code> test binary into a
+local directory that mirrors a FAT filesystem structure. For
+example:</p>
+<pre><code>test_disk/
+  └── EFI/
+      └── BOOT/
+          ├── TestModule.efi
+          └── startup.nsh</code></pre>
+<p>The <code>startup.nsh</code> script is an automated UEFI Shell script
+executed automatically on boot. It typically runs
+<code>TestModule.efi</code> and redirects output to a serial
+console.</p>
+<h4 id="b-launching-qemu-headless">B. Launching QEMU Headless</h4>
+<p>Developers invoke QEMU in a headless configuration, attaching the
+OVMF firmware and mounting the test directory as a virtual FAT
+drive:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">qemu-system-x86_64</span> <span class="dt">\</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">-nographic</span> <span class="dt">\</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">-drive</span> if=pflash,format=raw,readonly=on,file=OVMF_CODE.fd <span class="dt">\</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">-drive</span> if=pflash,format=raw,file=OVMF_VARS.fd <span class="dt">\</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">-drive</span> file=fat:rw:./test_disk,format=raw <span class="dt">\</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">-serial</span> stdio <span class="dt">\</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">-device</span> isa-debug-exit,iobase=0xf4,iosize=0x04</span></code></pre></div>
+<p>Key flags in this setup include:</p>
+<ul>
+<li><code>-nographic</code> and <code>-serial stdio</code>: Redirects
+the UEFI serial output directly to the host terminal or continuous
+integration (CI) log.</li>
+<li><code>fat:rw:./test_disk</code>: Emulates a virtual USB/hard drive
+from a host folder without requiring manual disk image creation.</li>
+<li><code>isa-debug-exit</code>: A specialized virtual device that
+allows the guest environment to terminate the QEMU process directly by
+writing an exit code to an I/O port, enabling clean test
+automation.</li>
+</ul>
+<h3 id="4-capturing-test-results-and-ci-integration">4. Capturing Test
+Results and CI Integration</h3>
+<p>In a fully automated pipeline, tests must communicate pass/fail
+status back to the host environment:</p>
+<ol type="1">
+<li><strong>Serial Logging:</strong> The test framework formats
+assertions and outputs test passes/failures over the serial port
+(<code>ConsoleOut</code> redirected to the serial terminal).</li>
+<li><strong>Exiting QEMU:</strong> When testing concludes, the test
+runner calls a reset function or writes directly to the
+<code>isa-debug-exit</code> port (or issues the <code>reset -s</code>
+command in the shell). QEMU terminates, translating the guest write into
+a standard process return code.</li>
+<li><strong>Log Parsing:</strong> The host CI runner parses the captured
+serial output for JUnit/XML reporting or relies on QEMU's exit code to
+pass or fail the pipeline step.</li>
+</ol>
+<h3 id="5-alternative-host-based-mocking">5. Alternative: Host-Based
+Mocking</h3>
+<p>When QEMU virtualization is heavier than necessary, developers also
+employ the <strong>EDK II Host-Based Unit Test Framework</strong>. This
+approach compiles the C source code of a UEFI module using the host’s
+native compiler (e.g., GCC or MSVC) targeting the host OS directly.
+Hardware interfaces and core UEFI services are substituted with stub
+libraries and mocks.</p>
+<p>While host-based execution is faster for pure algorithmic validation,
+QEMU remains the primary choice for integration and unit testing that
+requires real interaction with the UEFI memory map, interrupt tables,
+protocol databases, and ACPI tables.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-to-unit-test-uefi-modules-in-qemu';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Memory Map Descriptors for Operating Systems - uefi</title>
+    <meta name="description" content="This article provides a technical overview of how the Unified Extensible Firmware Interface (UEFI) defines and conveys physical memory layouts to an operating system. It examines the EFIMEMORYDESCRIPTOR structure, breaks down each of its essential fields,">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-memory-map-descriptors-for-operating-systems">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Memory Map Descriptors for Operating Systems - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-memory-map-descriptors-for-operating-systems" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article provides a technical overview of how the Unified Extensible Firmware Interface (UEFI) defines and conveys physical memory layouts to an operating system. It examines the EFIMEMORYDESCRIPTOR structure, breaks down each of its essential fields," />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-memory-map-descriptors-for-operating-systems">UEFI Memory
+Map Descriptors for Operating Systems</h1>
+<p>This article provides a technical overview of how the Unified
+Extensible Firmware Interface (UEFI) defines and conveys physical memory
+layouts to an operating system. It examines the
+<code>EFI_MEMORY_DESCRIPTOR</code> structure, breaks down each of its
+essential fields, explains how the operating system retrieves this map
+using boot services, and describes how the kernel interprets different
+memory types to safely manage system resources and reclaim firmware
+memory.</p>
+<hr />
+<h3 id="the-efi_memory_descriptor-structure">The
+<code>EFI_MEMORY_DESCRIPTOR</code> Structure</h3>
+<p>In the UEFI specification, the physical memory layout of the platform
+is represented as an array of descriptor structures. When an operating
+system bootloader queries the firmware for the system memory layout, it
+receives an array of <code>EFI_MEMORY_DESCRIPTOR</code> entries.</p>
+<p>In C-style syntax, the structure is defined as follows:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">typedef</span> <span class="kw">struct</span> <span class="op">{</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    UINT32                Type<span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    EFI_PHYSICAL_ADDRESS  PhysicalStart<span class="op">;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    EFI_VIRTUAL_ADDRESS   VirtualStart<span class="op">;</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    UINT64                NumberOfPages<span class="op">;</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    UINT64                Attribute<span class="op">;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="op">}</span> EFI_MEMORY_DESCRIPTOR<span class="op">;</span></span></code></pre></div>
+<p>Each field inside this structure serves a specific role:</p>
+<ul>
+<li><strong><code>Type</code> (UINT32):</strong> Specifies the
+classification and intended usage of the memory region.</li>
+<li><strong><code>PhysicalStart</code> (EFI_PHYSICAL_ADDRESS /
+UINT64):</strong> The starting physical address of the memory region. It
+is always aligned to a 4 KiB boundary.</li>
+<li><strong><code>VirtualStart</code> (EFI_VIRTUAL_ADDRESS /
+UINT64):</strong> The starting virtual address of the memory region.
+During boot services, this is typically unassigned or identical to
+<code>PhysicalStart</code>. It is populated if the operating system
+configures virtual addresses and invokes the
+<code>SetVirtualAddressMap()</code> runtime service.</li>
+<li><strong><code>NumberOfPages</code> (UINT64):</strong> The size of
+the memory region expressed in the number of contiguous 4 KiB pages. The
+total byte size of the region is calculated as
+<code>NumberOfPages * 4096</code>.</li>
+<li><strong><code>Attribute</code> (UINT64):</strong> A bitmask defining
+the architectural capabilities, caching modes (such as UC, WC, WT, WB),
+and protection levels (such as WP, RP, XP) of the region, as well as
+whether the region needs to be preserved for runtime firmware calls
+(<code>EFI_MEMORY_RUNTIME</code>).</li>
+</ul>
+<hr />
+<h3 id="key-uefi-memory-types">Key UEFI Memory Types</h3>
+<p>The <code>Type</code> field dictates whether the operating system can
+immediately take control of the region, must preserve it, or can reclaim
+it later. The standard types defined by the specification include:</p>
+<ul>
+<li><strong><code>EfiConventionalMemory</code>:</strong> Free,
+unallocated RAM. The operating system can immediately use this memory
+for its own allocators and page tables.</li>
+<li><strong><code>EfiLoaderCode</code> and
+<code>EfiLoaderData</code>:</strong> Memory allocated by the UEFI OS
+loader. The operating system may reclaim this space once the bootloader
+has finished execution.</li>
+<li><strong><code>EfiBootServicesCode</code> and
+<code>EfiBootServicesData</code>:</strong> Memory holding UEFI boot
+services code and data. The operating system can safely reclaim these
+regions after successfully calling <code>ExitBootServices()</code>.</li>
+<li><strong><code>EfiRuntimeServicesCode</code> and
+<code>EfiRuntimeServicesData</code>:</strong> Memory holding UEFI
+runtime services code and operational data. The OS must reserve these
+ranges across reboots and map them to allow the kernel to execute
+runtime services (such as updating NVRAM variables or setting the
+RTC).</li>
+<li><strong><code>EfiACPIReclaimMemory</code>:</strong> Contains ACPI
+tables. The OS can reclaim this memory only after it has fully read and
+parsed the ACPI tables into its own structures.</li>
+<li><strong><code>EfiACPIMemoryNVS</code>:</strong> Non-Volatile Sleep
+memory used by firmware ACPI code. The operating system must never
+overwrite this memory.</li>
+<li><strong><code>EfiMemoryMappedIO</code> and
+<code>EfiMemoryMappedIOPortSpace</code>:</strong> Physical address
+ranges designated for memory-mapped hardware registers.</li>
+<li><strong><code>EfiReservedMemoryType</code> and
+<code>EfiUnusableMemory</code>:</strong> Memory regions that are
+firmware-reserved or have sustained hardware errors; the OS must not use
+them.</li>
+</ul>
+<hr />
+<h3 id="retrieving-the-memory-map-via-getmemorymap">Retrieving the
+Memory Map via <code>GetMemoryMap()</code></h3>
+<p>The operating system bootloader retrieves the memory map array by
+calling the UEFI Boot Service function <code>GetMemoryMap()</code>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>EFI_STATUS GetMemoryMap <span class="op">(</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    IN OUT UINTN                  <span class="op">*</span>MemoryMapSize<span class="op">,</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    OUT EFI_MEMORY_DESCRIPTOR     <span class="op">*</span>MemoryMap<span class="op">,</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    OUT UINTN                     <span class="op">*</span>MapKey<span class="op">,</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    OUT UINTN                     <span class="op">*</span>DescriptorSize<span class="op">,</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    OUT UINT32                    <span class="op">*</span>DescriptorVersion</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span></code></pre></div>
+<h4 id="iterating-the-array-correctly">Iterating the Array
+Correctly</h4>
+<p>Compilers and firmware implementations may extend the descriptor or
+add padding. Therefore, operating systems must not iterate through the
+returned buffer using <code>sizeof(EFI_MEMORY_DESCRIPTOR)</code>.
+Instead, the OS must advance to the next entry by adding the returned
+<code>DescriptorSize</code> parameter in bytes:</p>
+<p><span class="math display">\[\text{Next Descriptor} =
+(\text{EFI\_MEMORY\_DESCRIPTOR}*)
+((\text{UINT8}*)\text{CurrentDescriptor} +
+\text{DescriptorSize})\]</span></p>
+<h4 id="the-role-of-mapkey">The Role of <code>MapKey</code></h4>
+<p>The <code>MapKey</code> parameter acts as an integrity token. When
+the operating system is ready to assume full hardware control, it calls
+<code>ExitBootServices(ImageHandle, MapKey)</code>. If memory
+allocations changed between the last call to <code>GetMemoryMap()</code>
+and <code>ExitBootServices()</code>, the <code>MapKey</code> becomes
+invalid, the exit call fails, and the OS must fetch the memory map again
+before retrying.</p>
+<hr />
+<h3 id="operating-system-handoff">Operating System Handoff</h3>
+<p>Once <code>ExitBootServices()</code> succeeds:</p>
+<ol type="1">
+<li>The OS kernel marks all <code>EfiConventionalMemory</code>,
+<code>EfiBootServicesCode</code>, and <code>EfiBootServicesData</code>
+regions as usable system RAM.</li>
+<li>The OS maps regions flagged with the <code>EFI_MEMORY_RUNTIME</code>
+attribute into its own address space if it intends to utilize UEFI
+runtime services.</li>
+<li>Hardware registers identified by <code>EfiMemoryMappedIO</code> are
+tracked to prevent overlapping physical memory allocations.</li>
+</ol></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-memory-map-descriptors-for-operating-systems';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

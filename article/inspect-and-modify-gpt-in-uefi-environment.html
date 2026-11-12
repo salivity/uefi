@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inspect and Modify GPT in UEFI Environment - uefi</title>
+    <meta name="description" content="Managing GUID Partition Table (GPT) disks directly from a Unified Extensible Firmware Interface (UEFI) environment allows administrators and developers to inspect, repair, or reconfigure storage devices without booting into a full operating system. This g">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/inspect-and-modify-gpt-in-uefi-environment">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Inspect and Modify GPT in UEFI Environment - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/inspect-and-modify-gpt-in-uefi-environment" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Managing GUID Partition Table (GPT) disks directly from a Unified Extensible Firmware Interface (UEFI) environment allows administrators and developers to inspect, repair, or reconfigure storage devices without booting into a full operating system. This g" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="inspect-and-modify-gpt-in-uefi-environment">Inspect and Modify
+GPT in UEFI Environment</h1>
+<p>Managing GUID Partition Table (GPT) disks directly from a Unified
+Extensible Firmware Interface (UEFI) environment allows administrators
+and developers to inspect, repair, or reconfigure storage devices
+without booting into a full operating system. This guide covers the
+essential tools and utilities compiled as native UEFI applications
+(<code>.efi</code> binaries) or integrated into the UEFI Shell that
+enable direct analysis and modification of GPT structures, headers, and
+partition arrays.</p>
+<h3 id="1-uefi-shell-built-in-commands">1. UEFI Shell Built-in
+Commands</h3>
+<p>The standard UEFI Shell (part of the open-source TianoCore EDK II
+project) includes low-level storage commands that interact directly with
+the <code>EFI_BLOCK_IO_PROTOCOL</code> and
+<code>EFI_DISK_IO_PROTOCOL</code>.</p>
+<ul>
+<li><strong><code>map</code></strong>: Displays all active device
+mappings, including block devices (<code>blkX</code>) and file system
+handles (<code>fsX</code>). It identifies which storage handle
+corresponds to the raw disk containing the GPT.</li>
+<li><strong><code>dblk</code> (Display Block)</strong>: Reads and
+outputs raw sectors directly from a block device in hexadecimal and
+ASCII formats. Because the primary GPT header is located at Logical
+Block Addressing (LBA) 1, running <code>dblk blk0 1 1</code> dumps the
+exact 512-byte (or 4096-byte) header, allowing you to manually verify
+the <code>EFI PART</code> signature, disk GUID, and partition entry
+LBAs.</li>
+<li><strong><code>gpt</code></strong>: Available in extended UEFI Shell
+builds, this command parses and verifies both the primary GPT header
+(LBA 1) and the backup GPT header located at the final LBA of the drive,
+reporting CRC32 mismatches or corrupted partition entries.</li>
+</ul>
+<h3 id="2-uefi-hexedit-hexeditefi">2. UEFI HexEdit
+(<code>HexEdit.efi</code>)</h3>
+<p><code>HexEdit.efi</code> is a native full-screen editor provided in
+the EDK II repository that can open block devices directly.</p>
+<ul>
+<li><strong>Capability</strong>: Allows direct read and write access to
+raw disk sectors.</li>
+<li><strong>Usage</strong>: By executing <code>hexedit -b blkX</code>,
+you can navigate directly to LBA 1 (Primary Header), LBA 2–33 (Partition
+Table Entries), or the secondary GPT at the end of the drive.</li>
+<li><strong>Application</strong>: Useful for manual data recovery,
+modifying partition type GUIDs, fixing disk attributes, or manually
+correcting corrupted header CRC32 values when standard partition tools
+refuse to load.</li>
+</ul>
+<h3 id="3-edk-ii-diskpart-diskpartefi">3. EDK II DiskPart
+(<code>DiskPart.efi</code>)</h3>
+<p>Originating from Intel's embedded system tools and open-source EDK II
+packages, <code>DiskPart.efi</code> serves as a lightweight, pre-boot
+equivalent of the Windows DiskPart command-line tool.</p>
+<ul>
+<li><strong>Capability</strong>: Inspects partition boundaries,
+initializes disks to GPT format, creates new partition entries, and
+removes existing entries.</li>
+<li><strong>Usage</strong>: Interacts dynamically with UEFI block
+devices to rewrite partition structures cleanly, automatically
+calculating and updating the header CRC32 checksums and secondary backup
+tables.</li>
+</ul>
+<h3 id="4-custom-and-ported-utilities">4. Custom and Ported
+Utilities</h3>
+<p>When advanced management is required beyond built-in UEFI Shell
+tools, several standalone utilities can be compiled for the UEFI
+architecture:</p>
+<ul>
+<li><strong>GPT fdisk (<code>gdisk</code> EFI Port)</strong>: Rod
+Smith's <code>gdisk</code> is the industry standard for repairing
+damaged GPT structures and converting MBR to GPT. Although primarily run
+from Linux or Windows, stripped-down builds and statically linked
+variants targeting the UEFI Shell environment exist to provide
+interactive GPT repair directly at the firmware prompt.</li>
+<li><strong>Custom EDK II EFI Applications</strong>: Developers can
+write targeted UEFI applications using the
+<code>EFI_PARTITION_INFO_PROTOCOL</code> introduced in modern UEFI
+specifications. This protocol provides programmatic methods to query
+partition formats, modify partition table entries, and commit changes
+back to the drive controllers prior to OS boot.</li>
+</ul>
+<h3 id="key-technical-considerations">Key Technical Considerations</h3>
+<p>When modifying GPT structures directly within a UEFI environment:</p>
+<ul>
+<li><strong>CRC32 Validation</strong>: Manually editing partition
+entries or the header via <code>HexEdit.efi</code> invalidates the CRC32
+checksums stored at byte offset 16 (Header CRC32) and offset 88
+(Partition Array CRC32). The UEFI firmware may mark the disk as invalid
+until both checksums are updated.</li>
+<li><strong>Dual Header Synchronization</strong>: Changes made to the
+primary GPT must be mirrored to the secondary GPT at the disk's
+termination LBA to prevent operating systems from flagging the partition
+layout as damaged.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/inspect-and-modify-gpt-in-uefi-environment';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

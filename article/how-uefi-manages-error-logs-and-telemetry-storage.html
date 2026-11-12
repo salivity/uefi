@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Manages Error Logs and Telemetry Storage - uefi</title>
+    <meta name="description" content="Unified Extensible Firmware Interface (UEFI) systems rely on dedicated non-volatile storage mechanisms, hardware abstraction tables, and platform standards to record diagnostic data across system reboots. This article examines how UEFI firmware allocates">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-manages-error-logs-and-telemetry-storage">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Manages Error Logs and Telemetry Storage - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-manages-error-logs-and-telemetry-storage" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Unified Extensible Firmware Interface (UEFI) systems rely on dedicated non-volatile storage mechanisms, hardware abstraction tables, and platform standards to record diagnostic data across system reboots. This article examines how UEFI firmware allocates" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-manages-error-logs-and-telemetry-storage">How UEFI
+Manages Error Logs and Telemetry Storage</h1>
+<p>Unified Extensible Firmware Interface (UEFI) systems rely on
+dedicated non-volatile storage mechanisms, hardware abstraction tables,
+and platform standards to record diagnostic data across system reboots.
+This article examines how UEFI firmware allocates non-volatile memory,
+utilizes ACPI Platform Error Interfaces (APEI) such as the Error Record
+Serialization Table (ERST), manages Common Platform Error Records
+(CPER), and coordinates with operating systems to preserve critical
+hardware failures and runtime telemetry without relying on traditional
+storage drives.</p>
+<h2 id="non-volatile-ram-nvram-and-spi-flash">Non-Volatile RAM (NVRAM)
+and SPI Flash</h2>
+<p>At the core of UEFI persistence is the SPI NOR flash chip soldered to
+the motherboard. UEFI manages a portion of this flash memory as
+Non-Volatile Random-Access Memory (NVRAM) to store persistent variables
+alongside the firmware image itself.</p>
+<p>When firmware or an operating system needs to persist diagnostic
+markers, it uses the UEFI Runtime Services API—specifically
+<code>SetVariable()</code>. To ensure the data survives power loss and
+system resets, the variable is defined with the attribute
+<code>EFI_VARIABLE_NON_VOLATILE</code>.</p>
+<p>Because SPI NOR flash has limited write endurance and constrained
+capacity (typically 16MB to 64MB shared with the firmware code), UEFI
+implementations employ strict space management strategies:</p>
+<ul>
+<li><strong>Garbage Collection and Wear Leveling:</strong> Firmware
+tracks valid, deleted, and stale variable entries, reclaiming blocks
+when space runs low.</li>
+<li><strong>Variable Size Limits:</strong> Individual telemetry or log
+variables are typically capped (often between 4KB and 64KB) to prevent
+rogue logs from exhausting firmware storage.</li>
+</ul>
+<h2 id="acpi-platform-error-interfaces-apei">ACPI Platform Error
+Interfaces (APEI)</h2>
+<p>For hardware faults and fatal system crashes, writing directly via
+standard UEFI variables during an unrecoverable failure is often too
+slow or unsafe. Modern systems use the ACPI Platform Error Interfaces
+(APEI) framework, which defines standardized hardware-to-software
+communication for telemetry and error reporting.</p>
+<p>Key APEI tables that interface with persistent storage include:</p>
+<ul>
+<li><strong>Hardware Error Source Table (HEST):</strong> Identifies all
+platform hardware error sources (such as PCIe Advanced Error Reporting,
+memory controller errors, and processor machine checks) and the
+signaling mechanisms used.</li>
+<li><strong>Boot Error Record Table (BERT):</strong> Reserves persistent
+memory to communicate unhandled errors that caused a reset or crash
+during the previous boot cycle. Firmware writes the fatal error to a
+designated physical memory location or non-volatile block before
+resetting, and populates the BERT table for the OS to parse during the
+subsequent initialization.</li>
+<li><strong>Error Record Serialization Table (ERST):</strong> Acts as
+the hardware abstraction interface for reading and writing error records
+to a persistent storage location (often dedicated non-volatile memory or
+reserved NVRAM sectors). ERST defines an instruction set (such as read,
+write, and clear operations) that firmware or an OS can execute to
+manage persistent records without needing direct hardware-specific flash
+controllers.</li>
+</ul>
+<h2 id="common-platform-error-record-cper-format">Common Platform Error
+Record (CPER) Format</h2>
+<p>Data written to persistent storage via APEI is structured according
+to the UEFI Common Platform Error Record (CPER) specification.
+Standardized under the UEFI Specification (Appendix N), CPER formats
+telemetry data into machine-readable headers and descriptors.</p>
+<p>A CPER record contains:</p>
+<ul>
+<li><strong>Record Header:</strong> Includes error severity
+(correctable, recoverable, or fatal), timestamp, platform ID, and record
+length.</li>
+<li><strong>Section Descriptors:</strong> Defines the type of hardware
+subsystem affected (such as Processor, Memory, PCIe, or Firmware).</li>
+<li><strong>Section Body:</strong> Contains granular
+architecture-specific register dumps, physical hardware addresses, and
+localized diagnostic data.</li>
+</ul>
+<p>By storing telemetry in the CPER format, different operating systems
+(such as Windows via the Windows Hardware Error Architecture [WHEA] or
+Linux via the kernel's EDAC and APEI drivers) can consistently parse
+errors generated by the firmware.</p>
+<h2 id="operating-system-integration-and-crash-logging">Operating System
+Integration and Crash Logging</h2>
+<p>The operating system uses UEFI and APEI interfaces to persist crash
+telemetry directly to firmware storage when the main storage subsystem
+(SATA, NVMe) is inaccessible or compromised.</p>
+<h3 id="linux-pstore-and-efi-pstore">Linux <code>pstore</code> and
+<code>efi-pstore</code></h3>
+<p>Linux implements the Persistent Storage (<code>pstore</code>)
+filesystem, with the <code>efi-pstore</code> backend mapping directly to
+UEFI NVRAM. When a kernel panic occurs, the OS writes the panic log,
+console dmesg buffer, and MCE (Machine Check Exception) records to UEFI
+variables named with a specific prefix (e.g., <code>dump-type-*</code>).
+On reboot, the system mounts <code>/sys/fs/pstore</code> to expose the
+saved logs as standard files, allowing administrators to inspect fatal
+crashes that prevented disk writes.</p>
+<h3 id="windows-hardware-error-architecture-whea">Windows Hardware Error
+Architecture (WHEA)</h3>
+<p>Windows leverages WHEA to read APEI tables upon boot. Fatal errors
+recorded in persistent storage via the ERST or BERT are processed by
+WHEA, mapped into Windows Event Tracing (ETW), and written to the System
+Event Log for post-crash analysis.</p>
+<h2 id="enterprise-telemetry-and-bmc-offloading">Enterprise Telemetry
+and BMC Offloading</h2>
+<p>In enterprise and server hardware, the primary UEFI SPI flash is
+often complemented or bypassed for telemetry to avoid flash
+exhaustion:</p>
+<ul>
+<li><strong>Baseboard Management Controllers (BMC):</strong> Server
+platforms route UEFI-level telemetry, POST codes, and hardware alerts to
+a dedicated out-of-band processor (BMC) via interfaces such as IPMI or
+Redfish.</li>
+<li><strong>System Event Log (SEL):</strong> Rather than storing large
+telemetry streams on the UEFI SPI chip, firmware sends CPER payloads
+directly to the BMC's dedicated eMMC or flash storage, preserving
+motherboard SPI endurance while enabling remote management independent
+of host OS state.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-manages-error-logs-and-telemetry-storage';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

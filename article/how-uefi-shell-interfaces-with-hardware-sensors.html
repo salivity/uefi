@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Shell Interfaces with Hardware Sensors - uefi</title>
+    <meta name="description" content="The Unified Extensible Firmware Interface (UEFI) Shell provides a low-level pre-boot environment capable of communicating with underlying platform hardware, including thermal and voltage sensors. Because the base UEFI specification does not mandate a univ">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-shell-interfaces-with-hardware-sensors">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Shell Interfaces with Hardware Sensors - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-shell-interfaces-with-hardware-sensors" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Unified Extensible Firmware Interface (UEFI) Shell provides a low-level pre-boot environment capable of communicating with underlying platform hardware, including thermal and voltage sensors. Because the base UEFI specification does not mandate a univ" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-shell-interfaces-with-hardware-sensors">How UEFI Shell
+Interfaces with Hardware Sensors</h1>
+<p>The Unified Extensible Firmware Interface (UEFI) Shell provides a
+low-level pre-boot environment capable of communicating with underlying
+platform hardware, including thermal and voltage sensors. Because the
+base UEFI specification does not mandate a universal hardware monitoring
+protocol, the shell retrieves these metrics by executing specialized
+diagnostic applications or relying on vendor-supplied Driver Execution
+Environment (DXE) drivers. These utilities read sensor data by directly
+addressing CPU Model-Specific Registers (MSRs), polling Super I/O or
+Embedded Controllers (EC) via I/O ports, or querying platform-specific
+UEFI protocols.</p>
+<h3 id="cpu-telemetry-via-model-specific-registers-msrs">CPU Telemetry
+via Model-Specific Registers (MSRs)</h3>
+<p>Processor temperature and core voltage are primarily managed within
+the CPU die itself. The UEFI Shell, operating in x86-64 long mode with
+ring 0 privileges, allows executables to run native assembly
+instructions such as <code>RDMSR</code> (Read from Model-Specific
+Register).</p>
+<ul>
+<li><strong>Temperature:</strong> On modern x86 architectures (such as
+Intel and AMD), the processor maintains digital thermal sensors (DTS). A
+UEFI utility reads thermal status registers (for example, Intel's
+<code>IA32_THERM_STATUS</code> at MSR <code>0x19C</code>). The register
+returns a relative value indicating the digital readout in degrees
+Celsius below the maximum junction temperature (<span
+class="math inline">\(T_\text{junction Max}\)</span>). The utility
+queries <span class="math inline">\(T_\text{junction Max}\)</span>
+(e.g., via <code>IA32_TEMPERATURE_TARGET</code>) and subtracts the
+offset to compute the absolute core temperature.</li>
+<li><strong>Voltage:</strong> Processor VID (Voltage Identification)
+pins or internal voltage regulator registers are queried via
+platform-specific MSRs or through the processor's Power Management
+Controller (PMC), calculating the supplied <span
+class="math inline">\(V_\text{core}\)</span> in real-time.</li>
+</ul>
+<h3
+id="motherboard-sensors-via-super-io-and-embedded-controllers">Motherboard
+Sensors via Super I/O and Embedded Controllers</h3>
+<p>System-level measurements—such as ambient board temperatures,
+auxiliary thermal diodes, and rail voltages (+12V, +5V, +3.3V)—typically
+reside on dedicated hardware monitoring chips. On desktop systems, these
+are integrated into Super I/O chips (e.g., from Nuvoton or ITE); on
+laptops and servers, they are integrated into an Embedded Controller
+(EC) or Baseboard Management Controller (BMC).</p>
+<p>UEFI applications interface with these chips through the following
+channels:</p>
+<ul>
+<li><strong>Port I/O Addressing:</strong> Super I/O controllers are
+traditionally indexed using standard x86 I/O space addresses (commonly
+ports <code>0x2E</code>/<code>0x2F</code> or
+<code>0x4E</code>/<code>0x4F</code>). A UEFI Shell application sends an
+"enter configuration" key to the index port, selects the hardware
+monitor logical device, and directly reads the analog-to-digital
+converter (ADC) registers at the designated base address.</li>
+<li><strong>Memory-Mapped I/O (MMIO):</strong> Modern implementations
+frequently map sensor registers into physical memory. Shell programs can
+utilize built-in commands like <code>mm</code> (Memory Modify/Read) or
+use customized C applications leveraging the
+<code>EFI_CPU_IO2_PROTOCOL</code> to read these physical memory
+addresses directly.</li>
+<li><strong>ADC Formula Translation:</strong> The raw values returned by
+hardware monitor chips are digital byte values representing voltage
+steps. The shell tool must possess vendor-specific conversion formulas,
+factoring in hardware voltage divider resistance values to translate raw
+counts into millivolts or degrees Celsius.</li>
+</ul>
+<h3 id="interfacing-through-the-smbusi2c-protocol">Interfacing Through
+the SMBus/I2C Protocol</h3>
+<p>Many external temperature sensors and voltage monitors communicate
+across the System Management Bus (SMBus) or Inter-Integrated Circuit
+(<span class="math inline">\(I^2C\)</span>) bus.</p>
+<p>Rather than driving the SMBus controller via raw port I/O, UEFI Shell
+tools typically interact with the <code>EFI_SMBUS_HC_PROTOCOL</code>.
+This protocol abstracts the platform’s SMBus Host Controller, allowing
+the shell application to specify:</p>
+<ul>
+<li>The slave address of the sensor device.</li>
+<li>The specific command code or register index.</li>
+<li>The data transfer size (byte, word, or block).</li>
+</ul>
+<p>The firmware executes the bus transaction, reads the sensor
+registers, and returns the measured payload to the calling shell
+program.</p>
+<h3 id="vendor-protocols-and-driver-execution-environment-dxe">Vendor
+Protocols and Driver Execution Environment (DXE)</h3>
+<p>Original Equipment Manufacturers (OEMs) often include proprietary DXE
+drivers in their firmware image that expose standardized or custom UEFI
+protocols for system health monitoring.</p>
+<ol type="1">
+<li><strong>Protocol Discovery:</strong> A shell tool uses the
+<code>LocateProtocol()</code> or <code>LocateHandleBuffer()</code> boot
+services to scan the UEFI handle database for hardware-monitoring
+interfaces (e.g., an OEM platform management protocol).</li>
+<li><strong>Abstracted Querying:</strong> Once located, the application
+calls member functions of that protocol (such as
+<code>GetSensorReading()</code>).</li>
+<li><strong>Execution:</strong> The underlying DXE driver handles all
+low-level hardware interactions—whether over ACPI, IPC, or proprietary
+mailbox interfaces—and hands back pre-calculated, human-readable
+temperature and voltage values to the shell.</li>
+</ol></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-shell-interfaces-with-hardware-sensors';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

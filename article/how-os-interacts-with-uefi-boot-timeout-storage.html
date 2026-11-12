@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How OS Interacts with UEFI Boot Timeout Storage - uefi</title>
+    <meta name="description" content="This article examines how modern operating systems interact with Unified Extensible Firmware Interface (UEFI) variable storage to configure system boot timeout values. It covers the underlying architectural mechanisms of UEFI Runtime Services, the structu">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-os-interacts-with-uefi-boot-timeout-storage">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How OS Interacts with UEFI Boot Timeout Storage - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-os-interacts-with-uefi-boot-timeout-storage" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article examines how modern operating systems interact with Unified Extensible Firmware Interface (UEFI) variable storage to configure system boot timeout values. It covers the underlying architectural mechanisms of UEFI Runtime Services, the structu" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-os-interacts-with-uefi-boot-timeout-storage">How OS
+Interacts with UEFI Boot Timeout Storage</h1>
+<p>This article examines how modern operating systems interact with
+Unified Extensible Firmware Interface (UEFI) variable storage to
+configure system boot timeout values. It covers the underlying
+architectural mechanisms of UEFI Runtime Services, the structure and
+attributes of the standardized global <code>Timeout</code> variable, and
+the platform-specific methods operating systems use to read and modify
+this data directly in non-volatile memory (NVRAM).</p>
+<h2 id="the-uefi-variable-architecture">The UEFI Variable
+Architecture</h2>
+<p>UEFI maintains system and boot state configurations in non-volatile
+storage, typically within an SPI flash memory chip on the motherboard.
+These configurations are stored as key-value pairs known as UEFI
+variables. Each variable is uniquely identified by a name and a globally
+unique identifier (GUID) representing its vendor or standardization
+namespace.</p>
+<p>To preserve these variables across system reboots and make them
+accessible to operating systems, UEFI defines specific attributes:</p>
+<ul>
+<li><strong><code>EFI_VARIABLE_NON_VOLATILE</code></strong>: Ensures the
+variable survives power cycles by residing in flash memory.</li>
+<li><strong><code>EFI_VARIABLE_BOOTSERVICE_ACCESS</code></strong>:
+Allows the firmware to read the variable during the pre-boot phase.</li>
+<li><strong><code>EFI_VARIABLE_RUNTIME_ACCESS</code></strong>: Exposes
+the variable to the operating system kernel after
+<code>ExitBootServices()</code> has been executed.</li>
+</ul>
+<h2 id="the-standard-boot-timeout-variable">The Standard Boot Timeout
+Variable</h2>
+<p>The boot timeout value is defined in the official UEFI Specification
+under the standard namespace <code>EFI_GLOBAL_VARIABLE</code> (GUID:
+<code>8BE4DF61-93CA-11D2-AA0D-00E098032B8C</code>).</p>
+<p>The variable itself is named <code>Timeout</code>. It is stored as a
+16-bit unsigned integer (<code>UINT16</code>), representing the number
+of seconds the firmware's boot manager must wait before automatically
+launching the default boot entry defined in <code>BootOrder</code>.</p>
+<ul>
+<li>A value of <code>0</code> directs the firmware to bypass any user
+prompt and boot the default image immediately.</li>
+<li>A value of <code>65535</code> (<code>0xFFFF</code>) instructs the
+firmware to wait indefinitely for user intervention.</li>
+<li>If the <code>Timeout</code> variable does not exist in NVRAM, the
+firmware falls back on a vendor-defined hardcoded default.</li>
+</ul>
+<h2 id="the-interface-uefi-runtime-services">The Interface: UEFI Runtime
+Services</h2>
+<p>The firmware provides a set of function pointers to the operating
+system known as UEFI Runtime Services. Operating systems interact with
+NVRAM using two primary system calls:</p>
+<ol type="1">
+<li><strong><code>GetVariable()</code></strong>: Retrieves the
+attributes, data size, and binary payload of a designated variable.</li>
+<li><strong><code>SetVariable()</code></strong>: Writes, updates, or
+deletes a variable in NVRAM.</li>
+</ol>
+<p>When an operating system boots, the kernel maps the physical memory
+pages containing these runtime service routines into the kernel's
+virtual address space. Any subsequent variable access triggers the
+kernel to call the firmware's underlying <code>SetVariable()</code>
+implementation with the appropriate namespace GUID, variable name,
+attributes, and value payload.</p>
+<h2 id="operating-system-implementations">Operating System
+Implementations</h2>
+<p>Different operating systems provide distinct abstractions for
+user-space utilities to safely trigger <code>SetVariable()</code>.</p>
+<h3 id="linux">Linux</h3>
+<p>Linux exposes UEFI NVRAM variables via the <code>efivarfs</code>
+pseudo-filesystem, typically mounted at
+<code>/sys/firmware/efi/efivars</code>.</p>
+<p>Each file in this directory represents a variable and includes an
+internal 4-byte attribute header followed by the binary data. When an
+administrator executes a command such as
+<code>efibootmgr -t 5</code>:</p>
+<ol type="1">
+<li>The <code>efibootmgr</code> utility constructs a 2-byte
+little-endian payload representing the integer <code>5</code>
+(<code>0x0005</code>).</li>
+<li>It writes this payload, alongside the requisite attribute bitmask,
+to
+<code>/sys/firmware/efi/efivars/Timeout-8be4df61-93ca-11d2-aa0d-00e098032b8c</code>.</li>
+<li>The Linux kernel intercepts this file write and translates it into a
+call to the UEFI <code>SetVariable()</code> runtime service.</li>
+</ol>
+<h3 id="windows">Windows</h3>
+<p>Windows manages firmware settings via the Hardware Abstraction Layer
+(HAL) and the Boot Configuration Data (BCD) interface.</p>
+<ol type="1">
+<li>Tools like <code>bcdedit /timeout &lt;val&gt;</code> execute Win32
+API functions such as
+<code>SetFirmwareEnvironmentVariableExW()</code>.</li>
+<li>The Win32 API sends an I/O Control (IOCTL) request to the Windows
+kernel.</li>
+<li>The Windows kernel validates security privileges (requiring
+<code>SE_SYSTEM_ENVIRONMENT_NAME</code>) and invokes the UEFI
+<code>SetVariable()</code> function, writing the modified timeout data
+to NVRAM.</li>
+</ol>
+<h2 id="hardware-persistence">Hardware Persistence</h2>
+<p>Once the operating system invokes <code>SetVariable()</code>, control
+temporarily passes to the motherboard's firmware code running in the
+CPU. The firmware driver communicates with the physical flash memory
+controller via the Serial Peripheral Interface (SPI) bus, executes an
+erase-and-write cycle on the corresponding NVRAM sector, and updates the
+non-volatile entry. On the next system boot, the UEFI Boot Manager
+queries the <code>Timeout</code> variable using
+<code>GetVariable()</code> to determine how long to pause before
+executing the boot sequence.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-os-interacts-with-uefi-boot-timeout-storage';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

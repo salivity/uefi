@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Committee Role in Defining New APIs - uefi</title>
+    <meta name="description" content="The Unified Extensible Firmware Interface (UEFI) Forum’s Specification Working Group plays a vital role in evolving system firmware standards to meet modern computing demands. This article explores how the committee proposes, evaluates, standardizes, and">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-committee-role-in-defining-new-ap-is">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Committee Role in Defining New APIs - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-committee-role-in-defining-new-ap-is" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Unified Extensible Firmware Interface (UEFI) Forum’s Specification Working Group plays a vital role in evolving system firmware standards to meet modern computing demands. This article explores how the committee proposes, evaluates, standardizes, and" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-committee-role-in-defining-new-apis">UEFI Committee Role in
+Defining New APIs</h1>
+<p>The Unified Extensible Firmware Interface (UEFI) Forum’s
+Specification Working Group plays a vital role in evolving system
+firmware standards to meet modern computing demands. This article
+explores how the committee proposes, evaluates, standardizes, and
+maintains new Application Programming Interfaces (APIs), ensuring
+cross-platform hardware interoperability, system security, and a
+consistent pre-boot environment across diverse operating systems and
+processor architectures.</p>
+<h3 id="identifying-emerging-industry-needs">Identifying Emerging
+Industry Needs</h3>
+<p>The process of defining new APIs begins with identifying
+technological gaps in the pre-boot environment. As computing hardware
+evolves—introducing standards like PCIe advances, non-volatile memory,
+or modern cryptographic modules—the firmware must provide standard
+interfaces to interact with these technologies before an operating
+system loads. The UEFI Specification Working Group (USWG), which
+operates as the primary committee under the UEFI Forum, aggregates input
+from silicon vendors, OS vendors, independent BIOS vendors (IBVs), and
+system manufacturers to determine which new system capabilities require
+standardized programmatic interfaces.</p>
+<h3 id="the-engineering-change-request-ecr-process">The Engineering
+Change Request (ECR) Process</h3>
+<p>New APIs are introduced formally through Engineering Change Requests
+(ECRs). Member companies draft an ECR that describes the proposed API,
+its purpose, function prototypes, data structures, return values, and
+expected platform behaviors. By framing API development within the ECR
+framework, the committee ensures that proposals are clearly documented
+and actionable, functioning as additions or modifications to the core
+UEFI Specification.</p>
+<h3 id="technical-review-and-multi-vendor-consensus">Technical Review
+and Multi-Vendor Consensus</h3>
+<p>Once an ECR is submitted, the committee engages in technical review
+cycles. A core objective of the UEFI committee is to prevent proprietary
+fragmentation; therefore, members evaluate new APIs to ensure they
+remain platform-neutral and processor-agnostic where applicable. Members
+analyze the API for potential security vulnerabilities, performance
+overhead, and architectural elegance across x86, ARM, RISC-V, and other
+supported architectures. Consensus among competing industry players is
+mandatory to ensure that the interface will be broadly adopted across
+both firmware codebases and operating system bootloaders.</p>
+<h3 id="preserving-backward-compatibility">Preserving Backward
+Compatibility</h3>
+<p>A critical responsibility of the committee when defining new APIs is
+safeguarding backward compatibility. The pre-boot ecosystem relies on
+long-term stability across diverse hardware and software versions. When
+new APIs are designed, the committee ensures they do not deprecate or
+break existing protocols unexpectedly. If a legacy API is insufficient,
+the committee standardizes versioned protocols or non-conflicting
+extensions to allow older boot targets to operate seamlessly on newer
+firmware implementations.</p>
+<h3 id="validation-through-reference-implementations">Validation through
+Reference Implementations</h3>
+<p>Before final adoption, proposed APIs are frequently implemented and
+tested within open-source reference implementations, such as the
+TianoCore EDK II project. This practical validation allows the committee
+to test API functionality, identify ambiguities in the specification
+text, and evaluate real-world software interactions. Feedback from these
+implementations is integrated back into the specification language to
+refine the API definitions.</p>
+<h3 id="ratification-and-specification-publication">Ratification and
+Specification Publication</h3>
+<p>After resolving all technical challenges and receiving consensus
+within the working group, the ECR is finalized. The UEFI Forum’s Board
+of Directors then formally ratifies the changes. The newly defined APIs
+are assigned official status and integrated into the next published
+revision of the UEFI Specification, making them the binding industry
+standard for global firmware engineers and operating system
+developers.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-committee-role-in-defining-new-ap-is';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What Is EDK II and How to Build UEFI Firmware - uefi</title>
+    <meta name="description" content="This article provides an overview of EFI Development Kit II (EDK II), the industry-standard open-source implementation of the Unified Extensible Firmware Interface (UEFI). It explores the architecture of EDK II, breaks down its core components, and walks">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/what-is-edk-ii-and-how-to-build-uefi-firmware">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="What Is EDK II and How to Build UEFI Firmware - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/what-is-edk-ii-and-how-to-build-uefi-firmware" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article provides an overview of EFI Development Kit II (EDK II), the industry-standard open-source implementation of the Unified Extensible Firmware Interface (UEFI). It explores the architecture of EDK II, breaks down its core components, and walks" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="what-is-edk-ii-and-how-to-build-uefi-firmware">What Is EDK II
+and How to Build UEFI Firmware</h1>
+<p>This article provides an overview of EFI Development Kit II (EDK II),
+the industry-standard open-source implementation of the Unified
+Extensible Firmware Interface (UEFI). It explores the architecture of
+EDK II, breaks down its core components, and walks through the
+step-by-step process of using the kit to build bootable UEFI firmware
+images for virtualized environments and physical hardware platforms.</p>
+<hr />
+<h3 id="what-is-edk-ii">What Is EDK II?</h3>
+<p>EDK II (EFI Development Kit II) is an open-source, modern
+implementation of the UEFI and Platform Initialization (PI)
+specifications. Maintained under the TianoCore project, EDK II serves as
+the foundation for the firmware found in most modern PCs, servers, and
+embedded systems, effectively replacing legacy BIOS.</p>
+<p>Written primarily in C, EDK II provides the low-level code required
+to initialize hardware components (such as the CPU, memory, and PCIe
+devices), enforce secure boot policies, and hand control of the system
+over to the operating system bootloader.</p>
+<h3 id="core-components-and-file-structure">Core Components and File
+Structure</h3>
+<p>EDK II uses a modular, package-based architecture to organize source
+code and platform definitions. The primary configuration files
+include:</p>
+<ul>
+<li><strong>INF Files (<code>.inf</code>):</strong> Module Information
+files. These define individual modules (drivers, libraries, or
+applications), specifying source files, library dependencies, and target
+architectures.</li>
+<li><strong>DEC Files (<code>.dec</code>):</strong> Package Declaration
+files. These define public interfaces, structures, and globally unique
+identifiers (GUIDs) that can be shared across packages.</li>
+<li><strong>DSC Files (<code>.dsc</code>):</strong> Platform Description
+files. These orchestrate the build process by specifying which
+libraries, components, and drivers to compile for a specific
+platform.</li>
+<li><strong>FDF Files (<code>.fdf</code>):</strong> Flash Description
+files. These define the layout and binary structure of the final
+firmware image, detailing how compiled modules are placed into firmware
+volumes (FV) and the final firmware device (<code>.fd</code>) file.</li>
+</ul>
+<p>Common standard packages in the repository include
+<code>MdePkg</code> (core definitions), <code>MdeModulePkg</code>
+(standard drivers and services), and <code>OvmfPkg</code> (Open Virtual
+Machine Firmware for QEMU/KVM).</p>
+<hr />
+<h3 id="how-to-build-uefi-firmware-with-edk-ii">How to Build UEFI
+Firmware with EDK II</h3>
+<p>Building firmware with EDK II involves preparing a toolchain,
+compiling EDK II's internal build tools, configuring the platform
+parameters, and running the build script to generate a firmware
+image.</p>
+<h4 id="1-set-up-the-build-environment">1. Set Up the Build
+Environment</h4>
+<p>EDK II requires specific build tools and compilers. On Linux, this
+typically includes <code>gcc</code>, <code>g++</code>,
+<code>make</code>, <code>python3</code>, <code>nasm</code>,
+<code>uuid-dev</code>, and <code>git</code>. On Windows, the process
+requires Visual Studio, Python, and NASM.</p>
+<p>Once the system prerequisites are installed, clone the EDK II
+repository along with its submodules:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone <span class="at">--recursive</span> https://github.com/tianocore/edk2.git</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> edk2</span></code></pre></div>
+<h4 id="2-compile-basetools">2. Compile BaseTools</h4>
+<p>EDK II includes a set of custom tools called <code>BaseTools</code>,
+written in C and Python, that parse configuration files
+(<code>.dsc</code>, <code>.fdf</code>, <code>.inf</code>) and generate
+code. To build them:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> <span class="at">-C</span> BaseTools</span></code></pre></div>
+<h4 id="3-configure-the-environment">3. Configure the Environment</h4>
+<p>Source the environment setup script to initialize variables like
+<code>WORKSPACE</code>, <code>EDK_TOOLS_PATH</code>, and default
+paths:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> edksetup.sh</span></code></pre></div>
+<p>This command automatically generates default configuration templates
+inside the <code>Conf/</code> directory, including
+<code>target.txt</code> and <code>tools_def.txt</code>.</p>
+<h4 id="4-define-the-build-target">4. Define the Build Target</h4>
+<p>You can configure the target platform by editing
+<code>Conf/target.txt</code> or by passing command-line arguments to the
+<code>build</code> tool. The key parameters are:</p>
+<ul>
+<li><strong>ACTIVE_PLATFORM:</strong> The <code>.dsc</code> file of the
+platform you are compiling (e.g.,
+<code>OvmfPkg/OvmfPkgX64.dsc</code>).</li>
+<li><strong>TARGET:</strong> The build type, typically
+<code>DEBUG</code> or <code>RELEASE</code>.</li>
+<li><strong>TARGET_ARCH:</strong> The processor architecture, such as
+<code>X64</code>, <code>IA32</code>, or <code>AARCH64</code>.</li>
+<li><strong>TOOL_CHAIN_TAG:</strong> The compiler tag matching your
+installed toolchain (e.g., <code>GCC5</code> or
+<code>VS2019</code>).</li>
+</ul>
+<h4 id="5-execute-the-build">5. Execute the Build</h4>
+<p>Run the <code>build</code> command with the appropriate flags. For
+example, to build an x86_64 OVMF image using GCC:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">build</span> <span class="at">-p</span> OvmfPkg/OvmfPkgX64.dsc <span class="at">-a</span> X64 <span class="at">-t</span> GCC5 <span class="at">-b</span> RELEASE</span></code></pre></div>
+<p>During this step, the build system:</p>
+<ol type="1">
+<li>Validates dependencies via <code>.dsc</code> and <code>.dec</code>
+files.</li>
+<li>Compiles individual modules specified by <code>.inf</code> files
+into <code>.efi</code> binaries.</li>
+<li>Packages the <code>.efi</code> binaries into firmware volumes based
+on the <code>.fdf</code> file.</li>
+<li>Produces the final binary flash file (<code>.fd</code>).</li>
+</ol>
+<h4 id="6-locate-and-test-the-firmware">6. Locate and Test the
+Firmware</h4>
+<p>The generated binary is placed in the <code>Build/</code> directory
+(e.g., <code>Build/OvmfX64/RELEASE_GCC5/FV/OVMF.fd</code>).</p>
+<p>You can test this virtual UEFI firmware using an emulator like
+QEMU:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">qemu-system-x86_64</span> <span class="at">-bios</span> Build/OvmfX64/RELEASE_GCC5/FV/OVMF.fd <span class="at">-net</span> none</span></code></pre></div>
+<p>For physical hardware, platform-specific packages (often supplied by
+board vendors or silicon manufacturers) replace <code>OvmfPkg</code>,
+and the resulting <code>.fd</code> image is flashed directly to the
+target system's SPI flash memory.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/what-is-edk-ii-and-how-to-build-uefi-firmware';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

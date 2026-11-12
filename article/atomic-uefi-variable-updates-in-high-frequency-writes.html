@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atomic UEFI Variable Updates in High-Frequency Writes - uefi</title>
+    <meta name="description" content="Maintaining data integrity during high-frequency writes to non-volatile UEFI variables requires specialized firmware mechanisms to counter the risk of data corruption, flash wear, and sudden power loss. Because underlying SPI NOR flash memory cannot be ov">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/atomic-uefi-variable-updates-in-high-frequency-writes">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Atomic UEFI Variable Updates in High-Frequency Writes - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/atomic-uefi-variable-updates-in-high-frequency-writes" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Maintaining data integrity during high-frequency writes to non-volatile UEFI variables requires specialized firmware mechanisms to counter the risk of data corruption, flash wear, and sudden power loss. Because underlying SPI NOR flash memory cannot be ov" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="atomic-uefi-variable-updates-in-high-frequency-writes">Atomic
+UEFI Variable Updates in High-Frequency Writes</h1>
+<p>Maintaining data integrity during high-frequency writes to
+non-volatile UEFI variables requires specialized firmware mechanisms to
+counter the risk of data corruption, flash wear, and sudden power loss.
+Because underlying SPI NOR flash memory cannot be overwritten without
+slow and destructive block erasures, UEFI implementations like EDK II
+utilize a combination of log-structured storage, monotonic state-flag
+transitions, the Fault Tolerant Write (FTW) protocol, and System
+Management Mode (SMM) serialization to guarantee that
+<code>SetVariable()</code> operations remain atomic, consistent, and
+crash-resilient under heavy workloads.</p>
+<h3 id="append-only-log-structured-storage">Append-Only Log-Structured
+Storage</h3>
+<p>Traditional file systems overwrite data in place, but SPI NOR flash
+allows bits to be flipped only from 1 to 0; resetting them from 0 to 1
+requires erasing an entire flash block. To ensure atomicity during
+updates, the UEFI variable driver treats the non-volatile storage region
+as an append-only log.</p>
+<p>When an operating system or firmware component updates an existing
+variable:</p>
+<ol type="1">
+<li>The driver does not modify or erase the existing entry.</li>
+<li>It writes the updated variable—with identical GUID and Name
+attributes but new data—into the next available free space in the
+variable store.</li>
+<li>Once the new entry is fully written and validated, the older entry
+is marked as superseded or deleted.</li>
+</ol>
+<p>Because the old variable remains intact until the new variable is
+confirmed valid, an interrupted write due to a crash or power failure
+simply leaves an incomplete record at the end of the log, which is
+discarded during subsequent boots without corrupting the active
+data.</p>
+<h3 id="bit-level-state-transitions">Bit-Level State Transitions</h3>
+<p>The lifecycle of a variable entry within the flash log is governed by
+state flags written to the variable header. By exploiting NOR flash's
+ability to transition bits from 1 (unwritten) to 0 (written) without an
+erase cycle, the variable driver tracks update phases atomically:</p>
+<ul>
+<li><strong><code>VAR_IN_DELETED_TRANSITION</code></strong>: Used when
+obsoleting a variable.</li>
+<li><strong><code>VAR_ADDED</code></strong>: Denotes a fully written,
+active variable.</li>
+<li><strong><code>VAR_DELETED</code></strong>: Clears the variable from
+active lookup.</li>
+</ul>
+<p>During an update, the new entry is programmed into free space. If a
+power failure occurs mid-write, the firmware checks these status bits
+during the next Power-On Self-Test (POST). If the header indicates an
+incomplete write (the <code>VAR_ADDED</code> state bit was never cleared
+to 0), the firmware ignores the record, leaving the previous version
+active and preserving system state.</p>
+<h3 id="fault-tolerant-write-ftw-protocol">Fault Tolerant Write (FTW)
+Protocol</h3>
+<p>High-frequency writes quickly exhaust the active variable store,
+triggering a reclamation process (garbage collection) to reclaim space
+occupied by deleted and superseded records. Reclamation requires erasing
+flash blocks, introducing a major vulnerability to mid-operation power
+loss.</p>
+<p>The Fault Tolerant Write (FTW) protocol prevents corruption during
+this phase using a multi-block transaction model:</p>
+<ol type="1">
+<li><strong>Working Block Allocation</strong>: FTW allocates a spare
+flash block designated as the working block.</li>
+<li><strong>State Logging</strong>: Before moving data, the driver
+writes an FTW record header detailing the planned transaction to the
+working block.</li>
+<li><strong>Data Staging</strong>: Valid variables (excluding deprecated
+ones) are copied to the spare block.</li>
+<li><strong>Target Block Erase and Restore</strong>: The original
+variable block is erased and repopulated with the compacted data from
+the spare block.</li>
+<li><strong>Completion Flagging</strong>: The FTW header is marked
+complete.</li>
+</ol>
+<p>If power is cut at any point during reclamation, the firmware
+inspects the FTW log on the subsequent boot. Depending on the last
+written state flag, the recovery routine either restarts the copy from
+the spare block or re-erases the target block, guaranteeing that the
+variable store is never left in an unrecoverable, half-erased state.</p>
+<h3 id="concurrency-control-and-smm-serialization">Concurrency Control
+and SMM Serialization</h3>
+<p>High-frequency updates originating from multiple OS threads or
+processor cores present race conditions. UEFI Variable Services address
+this by abstracting non-volatile access behind System Management Mode
+(SMM):</p>
+<ul>
+<li><strong>SMI Trapping</strong>: Calls to <code>SetVariable()</code>
+trigger a Software System Management Interrupt (SMI), suspending OS
+execution and routing the write to the SMM-based Variable Driver
+(<code>VariableSmm</code>).</li>
+<li><strong>Hardware Lockout</strong>: The SPI controller registers are
+typically locked so that only code executing in SMM can write to the
+flash chip.</li>
+<li><strong>Single-Threaded Execution</strong>: SMM serializes all
+incoming read, write, and reclamation requests. By eliminating
+multithreaded concurrency at the flash controller level, the firmware
+prevents overlapping write operations from interleaving partial payloads
+into the same flash sectors.</li>
+</ul>
+<p>Through log-structured allocation, monotonic bit flipping,
+transactional reclamation via FTW, and hardware-level execution
+serialization, UEFI variable storage maintains atomicity and fault
+tolerance even under continuous, high-frequency write loads.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/atomic-uefi-variable-updates-in-high-frequency-writes';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Block IO Protocols Abstract Storage - uefi</title>
+    <meta name="description" content="Unified Extensible Firmware Interface (UEFI) Block I/O protocols abstract storage device access by providing a standardized, device-agnostic interface that decouples physical hardware controllers from higher-level consumers such as file system drivers and">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-block-io-protocols-abstract-storage">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Block IO Protocols Abstract Storage - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-block-io-protocols-abstract-storage" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Unified Extensible Firmware Interface (UEFI) Block I/O protocols abstract storage device access by providing a standardized, device-agnostic interface that decouples physical hardware controllers from higher-level consumers such as file system drivers and" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-block-io-protocols-abstract-storage">How UEFI Block IO
+Protocols Abstract Storage</h1>
+<p>Unified Extensible Firmware Interface (UEFI) Block I/O protocols
+abstract storage device access by providing a standardized,
+device-agnostic interface that decouples physical hardware controllers
+from higher-level consumers such as file system drivers and OS
+bootloaders. By presenting diverse storage media—including NVMe, SATA,
+and USB mass storage—as uniform, zero-indexed arrays of logical blocks,
+these protocols eliminate the need for boot applications to implement
+hardware-specific register sets, transport protocols, or command
+queues.</p>
+<h3 id="the-role-of-efi_block_io_protocol">The Role of
+<code>EFI_BLOCK_IO_PROTOCOL</code></h3>
+<p>At the core of UEFI storage abstraction is the
+<code>EFI_BLOCK_IO_PROTOCOL</code>. When a UEFI device driver
+initializes a controller (such as an AHCI SATA controller or an NVMe
+host controller), it attaches an instance of this protocol to the device
+handle representing the physical storage drive or a specific
+partition.</p>
+<p>Higher-level applications interact with this protocol without
+requiring insight into the underlying interconnect (PCIe, USB, or SATA).
+The protocol exposes a small set of standard function pointers:</p>
+<ul>
+<li><strong><code>ReadBlocks()</code></strong>: Reads a specified number
+of consecutive logical blocks into a system memory buffer.</li>
+<li><strong><code>WriteBlocks()</code></strong>: Writes a buffer of
+memory to a specified range of logical blocks on the device.</li>
+<li><strong><code>FlushBlocks()</code></strong>: Forces any cached write
+data to be written to the physical non-volatile medium.</li>
+<li><strong><code>Reset()</code></strong>: Resets the storage device
+hardware to an operational state.</li>
+</ul>
+<h3 id="logical-block-addressing-lba">Logical Block Addressing
+(LBA)</h3>
+<p>Storage abstraction relies on Logical Block Addressing (LBA). Rather
+than addressing data using complex physical geometry (like
+cylinder-head-sector schemes or controller-specific command structures),
+the Block I/O protocol organizes all accessible storage into a flat
+array of sequential blocks starting at LBA 0.</p>
+<p>The protocol provides an <code>EFI_BLOCK_IO_MEDIA</code> structure
+that exposes essential device properties directly to applications:</p>
+<ul>
+<li><strong><code>BlockSize</code></strong>: The logical size of each
+block in bytes (typically 512 or 4096 bytes).</li>
+<li><strong><code>LastBlock</code></strong>: The highest valid LBA,
+defining the total accessible capacity.</li>
+<li><strong><code>MediaPresent</code></strong>: A boolean flag
+indicating whether physical media is detected (useful for optical drives
+or SD card slots).</li>
+<li><strong><code>RemovableMedia</code></strong>: Indicates if the media
+can be physically detached during runtime.</li>
+<li><strong><code>ReadOnly</code></strong>: Flags write-protected
+media.</li>
+</ul>
+<h3 id="the-uefi-driver-stack-and-layering">The UEFI Driver Stack and
+Layering</h3>
+<p>UEFI achieves complete abstraction by arranging drivers in a
+hierarchical stack:</p>
+<ol type="1">
+<li><strong>Bus Drivers</strong>: Manage physical buses like PCIe or
+USB.</li>
+<li><strong>Device Drivers</strong>: Implement protocol controllers
+(such as NVMe or USB Mass Storage) to communicate over the bus and
+translate standard storage operations into hardware command packets.
+These drivers publish the <code>EFI_BLOCK_IO_PROTOCOL</code>.</li>
+<li><strong>Partition Drivers</strong>: Inspect existing Block I/O
+instances for partition tables (such as GPT or MBR) and produce child
+device handles that each expose their own
+<code>EFI_BLOCK_IO_PROTOCOL</code> corresponding to a specific partition
+range.</li>
+<li><strong>File System Drivers</strong>: Consume the partition-level
+Block I/O protocol and publish the
+<code>EFI_SIMPLE_FILE_SYSTEM_PROTOCOL</code> (such as for FAT32),
+translating file paths into LBA read/write requests.</li>
+<li><strong>UEFI Applications &amp; Bootloaders</strong>: Consume file
+system protocols or Block I/O directly (e.g., GRUB,
+<code>systemd-boot</code>, Windows Boot Manager) to load OS kernels into
+memory without writing hardware-specific drivers.</li>
+</ol>
+<h3
+id="asynchronous-operations-with-efi_block_io2_protocol">Asynchronous
+Operations with <code>EFI_BLOCK_IO2_PROTOCOL</code></h3>
+<p>Modern UEFI specifications introduce
+<code>EFI_BLOCK_IO2_PROTOCOL</code>, which extends the traditional
+synchronous Block I/O architecture. While the base protocol blocks
+execution until a read or write operation completes, Block I/O 2
+supports asynchronous transactions using UEFI events and tokens. This
+allows higher-level applications to queue multiple I/O operations
+simultaneously and overlap disk access with processor-bound tasks,
+optimizing boot performance without sacrificing hardware
+independence.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-block-io-protocols-abstract-storage';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

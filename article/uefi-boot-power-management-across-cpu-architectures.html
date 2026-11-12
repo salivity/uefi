@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Boot Power Management Across CPU Architectures - uefi</title>
+    <meta name="description" content="The Unified Extensible Firmware Interface (UEFI) manages CPU power states during the boot process to ensure system stability, control thermals, and prepare power interfaces for the operating system. While the boot environment initially operates with basic">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-boot-power-management-across-cpu-architectures">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Boot Power Management Across CPU Architectures - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-boot-power-management-across-cpu-architectures" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Unified Extensible Firmware Interface (UEFI) manages CPU power states during the boot process to ensure system stability, control thermals, and prepare power interfaces for the operating system. While the boot environment initially operates with basic" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-boot-power-management-across-cpu-architectures">UEFI Boot
+Power Management Across CPU Architectures</h1>
+<p>The Unified Extensible Firmware Interface (UEFI) manages CPU power
+states during the boot process to ensure system stability, control
+thermals, and prepare power interfaces for the operating system. While
+the boot environment initially operates with basic, static power
+configurations to avoid instability, it progressively initializes
+platform-specific power registers, brings up secondary cores, and builds
+standardized interfaces like ACPI or Device Tree. The underlying
+mechanics of how UEFI manipulates power levels during this sequence vary
+fundamentally between x86, ARM, and RISC-V architectures.</p>
+<h2 id="uefi-boot-phases-and-power-management">UEFI Boot Phases and
+Power Management</h2>
+<p>During system boot, UEFI transitions through several distinct
+execution phases, each with specific power constraints:</p>
+<ol type="1">
+<li><strong>Security (SEC) Phase:</strong> The system starts from a cold
+reset. The primary CPU core operates in a conservative, safe operational
+state using default voltages and base clock frequencies. Low-power idle
+states (C-states) and dynamic frequency scaling (P-states) are disabled
+to prevent timing and voltage instabilities before hardware
+calibration.</li>
+<li><strong>Pre-EFI Initialization (PEI) Phase:</strong> Basic platform
+hardware, including the memory controller and power management ICs
+(PMICs), is initialized. The Primary Processor (Bootstrap Processor or
+BSP) establishes stable rail voltages and baseline CPU operating
+frequencies. Secondary cores (Application Processors or APs) remain in a
+reset or quiescent low-power halt state.</li>
+<li><strong>Driver Execution Environment (DXE) Phase:</strong>
+Architectural power management drivers are dispatched. The firmware
+detects processor topology, programs thermal and power management
+registers, enables basic power-saving governors, and wakes secondary
+cores to test initialization before placing them back into low-power
+states.</li>
+<li><strong>Boot Device Selection (BDS) and OS Handoff:</strong> UEFI
+constructs the runtime tables—primarily ACPI or Device Tree—that
+describe the hardware's power capabilities. When the OS loader executes
+<code>ExitBootServices()</code>, UEFI relinquishes direct power
+management to the Operating System-directed Power Management (OSPM)
+subsystem.</li>
+</ol>
+<h2 id="implementation-across-architectures">Implementation Across
+Architectures</h2>
+<p>While the high-level phases are standard across UEFI implementations
+(such as EDK II), the low-level execution differs depending on the
+processor architecture and its privilege model.</p>
+<h3 id="x86-and-x86-64-architectures">x86 and x86-64 Architectures</h3>
+<p>In x86 implementations (Intel and AMD), UEFI directly interacts with
+the hardware through Model-Specific Registers (MSRs) and memory-mapped
+I/O (MMIO):</p>
+<ul>
+<li><strong>Initial States:</strong> The BSP boots using standard
+default clock multipliers. Microcode updates applied during the SEC/PEI
+phase often patch voltage/frequency curves.</li>
+<li><strong>Core Management:</strong> The BSP communicates with APs
+using Inter-Processor Interrupts (INIT-SIPI-SIPI sequences). Cores not
+actively executing boot tasks are halted using low-power halt loops or
+architectural states like <code>MWAIT</code>.</li>
+<li><strong>Hardware-Controlled Performance (HWP):</strong> On modern
+x86 chips, UEFI can enable autonomous frequency control (such as Intel
+Speed Shift), allowing the CPU to manage its own voltage and frequency
+transitions during later boot phases.</li>
+<li><strong>Handoff Mechanism:</strong> UEFI builds ACPI tables
+containing static power resource descriptions, such as <code>_PSS</code>
+(Performance Supported States), <code>_CPC</code> (Continuous
+Performance Control), and <code>_CST</code> (C-States). Control
+transitions entirely to ACPI/OSPM at boot completion.</li>
+</ul>
+<h3 id="arm64-aarch64-architecture">ARM64 (AArch64) Architecture</h3>
+<p>ARM systems decouple firmware power execution using a layered
+privilege hierarchy governed by the Power State Coordination Interface
+(PSCI):</p>
+<ul>
+<li><strong>Privilege Separation:</strong> UEFI typically executes at
+Exception Level 2 (EL2, hypervisor) or Exception Level 1 (EL1,
+OS/bootloader). UEFI does not directly write to low-level CPU power
+registers.</li>
+<li><strong>Firmware Coordination:</strong> Power operations are
+delegated to a secure runtime layer running at Exception Level 3 (EL3),
+such as ARM Trusted Firmware (TF-A).</li>
+<li><strong>Power Calls:</strong> When UEFI needs to wake secondary
+cores, adjust core power levels, or prepare for sleep, it issues Secure
+Monitor Calls (<code>SMC</code>) or Hypervisor Calls (<code>HVC</code>)
+implementing standard PSCI functions (e.g., <code>CPU_ON</code>,
+<code>CPU_SUSPEND</code>).</li>
+<li><strong>Handoff Mechanism:</strong> UEFI passes power topology to
+the OS via either ACPI tables (using the standard ARM PSCI definitions)
+or flattened Device Trees (<code>psci</code> nodes), allowing the OS
+kernel to call the same PSCI services established during firmware
+initialization.</li>
+</ul>
+<h3 id="risc-v-architecture">RISC-V Architecture</h3>
+<p>RISC-V systems handle power via the Supervisor Binary Interface (SBI)
+and its Hart State Management (HSM) extension:</p>
+<ul>
+<li><strong>Privilege Model:</strong> UEFI runs in Supervisor mode
+(S-mode). Direct control of hardware execution states (called "harts")
+belongs to Machine mode (M-mode), typically managed by runtime firmware
+such as OpenSBI.</li>
+<li><strong>Hart State Management:</strong> The UEFI implementation uses
+SBI calls (via the <code>ecall</code> instruction) to query, start,
+stop, or suspend secondary harts during the PEI and DXE phases.</li>
+<li><strong>Dynamic Power States:</strong> Advanced frequency scaling
+and voltage regulation are performed either by SBI platform drivers or
+platform-specific PMIC interfaces registered prior to UEFI payload
+execution.</li>
+<li><strong>Handoff Mechanism:</strong> UEFI translates the initialized
+platform topology into standard Device Tree entries or ACPI RISC-V
+extensions, enabling the OS kernel to coordinate power states using SBI
+HSM calls post-boot.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-boot-power-management-across-cpu-architectures';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

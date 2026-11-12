@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI PEI Phase Prepares Permanent Memory - uefi</title>
+    <meta name="description" content="The Pre-EFI Initialization (PEI) phase serves as the critical bridge in the UEFI boot flow that transitions a platform from a bare-metal, resource-constrained state to a fully functional environment backed by permanent physical memory. When a computer boo">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-pei-phase-prepares-permanent-memory">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI PEI Phase Prepares Permanent Memory - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-pei-phase-prepares-permanent-memory" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Pre-EFI Initialization (PEI) phase serves as the critical bridge in the UEFI boot flow that transitions a platform from a bare-metal, resource-constrained state to a fully functional environment backed by permanent physical memory. When a computer boo" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-pei-phase-prepares-permanent-memory">How UEFI PEI Phase
+Prepares Permanent Memory</h1>
+<p>The Pre-EFI Initialization (PEI) phase serves as the critical bridge
+in the UEFI boot flow that transitions a platform from a bare-metal,
+resource-constrained state to a fully functional environment backed by
+permanent physical memory. When a computer boots, system RAM is
+uninitialized and unusable, forcing the system to execute code directly
+from flash memory and rely on temporary CPU cache storage. The PEI phase
+systematically detects, trains, tests, and maps the system's dynamic
+random-access memory (DRAM), builds architectural descriptors for memory
+allocation, migrates critical runtime data into system RAM, and hands
+off a fully populated memory map to the Driver Execution Environment
+(DXE) phase.</p>
+<h3 id="utilizing-temporary-memory-via-cache-as-ram-car">Utilizing
+Temporary Memory via Cache-as-RAM (CAR)</h3>
+<p>Before permanent memory can be configured, the PEI phase requires a
+writable memory stack to execute C-based Pre-EFI Initialization Modules
+(PEIMs). Because main system memory is inaccessible, the Security (SEC)
+phase configures the CPU's internal L1 or L2 cache as temporary storage
+using a technique called Cache-as-RAM (CAR).</p>
+<p>Under CAR, the CPU's Memory Type Range Registers (MTRRs) are
+programmed to treat designated cache lines as Write-Back (WB) memory
+without flushing writes out to the nonexistent system bus. The PEI
+Foundation initializes its early stack and heap inside this restricted
+cache space. While CAR provides the necessary environment to run complex
+C code, it is severely limited in size—often to only a few tens or
+hundreds of kilobytes—making the initialization of permanent RAM the
+primary objective of the PEI phase.</p>
+<h3 id="discovery-via-serial-presence-detect-spd">Discovery via Serial
+Presence Detect (SPD)</h3>
+<p>Permanent memory configuration begins when the PEI Dispatcher loads
+the platform-specific Memory Initialization PEIM. This module often
+interfaces with vendor-provided algorithms known as the Memory Reference
+Code (MRC).</p>
+<p>The MRC initiates hardware discovery by querying the Serial Presence
+Detect (SPD) EEPROMs located on each installed memory module via the
+System Management Bus (SMBus) or I3C interface. The SPD data provides
+the memory controller with critical specifications regarding the
+installed DRAM modules, including:</p>
+<ul>
+<li>Memory technology and generation (e.g., DDR4, DDR5, LPDDR5)</li>
+<li>Module density, rank count, and bank architecture</li>
+<li>Supported clock frequencies, CAS latencies, and base timing
+constraints (<span class="math inline">\(t_{RCD}\)</span>, <span
+class="math inline">\(t_{RP}\)</span>, <span
+class="math inline">\(t_{RAS}\)</span>)</li>
+<li>Required operational voltages</li>
+</ul>
+<h3 id="memory-training-and-controller-configuration">Memory Training
+and Controller Configuration</h3>
+<p>Modern high-speed memory interfaces cannot operate reliably using
+static timing presets due to microscopic trace-length differences,
+signal degradation, and temperature variations across motherboard
+designs. The Memory Initialization PEIM coordinates an extensive
+hardware calibration sequence known as memory training.</p>
+<p>During this stage, the memory controller and the DRAM physical layers
+(PHY) execute a series of diagnostic and synchronization steps:</p>
+<ol type="1">
+<li><strong>ZQ Calibration:</strong> Calibrates internal termination
+resistances to ensure proper signal termination and minimize
+reflections.</li>
+<li><strong>Read/Write Leveling:</strong> Adjusts the delay lines for
+individual clock, strobe (DQS), and data (DQ) signals to compensate for
+physical PCB trace-length skews.</li>
+<li><strong>Vref Centering:</strong> Tunes the reference voltage levels
+to determine the widest, most stable data eye for error-free
+sampling.</li>
+<li><strong>Command/Address Training:</strong> Synchronizes the command
+and address bus timing relative to the system memory clock.</li>
+</ol>
+<p>Once training sequences succeed, the memory controller maps the
+physical address space, interleaves channels for optimal throughput, and
+clears parity states.</p>
+<h3 id="relocation-and-the-teardown-of-cache-as-ram">Relocation and the
+Teardown of Cache-as-RAM</h3>
+<p>Once physical DRAM is initialized, the PEI phase must transition
+execution out of temporary cache storage and into main memory:</p>
+<ol type="1">
+<li><strong>Memory Range Testing and Allocation:</strong> The PEIM tests
+the lower regions of physical memory to ensure stability and reserves a
+region to host the permanent PEI stack, heap, and firmware
+structures.</li>
+<li><strong>Data Migration:</strong> The PEI Foundation copies the
+execution stack, global variables, and active state data from CAR into
+physical memory.</li>
+<li><strong>CAR Evacuation and Disabling:</strong> The CPU MTRRs are
+reset to normal caching states. The temporary cache lines are
+invalidated and disabled, returning the CPU cache to its standard
+hardware-managed function.</li>
+<li><strong>Stack Switching:</strong> The CPU stack pointer register
+(e.g., ESP/RSP) is redirected from the temporary CAR address space to
+the newly allocated permanent stack address in DRAM.</li>
+</ol>
+<h3 id="creating-hand-off-blocks-hobs-for-dxe">Creating Hand-Off Blocks
+(HOBs) for DXE</h3>
+<p>The final duty of the PEI memory subsystem is documenting the
+platform's memory map so downstream phases can consume it without
+re-interrogating hardware. The PEI Foundation creates a series of data
+structures called Hand-Off Blocks (HOBs).</p>
+<p>Specifically, it constructs <strong>Resource Descriptor HOBs</strong>
+that define:</p>
+<ul>
+<li>The total amount and physical address boundaries of detected
+RAM.</li>
+<li>Attributes of the memory (e.g., present, initialized, tested,
+non-volatile).</li>
+<li>Pre-allocated memory reservations dedicated to firmware runtime
+usage, ACPI tables, and boot services.</li>
+</ul>
+<p>With permanent memory fully operational and documented in the HOB
+list, the PEI phase concludes by passing the HOB list pointer to the DXE
+Foundation, allowing UEFI to load high-level device drivers, file
+systems, and operating system bootloaders into standard system RAM.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-pei-phase-prepares-permanent-memory';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

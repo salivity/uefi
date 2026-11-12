@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protecting Sensitive UEFI Variables From Tampering - uefi</title>
+    <meta name="description" content="Unified Extensible Firmware Interface (UEFI) variables store critical system state information, boot configurations, and cryptographic keys essential for platform integrity. Unauthorized modification of these variables can compromise the platform before t">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/protecting-sensitive-uefi-variables-from-tampering">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Protecting Sensitive UEFI Variables From Tampering - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/protecting-sensitive-uefi-variables-from-tampering" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Unified Extensible Firmware Interface (UEFI) variables store critical system state information, boot configurations, and cryptographic keys essential for platform integrity. Unauthorized modification of these variables can compromise the platform before t" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="protecting-sensitive-uefi-variables-from-tampering">Protecting
+Sensitive UEFI Variables From Tampering</h1>
+<p>Unified Extensible Firmware Interface (UEFI) variables store critical
+system state information, boot configurations, and cryptographic keys
+essential for platform integrity. Unauthorized modification of these
+variables can compromise the platform before the operating system even
+loads. To protect against malicious alteration, modern systems rely on a
+layered defense combining variable-level access attributes,
+cryptographic signature validation, firmware isolation via System
+Management Mode (SMM), and operating system enforcement policies.</p>
+<h3 id="uefi-variable-attributes-and-access-flags">UEFI Variable
+Attributes and Access Flags</h3>
+<p>At the firmware level, every UEFI variable is governed by specific
+attributes defined during creation. These flags dictate when and how an
+application can read or write the data:</p>
+<ul>
+<li><strong><code>EFI_VARIABLE_BOOTSERVICE_ACCESS</code> vs.
+<code>EFI_VARIABLE_RUNTIME_ACCESS</code>:</strong> Variables marked only
+for Boot Services are completely inaccessible once the operating system
+executes the <code>ExitBootServices()</code> API. Without the
+<code>RUNTIME_ACCESS</code> attribute, an operating system or user-space
+application cannot view or modify the variable.</li>
+<li><strong><code>EFI_VARIABLE_READ_ONLY</code>:</strong> Firmware can
+define variables as intrinsically read-only to runtime callers,
+preventing any subsequent <code>SetVariable()</code> calls from
+overriding the configuration.</li>
+</ul>
+<h3
+id="authenticated-variables-and-cryptographic-signatures">Authenticated
+Variables and Cryptographic Signatures</h3>
+<p>Sensitive variables critical to UEFI Secure Boot—such as the Platform
+Key (<code>PK</code>), Key Exchange Key (<code>KEK</code>), Authorized
+Signature Database (<code>db</code>), and Forbidden Signature Database
+(<code>dbx</code>)—require authenticated write access.</p>
+<p>Firmware enforces this through the
+<code>EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS</code>
+attribute. Under this policy, any payload submitted to modify a variable
+must be cryptographically signed using a private key corresponding to an
+established certificate chain:</p>
+<ul>
+<li>Updating the <code>db</code> or <code>dbx</code> requires a
+signature from an entity enrolled in the <code>KEK</code> or
+<code>PK</code>.</li>
+<li>Updating the <code>KEK</code> requires a signature from the
+<code>PK</code>.</li>
+<li>Payloads must include an increasing timestamp counter to prevent
+replay attacks.</li>
+</ul>
+<p>Without the appropriate private key, even an application running with
+system-level privileges cannot alter these protected stores.</p>
+<h3 id="system-management-mode-smm-isolation">System Management Mode
+(SMM) Isolation</h3>
+<p>Because operating system kernels run in privileged execution rings
+(Ring 0), software controls alone are insufficient if the kernel is
+compromised. Modern UEFI implementations delegate variable modification
+to System Management Mode (SMM), an isolated execution environment
+running in Ring -2.</p>
+<p>When an OS calls the <code>SetVariable()</code> runtime service, the
+CPU triggers a System Management Interrupt (SMI). Execution suspends the
+OS and hands control to an SMM handler. The SMM handler validates the
+caller's permissions, verifies cryptographic signatures for
+authenticated variables, and inspects the physical flash memory locks.
+Operating system code cannot access SMM memory or bypass this
+handler.</p>
+<h3 id="operating-system-and-hardware-flash-locks">Operating System and
+Hardware Flash Locks</h3>
+<p>Complementing firmware policies, both the operating system and
+underlying hardware enforce strict boundary rules:</p>
+<ul>
+<li><strong>Hardware Flash Protection:</strong> Hardware registers (such
+as the BIOS Control register on modern chipsets) lock the SPI flash
+memory containing NVRAM. These locks ensure write operations to flash
+storage can only originate from authenticated SMM routines.</li>
+<li><strong>OS Privilege Separation:</strong> General applications
+running in user space (Ring 3) do not possess the privileges needed to
+issue raw firmware calls. Systems require root or administrative
+privileges to interface with UEFI interfaces.</li>
+<li><strong>Kernel Lockdown and Virtualization-Based Security
+(VBS):</strong> Modern security frameworks, such as Linux Kernel
+Lockdown and Windows Hypervisor-Protected Code Integrity (HVCI), prevent
+even administrative or root users from arbitrarily writing to UEFI
+runtime variables, reserving access strictly for verified operating
+system components.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/protecting-sensitive-uefi-variables-from-tampering';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

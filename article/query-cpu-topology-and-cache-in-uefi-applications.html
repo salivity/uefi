@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Query CPU Topology and Cache in UEFI Applications - uefi</title>
+    <meta name="description" content="UEFI applications query CPU topology and cache architecture by leveraging firmware-provided protocols, executing low-level CPU instructions directly, and parsing system description tables. Because UEFI applications operate in a privileged execution enviro">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/query-cpu-topology-and-cache-in-uefi-applications">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Query CPU Topology and Cache in UEFI Applications - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/query-cpu-topology-and-cache-in-uefi-applications" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI applications query CPU topology and cache architecture by leveraging firmware-provided protocols, executing low-level CPU instructions directly, and parsing system description tables. Because UEFI applications operate in a privileged execution enviro" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="query-cpu-topology-and-cache-in-uefi-applications">Query CPU
+Topology and Cache in UEFI Applications</h1>
+<p>UEFI applications query CPU topology and cache architecture by
+leveraging firmware-provided protocols, executing low-level CPU
+instructions directly, and parsing system description tables. Because
+UEFI applications operate in a privileged execution environment
+(typically Ring 0 on x86 platforms), developers can combine high-level
+firmware interfaces like the <code>EFI_MP_SERVICES_PROTOCOL</code> and
+SMBIOS protocols with native hardware instructions such as
+<code>CPUID</code>, or inspect ACPI tables directly from system memory
+to map cores, threads, NUMA nodes, and cache hierarchies.</p>
+<h3 id="1-using-the-efi_mp_services_protocol">1. Using the
+EFI_MP_SERVICES_PROTOCOL</h3>
+<p>The standard approach within the UEFI framework is locating and
+consuming the <code>EFI_MP_SERVICES_PROTOCOL</code>. This protocol
+abstracts multiprocessor initialization and management.</p>
+<p>An application locates the protocol using the UEFI Boot Services
+table:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>EFI_STATUS Status<span class="op">;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>EFI_MP_SERVICES_PROTOCOL <span class="op">*</span>MpServices<span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>Status <span class="op">=</span> gBS<span class="op">-&gt;</span>LocateProtocol<span class="op">(</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="op">&amp;</span>gEfiMpServiceProtocolGuid<span class="op">,</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    NULL<span class="op">,</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">(</span>VOID <span class="op">**)&amp;</span>MpServices</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span></code></pre></div>
+<p>Once the protocol interface is acquired:</p>
+<ul>
+<li><strong><code>GetNumberOfProcessors</code></strong>: Returns the
+total number of logical processors and the number of currently enabled
+processors.</li>
+<li><strong><code>GetProcessorInfo</code></strong>: Accepts a processor
+index and populates an <code>EFI_PROCESSOR_INFORMATION</code>
+structure.</li>
+</ul>
+<p>The <code>EFI_PROCESSOR_INFORMATION</code> structure provides
+critical topology fields:</p>
+<ul>
+<li><code>ProcessorId</code>: The unique physical ID (usually matching
+the Local APIC ID).</li>
+<li><code>StatusFlag</code>: Indicates if the processor is the Bootstrap
+Processor (BSP) or an Application Processor (AP), and whether it is
+enabled.</li>
+<li><code>Location</code>: An <code>EFI_CPU_PHYSICAL_LOCATION</code>
+struct containing package (socket), core, and thread indexes. On newer
+UEFI specifications, <code>ExtendedInformation</code> can also map
+multi-die packages and module-level hierarchies.</li>
+</ul>
+<h3 id="2-direct-hardware-querying-via-cpuid-x86x86-64">2. Direct
+Hardware Querying via CPUID (x86/x86-64)</h3>
+<p>Because UEFI applications run in 64-bit flat-memory mode without
+OS-level sandboxing, they can directly execute the <code>CPUID</code>
+assembly instruction using compiler intrinsics (such as
+<code>__cpuid</code> or <code>__cpuidex</code>).</p>
+<h4 id="cpu-topology-discovery">CPU Topology Discovery</h4>
+<ul>
+<li><strong>Leaf <code>0x0B</code> and Leaf <code>0x1F</code> (Extended
+Topology Enumeration):</strong> Intel and modern AMD architectures use
+these leaves to define thread, core, and module topology. By iterating
+sub-leaves (<code>ECX = 0, 1, 2...</code>), the application reads
+<code>EAX</code> (shift count to derive higher-level IDs),
+<code>EBX</code> (number of logical processors at this level), and
+<code>EDX</code> (x2APIC ID of the current logical processor).</li>
+<li><strong>Leaf <code>0x8000001E</code> (AMD Extended
+Topology):</strong> On AMD systems, this leaf provides the compute unit
+ID, core ID, and node (socket/NUMA) ID.</li>
+</ul>
+<h4 id="cache-architecture-discovery">Cache Architecture Discovery</h4>
+<ul>
+<li><strong>Leaf <code>0x04</code> (Deterministic Cache
+Parameters):</strong> Intel and modern AMD processors report detailed
+cache layouts using this leaf. Setting <code>EAX = 0x04</code> and
+varying <code>ECX</code> (cache level index starting at 0) returns:
+<ul>
+<li>Cache type (Data, Instruction, or Unified) in
+<code>EAX[4:0]</code>.</li>
+<li>Cache level (L1, L2, L3) in <code>EAX[7:5]</code>.</li>
+<li>Number of threads sharing this cache in
+<code>EAX[25:14] + 1</code>.</li>
+<li>Ways of associativity, line size, and total sets via
+<code>EBX</code> and <code>ECX</code>.</li>
+</ul></li>
+<li><strong>Leaf <code>0x8000001D</code>:</strong> Dedicated cache
+topology parameter leaf used by AMD processors providing identical
+layout details for Zen-based architectures.</li>
+</ul>
+<h3 id="3-parsing-smbios-tables">3. Parsing SMBIOS Tables</h3>
+<p>The UEFI system configuration table provides access to SMBIOS (System
+Management BIOS) structures, which contain static, human-readable
+information prepared by the platform initialization firmware.</p>
+<p>An application can locate SMBIOS through
+<code>gBS-&gt;LocateProtocol(&amp;gEfiSmbiosProtocolGuid, ...)</code> or
+by searching <code>gST-&gt;ConfigurationTable</code> for
+<code>SMBIOS_TABLE_GUID</code> or <code>SMBIOS3_TABLE_GUID</code>.</p>
+<ul>
+<li><strong>Type 4 (Processor Information):</strong> Contains core
+count, thread count, external clock frequencies, socket designation, and
+references to associated cache handles.</li>
+<li><strong>Type 7 (Cache Information):</strong> Lists operational mode,
+maximum cache size, installed cache size, supported SRAM types, error
+correction types, and cache level associative properties.</li>
+</ul>
+<h3 id="4-reading-acpi-tables-madt-and-pptt">4. Reading ACPI Tables
+(MADT and PPTT)</h3>
+<p>For platform-independent topology mappings—especially on AArch64
+(ARM) platforms where <code>CPUID</code> is absent—UEFI applications
+locate the ACPI Root System Description Pointer (RSDP) in the UEFI
+System Configuration Table.</p>
+<ul>
+<li><strong>MADT (Multiple APIC Description Table):</strong> On x86, it
+lists every Local APIC and x2APIC entry, confirming valid hardware
+execution targets and physical core mappings.</li>
+<li><strong>PPTT (Processor Properties Topology Table):</strong>
+Essential on modern systems, PPTT describes the exact physical processor
+hierarchy (sockets, clusters, cores, threads) and defines the exact
+cache hierarchy associated with each node using standard cache attribute
+structures.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/query-cpu-topology-and-cache-in-uefi-applications';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Evolution from Intel Boot Initiative to UEFI - uefi</title>
+    <meta name="description" content="The transition from the Intel Boot Initiative to the Unified Extensible Firmware Interface represents one of the most critical evolutions in modern computer architecture. In the late 1990s, limitations in legacy PC BIOS threatened to bottleneck next-gener">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/the-evolution-from-intel-boot-initiative-to-uefi">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="The Evolution from Intel Boot Initiative to UEFI - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/the-evolution-from-intel-boot-initiative-to-uefi" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The transition from the Intel Boot Initiative to the Unified Extensible Firmware Interface represents one of the most critical evolutions in modern computer architecture. In the late 1990s, limitations in legacy PC BIOS threatened to bottleneck next-gener" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="the-evolution-from-intel-boot-initiative-to-uefi">The Evolution
+from Intel Boot Initiative to UEFI</h1>
+<p>The transition from the Intel Boot Initiative to the Unified
+Extensible Firmware Interface represents one of the most critical
+evolutions in modern computer architecture. In the late 1990s,
+limitations in legacy PC BIOS threatened to bottleneck next-generation
+server platforms, prompting Intel to develop a modern boot specification
+known initially as the Intel Boot Initiative. This project quickly
+matured into the Extensible Firmware Interface and ultimately
+transitioned into the industry-wide Unified Extensible Firmware
+Interface standard in 2005, replacing decades-old firmware with a
+flexible, modular, and secure environment.</p>
+<h3 id="the-limits-of-legacy-bios">The Limits of Legacy BIOS</h3>
+<p>The Basic Input/Output System (BIOS) had served as the standard
+firmware interface for IBM-compatible personal computers since 1975.
+However, BIOS was fundamentally designed around 16-bit processor
+architecture, 1 megabyte of addressable memory, and Master Boot Record
+(MBR) partitioning, which capped storage drives at 2.2 terabytes.</p>
+<p>By the mid-1990s, Intel was developing the Itanium (IA-64) processor
+family targeted at enterprise servers and high-performance computing.
+The 16-bit constraints, slow initialization, and assembly-language
+reliance of legacy BIOS made it entirely unsuitable for 64-bit server
+architectures.</p>
+<h3 id="the-intel-boot-initiative-ibi">The Intel Boot Initiative
+(IBI)</h3>
+<p>To resolve these architectural bottlenecks, Intel launched an
+internal research project known as the Intel Boot Initiative (IBI). The
+goal of IBI was to separate the low-level platform hardware from the
+operating system loader by creating an abstracted, modular interface.
+Instead of relying on assembly code embedded directly in fixed
+motherboard ROM addresses, IBI proposed writing firmware interfaces
+primarily in high-level C code, enabling dynamic driver loading and
+independent hardware testing.</p>
+<h3 id="the-emergence-of-efi">The Emergence of EFI</h3>
+<p>As the Intel Boot Initiative matured between 1998 and 1999, Intel
+formalized the project and renamed it the Extensible Firmware Interface
+(EFI).</p>
+<p>In December 2000, Intel published the EFI 1.02 specification,
+followed by EFI 1.10 in December 2002. EFI introduced key innovations
+that would define modern system boot environments:</p>
+<ul>
+<li><strong>GUID Partition Table (GPT):</strong> Allowed drive
+partitions larger than 2.2 TB and supported theoretically limitless
+partition counts.</li>
+<li><strong>Pre-OS Environment:</strong> Provided a mini-operating
+system environment capable of running independent diagnostics, tools,
+and network stacks before loading the primary OS.</li>
+<li><strong>Modular Drivers:</strong> Allowed add-in card manufacturers
+to write architecture-neutral device drivers that functioned within the
+firmware.</li>
+</ul>
+<p>Despite its technical advantages, adoption of EFI was initially slow
+in the mainstream PC market. Operating system vendors and motherboard
+manufacturers were hesitant to adopt a standard owned exclusively by
+Intel, viewing it as a proprietary control mechanism.</p>
+<h3 id="the-formation-of-the-uefi-forum">The Formation of the UEFI
+Forum</h3>
+<p>Recognizing that universal adoption required industry-wide consensus
+and collective ownership, Intel decided to open the technology to the
+broader computing industry.</p>
+<p>In July 2005, Intel contributed the EFI 1.10 specification to a newly
+established non-profit industry trade group: the Unified EFI Forum (UEFI
+Forum). The founding board members included major competitors and
+partners across the industry, including Intel, AMD, Microsoft, Apple,
+Hewlett-Packard, IBM, Dell, American Megatrends (AMI), Phoenix
+Technologies, and Insyde Software.</p>
+<p>With this handover, the specification was renamed the Unified
+Extensible Firmware Interface (UEFI). The newly formed consortium
+released the UEFI 2.0 specification in early 2006, updating the original
+codebase with new cryptographic frameworks, improved modularity, and
+support for 64-bit x86 (x86-64) architecture alongside IA-64.</p>
+<h3 id="broad-industry-adoption">Broad Industry Adoption</h3>
+<p>The shift from a proprietary Intel specification to the open UEFI
+consortium triggered rapid industry adoption:</p>
+<ul>
+<li><strong>Apple:</strong> Adopted EFI/UEFI for its transition from
+PowerPC to Intel processors beginning in 2006.</li>
+<li><strong>Microsoft:</strong> Added native support for UEFI 2.0
+starting with Windows Vista Service Pack 1 and Windows Server 2008,
+later mandating UEFI with Secure Boot for Windows 8 certified
+hardware.</li>
+<li><strong>Firmware Vendors:</strong> Independent BIOS vendors migrated
+their core products to UEFI-compliant frameworks (such as the
+open-source TianoCore EDK II project).</li>
+</ul>
+<p>By the early 2010s, UEFI had replaced legacy BIOS as the default
+firmware interface across consumer motherboards, laptops, and enterprise
+data centers, completing the transition envisioned by the Intel Boot
+Initiative nearly two decades earlier.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/the-evolution-from-intel-boot-initiative-to-uefi';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

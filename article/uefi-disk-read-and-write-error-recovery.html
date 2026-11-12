@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Disk Read and Write Error Recovery - uefi</title>
+    <meta name="description" content="This article examines the error recovery mechanisms integrated into Unified Extensible Firmware Interface (UEFI) disk read and write operations. UEFI employs a modular, layered architecture to manage disk input/output (I/O) failures, relying on standard p">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-disk-read-and-write-error-recovery">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Disk Read and Write Error Recovery - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-disk-read-and-write-error-recovery" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article examines the error recovery mechanisms integrated into Unified Extensible Firmware Interface (UEFI) disk read and write operations. UEFI employs a modular, layered architecture to manage disk input/output (I/O) failures, relying on standard p" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-disk-read-and-write-error-recovery">UEFI Disk Read and
+Write Error Recovery</h1>
+<p>This article examines the error recovery mechanisms integrated into
+Unified Extensible Firmware Interface (UEFI) disk read and write
+operations. UEFI employs a modular, layered architecture to manage disk
+input/output (I/O) failures, relying on standard protocols such as
+<code>EFI_BLOCK_IO_PROTOCOL</code> and
+<code>EFI_BLOCK_IO2_PROTOCOL</code>. These mechanisms include status
+code propagation, synchronous software and hardware resets, underlying
+bus-level retransmissions, asynchronous transaction cancellation, and
+firmware-level boot failover paths to maintain system integrity during
+storage faults.</p>
+<h3
+id="protocol-level-error-detection-and-status-reporting">Protocol-Level
+Error Detection and Status Reporting</h3>
+<p>UEFI storage drivers detect I/O anomalies by returning specific
+<code>EFI_STATUS</code> codes from their read and write services. When a
+routine encounters a physical or logical failure, execution halts, and
+the function returns an explicit error condition to the caller rather
+than silently failing:</p>
+<ul>
+<li><strong><code>EFI_DEVICE_ERROR</code></strong>: Indicates that the
+physical device reported a hardware failure during the transaction.</li>
+<li><strong><code>EFI_TIMEOUT</code></strong>: Returned when a read or
+write operation does not complete within the controller's allocated
+operational window.</li>
+<li><strong><code>EFI_NO_MEDIA</code> /
+<code>EFI_MEDIA_CHANGED</code></strong>: Signals that the storage medium
+is missing, was physically removed, or was replaced during execution,
+necessitating a state refresh.</li>
+<li><strong><code>EFI_BAD_BUFFER_SIZE</code></strong>: Flags buffer
+alignment or size mismatches relative to the physical media block
+size.</li>
+</ul>
+<h3 id="the-reset-function">The Reset Function</h3>
+<p>The primary explicit recovery mechanism defined in
+<code>EFI_BLOCK_IO_PROTOCOL</code> is the <code>Reset()</code> service.
+When a read or write routine fails with a fatal error such as
+<code>EFI_DEVICE_ERROR</code>, the consumer (such as a filesystem driver
+or bootloader) invokes this function:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>EFI_STATUS Reset <span class="op">(</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  IN EFI_BLOCK_IO_PROTOCOL <span class="op">*</span>This<span class="op">,</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  IN BOOLEAN               ExtendedVerification</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="op">);</span></span></code></pre></div>
+<ul>
+<li><strong>Standard Reset
+(<code>ExtendedVerification = FALSE</code>)</strong>: Reinitializes the
+software state of the driver and sends a basic reset command to the
+storage controller, clearing pending queues and internal device
+states.</li>
+<li><strong>Extended Reset
+(<code>ExtendedVerification = TRUE</code>)</strong>: Instructs the
+driver to perform an exhaustive diagnostic and hardware initialization
+sequence. This can include power-cycling the communication link,
+resetting controller registers, and performing non-destructive
+self-tests on the drive.</li>
+</ul>
+<h3 id="hardware-and-transport-layer-retries">Hardware and
+Transport-Layer Retries</h3>
+<p>UEFI delegates low-level mechanical and electrical recovery to
+transport-specific drivers executing underneath the Block I/O interface.
+These intermediate drivers implement protocol-specific recovery before
+returning an error to higher layers:</p>
+<ul>
+<li><strong>NVMe Drivers</strong>: Implement submission and completion
+queue resets. If an individual NVMe command fails due to a transient
+link error or transport issue, the driver checks controller status
+registers, aborts the hanging command, and re-submits if allowable by
+the command status field.</li>
+<li><strong>SATA/AHCI Drivers</strong>: Manage Serial ATA task file
+errors and COMRESET signaling. If a command times out or encounters a
+cyclic redundancy check (CRC) error, the driver issues a port reset to
+re-establish SATA PHY layer communication.</li>
+<li><strong>USB Mass Storage Drivers</strong>: Utilize control endpoint
+pipe resets and mass storage reset recovery sequences (Clear Feature
+HALT requests) to clear stalled endpoints following failed Bulk-Out or
+Bulk-In transfers.</li>
+</ul>
+<h3 id="asynchronous-error-recovery-in-block-io-2">Asynchronous Error
+Recovery in Block I/O 2</h3>
+<p>The <code>EFI_BLOCK_IO2_PROTOCOL</code> provides non-blocking,
+asynchronous read and write capabilities. In this model, error handling
+relies on token-driven event notifications:</p>
+<ul>
+<li><strong>Token Status Monitoring</strong>: Each transaction binds to
+an <code>EFI_BLOCK_IO2_TOKEN</code>. If an operation fails
+asynchronously, the token's <code>TransactionStatus</code> updates to
+reflect the failure code, and an attached event triggers to notify the
+system.</li>
+<li><strong>Queue Management</strong>: If an error occurs on a specific
+read/write token, the driver halts processing of dependent requests to
+prevent data corruption, allowing the host application to cancel or
+clear remaining transactions.</li>
+</ul>
+<h3 id="media-state-tracking">Media State Tracking</h3>
+<p>The <code>EFI_BLOCK_IO_MEDIA</code> structure dynamically tracks disk
+health and configuration parameters. If an I/O routine encounters
+unexpected drive states, it flags changes via this structure:</p>
+<ul>
+<li><strong><code>MediaPresent</code></strong>: Tracks whether the disk
+is currently accessible.</li>
+<li><strong><code>MediaId</code></strong>: An integer identifier that
+increments whenever media is changed or re-initialized. High-level
+consumers compare <code>MediaId</code> values before retrying failed
+reads or writes to ensure they are not writing to a swapped or stale
+device.</li>
+</ul>
+<h3 id="firmware-boot-manager-failover">Firmware Boot Manager
+Failover</h3>
+<p>When disk read errors persist and cannot be resolved by driver-level
+resets, control shifts to the UEFI Boot Manager. If a critical boot
+payload cannot be read from the primary storage device:</p>
+<ol type="1">
+<li>The Boot Manager records the failure of the active
+<code>BootOrder</code> entry.</li>
+<li>The system executes a software fallback, walking to the next entry
+in the NVRAM boot sequence (e.g., secondary drives, network PXE boot, or
+a recovery shell).</li>
+<li>If no alternative target succeeds, the firmware triggers an error
+halt or displays diagnostic information to prevent corrupted state
+progression.</li>
+</ol></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-disk-read-and-write-error-recovery';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI and Device Trees on Non-ACPI Hardware - uefi</title>
+    <meta name="description" content="On non-ACPI hardware architectures such as ARM and RISC-V, combining UEFI with vendor-neutral Device Trees bridges the gap between standardized platform initialization and flexible hardware description. While the Unified Extensible Firmware Interface (UEF">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-and-device-trees-on-non-acpi-hardware">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI and Device Trees on Non-ACPI Hardware - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-and-device-trees-on-non-acpi-hardware" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="On non-ACPI hardware architectures such as ARM and RISC-V, combining UEFI with vendor-neutral Device Trees bridges the gap between standardized platform initialization and flexible hardware description. While the Unified Extensible Firmware Interface (UEF" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-and-device-trees-on-non-acpi-hardware">UEFI and Device
+Trees on Non-ACPI Hardware</h1>
+<p>On non-ACPI hardware architectures such as ARM and RISC-V, combining
+UEFI with vendor-neutral Device Trees bridges the gap between
+standardized platform initialization and flexible hardware description.
+While the Unified Extensible Firmware Interface (UEFI) standardizes the
+pre-boot environment, secure boot process, and operating system loading,
+Device Trees describe the platform's non-discoverable hardware
+components without relying on proprietary firmware layers. This article
+explores how vendor-neutral Device Trees operate alongside UEFI to
+decouple operating systems from specific silicon designs, streamline
+distribution maintenance, and establish a consistent, standards-based
+boot architecture on non-ACPI platforms.</p>
+<h3 id="the-challenge-of-non-acpi-hardware">The Challenge of Non-ACPI
+Hardware</h3>
+<p>Traditional x86 architectures rely on Advanced Configuration and
+Power Interface (ACPI) tables to enable operating systems to discover
+and manage hardware devices, power states, and system configurations.
+Modern embedded, edge, and mobile processors—particularly those built on
+ARM, RISC-V, and MIPS architectures—often feature non-discoverable
+hardware. In these systems, memory-mapped I/O (MMIO) registers, clocks,
+interrupt routing, and power domains cannot be probed dynamically over a
+bus like PCIe or USB.</p>
+<p>Implementing full ACPI on these systems can be complex, bloated, and
+impractical for cost- or resource-constrained boards. Historically, this
+led to fragmented, vendor-specific board files or hardcoded kernel
+forks, making it difficult to run generic operating system distributions
+across different hardware designs.</p>
+<h3 id="defining-the-roles-uefi-vs-device-tree">Defining the Roles: UEFI
+vs. Device Tree</h3>
+<p>To solve hardware fragmentation, modern embedded standards divide
+responsibilities between UEFI and Device Trees:</p>
+<ul>
+<li><strong>UEFI (Unified Extensible Firmware Interface):</strong>
+Standardizes platform initialization, boot variables, boot services, and
+runtime services. It exposes a consistent programmatic interface to OS
+loaders (such as GRUB or systemd-boot) and implements security features
+like UEFI Secure Boot.</li>
+<li><strong>Device Tree (DT):</strong> Provides a structured, static
+data representation of the hardware topology. Stored in a compiled
+format (<code>.dtb</code>), it details memory maps, peripheral
+addresses, interrupt assignments, and driver bindings that the OS kernel
+requires to initialize drivers for non-discoverable devices.</li>
+</ul>
+<p>In this architecture, UEFI initializes core resources (such as DRAM
+and standard storage devices), locates the compiled Device Tree blob,
+applies any needed runtime fixups or overlays, and passes both the
+system control and the Device Tree to the OS bootloader or kernel.</p>
+<h3 id="the-importance-of-vendor-neutral-device-trees">The Importance of
+Vendor-Neutral Device Trees</h3>
+<p>For a Device Tree to function effectively with standardized firmware,
+it must be vendor-neutral. A vendor-neutral Device Tree adheres to the
+official Devicetree Specification and uses upstream, standardized
+hardware bindings rather than proprietary properties tailored to a
+single vendor's customized kernel.</p>
+<ol type="1">
+<li><strong>Single-Image OS Support:</strong> When Device Trees use
+standard bindings, an operating system distributor (like Debian, Fedora,
+or openSUSE) can build a single, generic kernel binary that works across
+dozens of boards from different manufacturers, matching drivers solely
+on standardized <code>compatible</code> strings.</li>
+<li><strong>Long-Term Maintainability:</strong> Proprietary Device Trees
+often force developers to maintain out-of-tree kernels. Vendor-neutral
+trees allow systems to run mainline, upstream kernels, drastically
+reducing the cost and security risks of maintaining outdated board
+support packages (BSPs).</li>
+<li><strong>Clean Separation of Concerns:</strong> Firmware vendors
+focus on platform initialization and hardware abstraction, while OS
+vendors focus on kernel and user-space features, minimizing the need for
+coordination between board makers and software maintainers.</li>
+</ol>
+<h3 id="industry-standardization-ebbr-and-systemready">Industry
+Standardization: EBBR and SystemReady</h3>
+<p>The synergy between UEFI and Device Trees is codified by industry
+standards, notably the Embedded Base Boot Requirements (EBBR)
+specification and the Arm SystemReady IR (IoT Ready) compliance
+program.</p>
+<p>EBBR establishes that platforms are not required to implement ACPI to
+be considered standard-compliant; instead, they can provide a
+lightweight UEFI interface alongside an EBBR-compliant Device Tree. This
+standard guarantees that if a system satisfies these requirements, any
+standard Linux, BSD, or real-time operating system with generic Device
+Tree and UEFI support will boot out of the box.</p>
+<h3 id="conclusion">Conclusion</h3>
+<p>On non-ACPI hardware, vendor-neutral Device Trees and UEFI represent
+a complementary pair rather than competing technologies. UEFI brings
+procedural consistency to system initialization and OS loading, while
+vendor-neutral Device Trees provide the structured, OS-agnostic data
+required to control non-discoverable hardware. Together, they eliminate
+the need for fragmented, single-use firmware ecosystems and provide
+non-ACPI platforms with the plug-and-play boot predictability
+traditionally reserved for enterprise servers and x86 PCs.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-and-device-trees-on-non-acpi-hardware';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Understanding the UEFI Graphics Output Protocol - uefi</title>
+    <meta name="description" content="The Graphics Output Protocol (GOP) is the standard display mechanism within the Unified Extensible Firmware Interface (UEFI) environment, replacing legacy BIOS VGA and VESA BIOS Extensions. This article details what GOP is, how it operates in modern firmw">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/understanding-the-uefi-graphics-output-protocol">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Understanding the UEFI Graphics Output Protocol - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/understanding-the-uefi-graphics-output-protocol" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Graphics Output Protocol (GOP) is the standard display mechanism within the Unified Extensible Firmware Interface (UEFI) environment, replacing legacy BIOS VGA and VESA BIOS Extensions. This article details what GOP is, how it operates in modern firmw" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="understanding-the-uefi-graphics-output-protocol">Understanding
+the UEFI Graphics Output Protocol</h1>
+<p>The Graphics Output Protocol (GOP) is the standard display mechanism
+within the Unified Extensible Firmware Interface (UEFI) environment,
+replacing legacy BIOS VGA and VESA BIOS Extensions. This article details
+what GOP is, how it operates in modern firmware, and the step-by-step
+process UEFI applications use to locate the protocol, configure display
+resolutions, and render pixels directly to a physical screen.</p>
+<h3 id="what-is-the-graphics-output-protocol">What is the Graphics
+Output Protocol?</h3>
+<p>The Graphics Output Protocol (GOP) is a UEFI boot-services protocol
+that provides a runtime-independent, hardware-agnostic interface for
+rendering graphics. In legacy BIOS systems, bootloaders and early-stage
+software relied on 16-bit real-mode interrupts (such as
+<code>INT 10h</code>) and VESA BIOS Extensions (VBE) to display
+graphics. GOP modernizes this by running in protected or long mode
+(32-bit or 64-bit), offering direct access to a linear framebuffer and
+high-resolution display modes without requiring specialized GPU
+drivers.</p>
+<p>GOP remains active only during the UEFI boot phase. Once an operating
+system calls <code>ExitBootServices()</code>, control of the display
+hardware transitions away from UEFI GOP to native OS-level graphics
+device drivers.</p>
+<h3 id="how-uefi-applications-locate-gop">How UEFI Applications Locate
+GOP</h3>
+<p>A UEFI application interacts with GOP through the UEFI Boot Services
+table. To initialize graphics:</p>
+<ol type="1">
+<li><strong>Locate the Protocol:</strong> The application calls
+<code>gBS-&gt;LocateProtocol()</code> or
+<code>gBS-&gt;HandleProtocol()</code>, passing the unique GUID for the
+Graphics Output Protocol
+(<code>EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID</code>).</li>
+<li><strong>Obtain the Interface Pointer:</strong> Firmware returns a
+pointer to an <code>EFI_GRAPHICS_OUTPUT_PROTOCOL</code> structure
+containing pointers to protocol functions and display mode
+metadata.</li>
+</ol>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>EFI_GRAPHICS_OUTPUT_PROTOCOL <span class="op">*</span>Gop<span class="op">;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>EFI_GUID GopGuid <span class="op">=</span> EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID<span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>EFI_STATUS Status <span class="op">=</span> gBS<span class="op">-&gt;</span>LocateProtocol<span class="op">(&amp;</span>GopGuid<span class="op">,</span> NULL<span class="op">,</span> <span class="op">(</span>VOID<span class="op">**)&amp;</span>Gop<span class="op">);</span></span></code></pre></div>
+<h3 id="querying-and-setting-display-modes">Querying and Setting Display
+Modes</h3>
+<p>The GOP structure contains a <code>Mode</code> pointer, which houses
+the current display configuration:</p>
+<ul>
+<li><code>MaxMode</code>: The total number of video modes supported by
+the hardware.</li>
+<li><code>Mode</code>: The index of the currently active video
+mode.</li>
+<li><code>Info</code>: An
+<code>EFI_GRAPHICS_OUTPUT_MODE_INFORMATION</code> structure containing
+horizontal and vertical resolution, the pixel format, and the number of
+pixels per scanline.</li>
+</ul>
+<p>If the default resolution is unsuitable, the application can
+enumerate modes by passing mode indices to
+<code>Gop-&gt;QueryMode()</code>. Once the desired resolution is
+identified, the application applies it by calling
+<code>Gop-&gt;SetMode()</code>.</p>
+<h3 id="how-pixels-are-drawn-to-the-screen">How Pixels Are Drawn to the
+Screen</h3>
+<p>UEFI applications draw pixels to the screen using one of two primary
+methods: direct linear framebuffer access or the Block Transfer
+(<code>Blt</code>) function.</p>
+<h4 id="method-1-writing-directly-to-the-linear-framebuffer">Method 1:
+Writing Directly to the Linear Framebuffer</h4>
+<p>The most common approach for performance-sensitive tasks, such as
+custom bootloaders or early GUI rendering, is writing directly to video
+memory.</p>
+<ol type="1">
+<li><strong>Get the Base Address:</strong> The physical memory address
+of the display buffer is exposed at
+<code>Gop-&gt;Mode-&gt;FrameBufferBase</code>.</li>
+<li><strong>Determine Pixel Format:</strong> The
+<code>Info-&gt;PixelFormat</code> field indicates the byte ordering,
+commonly <code>PixelBlueGreenRedReserved8BitPerColor</code> (BGRA) or
+<code>PixelRedGreenBlueReserved8BitPerColor</code> (RGBA), with 32 bits
+(4 bytes) per pixel.</li>
+<li><strong>Calculate the Pixel Offset:</strong> Due to hardware
+alignment, display rows often include padding. Applications must use
+<code>PixelsPerScanLine</code> rather than
+<code>HorizontalResolution</code> to calculate memory offsets:</li>
+</ol>
+<p><span class="math display">\[\text{Offset} = (Y \times
+\text{PixelsPerScanLine} + X) \times 4\]</span></p>
+<ol start="4" type="1">
+<li><strong>Write the Color Value:</strong> The application writes the
+32-bit color data directly to the memory address:</li>
+</ol>
+<div class="sourceCode" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>UINT32 <span class="op">*</span>Framebuffer <span class="op">=</span> <span class="op">(</span>UINT32<span class="op">*)</span>Gop<span class="op">-&gt;</span>Mode<span class="op">-&gt;</span>FrameBufferBase<span class="op">;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>UINT32 Index <span class="op">=</span> <span class="op">(</span>Y <span class="op">*</span> Gop<span class="op">-&gt;</span>Mode<span class="op">-&gt;</span>Info<span class="op">-&gt;</span>PixelsPerScanLine<span class="op">)</span> <span class="op">+</span> X<span class="op">;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">// Write a 32-bit color value (e.g., Red in a 0x00RRGGBB/BGR format depending on layout)</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>Framebuffer<span class="op">[</span>Index<span class="op">]</span> <span class="op">=</span> <span class="bn">0x00FF0000</span><span class="op">;</span></span></code></pre></div>
+<h4 id="method-2-the-block-transfer-blt-function">Method 2: The Block
+Transfer (<code>Blt</code>) Function</h4>
+<p>GOP also provides a built-in software blit service via
+<code>Gop-&gt;Blt()</code>. This function allows the application to
+manipulate rectangular regions of the screen without manually writing to
+the framebuffer.</p>
+<p>The <code>Blt</code> function supports several operations via the
+<code>EFI_GRAPHICS_OUTPUT_BLT_OPERATION</code> enum:</p>
+<ul>
+<li><strong><code>EfiBltVideoFill</code></strong>: Fills a specified
+rectangular area on the screen with a single solid color.</li>
+<li><strong><code>EfiBltBufferToVideo</code></strong>: Copies pixel data
+from a system memory buffer onto the display.</li>
+<li><strong><code>EfiBltVideoToBltBuffer</code></strong>: Reads a
+rectangular area of pixels from the display back into system
+memory.</li>
+<li><strong><code>EfiBltVideoToVideo</code></strong>: Copies a rectangle
+from one location on the screen directly to another, useful for
+scrolling console text.</li>
+</ul>
+<p>Using direct framebuffer writes provides faster rendering for dynamic
+graphics, whereas <code>Blt</code> offers a simple, standardized
+abstraction for basic UI drawing and buffer swapping.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/understanding-the-uefi-graphics-output-protocol';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

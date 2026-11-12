@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EFI 1.x to UEFI 2.x: Key Milestones - uefi</title>
+    <meta name="description" content="The transition from Extensible Firmware Interface (EFI) 1.x to Unified EFI (UEFI) 2.x represents the evolution of modern PC firmware from an Intel-driven initiative into a unified industry standard. This article explores the defining milestones of that sh">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/efi-1-x-to-uefi-2-x-key-milestones">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="EFI 1.x to UEFI 2.x: Key Milestones - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/efi-1-x-to-uefi-2-x-key-milestones" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The transition from Extensible Firmware Interface (EFI) 1.x to Unified EFI (UEFI) 2.x represents the evolution of modern PC firmware from an Intel-driven initiative into a unified industry standard. This article explores the defining milestones of that sh" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="efi-1x-to-uefi-2x-key-milestones">EFI 1.x to UEFI 2.x: Key
+Milestones</h1>
+<p>The transition from Extensible Firmware Interface (EFI) 1.x to
+Unified EFI (UEFI) 2.x represents the evolution of modern PC firmware
+from an Intel-driven initiative into a unified industry standard. This
+article explores the defining milestones of that shift, including the
+formation of the UEFI Forum, the release of the UEFI 2.0 and 2.1
+specifications, and the technical advancements in cryptography, 64-bit
+architecture, and networking that permanently replaced legacy PC
+BIOS.</p>
+<h3 id="the-formation-of-the-uefi-forum-2005">The Formation of the UEFI
+Forum (2005)</h3>
+<p>Prior to 2005, the specification was solely maintained by Intel as
+EFI, reaching version 1.10 in late 2002. Recognizing that broader
+industry adoption required vendor neutrality, Intel contributed the EFI
+1.10 specification to a newly formed trade group: the Unified EFI Forum.
+Founded by major technology leaders including AMD, American Megatrends
+(AMI), Apple, Dell, HP, IBM, Intel, Microsoft, and Phoenix Technologies,
+this coalition assumed collective ownership of the standard and
+rebranded it as UEFI.</p>
+<h3 id="the-release-of-the-uefi-20-specification-2006">The Release of
+the UEFI 2.0 Specification (2006)</h3>
+<p>In early 2006, the UEFI Forum released the UEFI 2.0 specification,
+marking the formal shift to the 2.x generation. This milestone
+accomplished several critical tasks:</p>
+<ul>
+<li><strong>Vendor-Agnostic Refactoring:</strong> Removed
+Intel-proprietary language, structures, and legacy dependencies present
+in EFI 1.10 to ensure multi-vendor interoperability across diverse
+processor architectures.</li>
+<li><strong>Expanded Processor Architecture Support:</strong>
+Standardized execution environments for AMD64 (x86-64) and Itanium,
+streamlining the path for full 64-bit platform initialization.</li>
+<li><strong>Streamlined Code Base:</strong> Cleaned up obsolete data
+tables and deprecated archaic calling conventions left over from the
+original EFI architecture.</li>
+</ul>
+<h3 id="the-release-of-uefi-21-and-feature-expansion-2007">The Release
+of UEFI 2.1 and Feature Expansion (2007)</h3>
+<p>While UEFI 2.0 established the new governance and architectural
+baseline, UEFI 2.1—released in 2007—introduced crucial functional
+enhancements that distinguished modern firmware from older EFI
+implementations:</p>
+<ul>
+<li><strong>Human Interface Infrastructure (HII):</strong> Introduced a
+standardized framework for configuration management, localized strings,
+and user input, establishing a consistent look and feel across setup
+utilities.</li>
+<li><strong>Network Modernization:</strong> Added support for IPv6
+networking protocols and improved pre-boot networking stacks for Preboot
+Execution Environment (PXE) booting.</li>
+<li><strong>Cryptographic Foundation and Authenticated
+Variables:</strong> Introduced authenticated variables and preliminary
+cryptographic services, which later served as the foundation for modern
+platform security features such as Secure Boot.</li>
+</ul>
+<h3 id="the-formal-deprecation-of-efi-110">The Formal Deprecation of EFI
+1.10</h3>
+<p>Following the broad adoption of the UEFI 2.x specifications, the UEFI
+Forum formally superseded EFI 1.10. Operating system vendors, led by
+Microsoft with 64-bit versions of Windows Vista (Service Pack 1) and
+Windows Server 2008, committed firmware compatibility exclusively to the
+UEFI 2.x specification. This alignment by operating system developers,
+independent BIOS vendors (IBVs), and original equipment manufacturers
+(OEMs) cemented the 2.x lineage as the definitive standard for pre-boot
+environments worldwide.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/efi-1-x-to-uefi-2-x-key-milestones';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

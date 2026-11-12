@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Testing Network Connectivity in UEFI Shell - uefi</title>
+    <meta name="description" content="The UEFI Shell provides a powerful pre-boot environment for system administration, hardware validation, and diagnostics before any operating system loads. This article explains how to test network connectivity directly from the UEFI Shell by identifying a">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/testing-network-connectivity-in-uefi-shell">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Testing Network Connectivity in UEFI Shell - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/testing-network-connectivity-in-uefi-shell" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The UEFI Shell provides a powerful pre-boot environment for system administration, hardware validation, and diagnostics before any operating system loads. This article explains how to test network connectivity directly from the UEFI Shell by identifying a" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="testing-network-connectivity-in-uefi-shell">Testing Network
+Connectivity in UEFI Shell</h1>
+<p>The UEFI Shell provides a powerful pre-boot environment for system
+administration, hardware validation, and diagnostics before any
+operating system loads. This article explains how to test network
+connectivity directly from the UEFI Shell by identifying active network
+interfaces, configuring IP parameters using DHCP or static assignment,
+and utilizing network commands such as <code>ifconfig</code> and
+<code>ping</code> to verify communication over supported UEFI networking
+protocols.</p>
+<h2 id="1-prerequisites-and-bios-configuration">1. Prerequisites and
+BIOS Configuration</h2>
+<p>Before testing the network in the UEFI Shell, ensure the platform's
+firmware network stack is enabled:</p>
+<ol type="1">
+<li>Enter your system BIOS/UEFI setup.</li>
+<li>Navigate to the <strong>Network Stack</strong> or
+<strong>Advanced</strong> configuration menu.</li>
+<li>Enable <strong>Network Stack</strong>, as well as <strong>IPv4 PXE
+Support</strong> and/or <strong>IPv6 PXE Support</strong>.</li>
+<li>Save changes and boot into the UEFI Shell.</li>
+</ol>
+<h2 id="2-identify-network-interfaces">2. Identify Network
+Interfaces</h2>
+<p>Once in the UEFI Shell, check if the network drivers are loaded and
+locate the assigned network device names:</p>
+<pre class="text"><code>Shell&gt; ifconfig -l</code></pre>
+<p>This command lists all available network interfaces (typically
+designated as <code>eth0</code>, <code>eth1</code>, etc.) alongside
+their MAC addresses and current configuration status.</p>
+<p>If no interfaces appear, check whether the underlying Simple Network
+Protocol (SNP) and Universal Network Device Interface (UNDI) drivers are
+active:</p>
+<pre class="text"><code>Shell&gt; drivers
+Shell&gt; devtree</code></pre>
+<p>Look for network controllers such as Intel (e1000e, igb) or Realtek
+drivers. If the drivers are missing, they must be loaded manually via
+the <code>load</code> command:</p>
+<pre class="text"><code>Shell&gt; load fs0:\path\to\driver.efi</code></pre>
+<h2 id="3-configure-the-network-interface">3. Configure the Network
+Interface</h2>
+<p>You must configure an interface with valid IP settings before
+transmitting packets.</p>
+<h3 id="option-a-automatic-configuration-via-dhcp">Option A: Automatic
+Configuration via DHCP</h3>
+<p>To obtain an IP address automatically over IPv4:</p>
+<pre class="text"><code>Shell&gt; ifconfig -s eth0 dhcp</code></pre>
+<h3 id="option-b-static-ip-assignment">Option B: Static IP
+Assignment</h3>
+<p>To assign a static IPv4 address, netmask, and default gateway:</p>
+<pre class="text"><code>Shell&gt; ifconfig -s eth0 static &lt;IP_ADDRESS&gt; &lt;SUBNET_MASK&gt; &lt;GATEWAY_IP&gt;</code></pre>
+<p>Example:</p>
+<pre class="text"><code>Shell&gt; ifconfig -s eth0 static 192.168.1.50 255.255.255.0 192.168.1.1</code></pre>
+<h3 id="verify-configuration">Verify Configuration</h3>
+<p>To confirm that the settings were applied correctly, display the
+interface details:</p>
+<pre class="text"><code>Shell&gt; ifconfig -l eth0</code></pre>
+<p>The output displays the assigned IP address, subnet mask, gateway,
+and configuration method.</p>
+<h2 id="4-test-connectivity-with-ping">4. Test Connectivity with
+Ping</h2>
+<p>With the interface configured, use the <code>ping</code> utility to
+test ICMP communication across the local subnet or out to an external
+gateway:</p>
+<pre class="text"><code>Shell&gt; ping -n 4 192.168.1.1</code></pre>
+<p>Command options:</p>
+<ul>
+<li><code>-n &lt;count&gt;</code>: Specifies the number of echo request
+packets to send (default is usually 10).</li>
+<li><code>-l &lt;size&gt;</code>: Specifies the buffer size in bytes for
+the packet payload.</li>
+</ul>
+<p>A successful response outputs round-trip times and a 0% packet loss
+summary, confirming that the physical link, UNDI driver, SNP layer, MNP
+(Managed Network Protocol), ARP, and IPv4 layers are functional.</p>
+<h2 id="5-clear-configuration">5. Clear Configuration</h2>
+<p>After completing tests, release or clear the network settings if
+needed:</p>
+<pre class="text"><code>Shell&gt; ifconfig -c eth0</code></pre>
+<p>This command clears the current static or DHCP-assigned configuration
+from the specified adapter.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/testing-network-connectivity-in-uefi-shell';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

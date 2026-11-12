@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Using UEFI Shell Map Command for Optical Media - uefi</title>
+    <meta name="description" content="This article explains the role and utility of the UEFI Shell map command when interacting with optical media such as CDs, DVDs, and BDs. It details how the command identifies optical drives within the pre-boot environment, refreshes device tables to detec">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/using-uefi-shell-map-command-for-optical-media">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Using UEFI Shell Map Command for Optical Media - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/using-uefi-shell-map-command-for-optical-media" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article explains the role and utility of the UEFI Shell map command when interacting with optical media such as CDs, DVDs, and BDs. It details how the command identifies optical drives within the pre-boot environment, refreshes device tables to detec" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="using-uefi-shell-map-command-for-optical-media">Using UEFI Shell
+Map Command for Optical Media</h1>
+<p>This article explains the role and utility of the UEFI Shell
+<code>map</code> command when interacting with optical media such as
+CDs, DVDs, and BDs. It details how the command identifies optical drives
+within the pre-boot environment, refreshes device tables to detect newly
+inserted discs, and assigns file system handles necessary for manual
+booting, firmware updates, and system recovery.</p>
+<p>In the Unified Extensible Firmware Interface (UEFI) Shell, storage
+devices are not assigned traditional operating system drive letters.
+Instead, the environment assigns short device mappings such as
+<code>fs0:</code>, <code>fs1:</code> for accessible file systems, or
+<code>blk0:</code>, <code>blk1:</code> for raw block devices. The
+primary purpose of the <code>map</code> command is to list, create, or
+modify these mappings so users can interact with connected hardware.</p>
+<p>When dealing with optical media, the <code>map</code> command serves
+three critical functions:</p>
+<h3 id="1-identifying-the-optical-drive">1. Identifying the Optical
+Drive</h3>
+<p>Executing <code>map</code> without arguments outputs a table of all
+recognized devices alongside their complete UEFI device paths. Optical
+drives are easily identified within this list by searching for device
+path strings containing identifiers such as <code>CDROM</code>,
+<code>SATA</code>, or <code>ATAPI</code>. This output informs the user
+whether the optical hardware is recognized by the UEFI firmware and what
+mapping alias (<code>blk</code> or <code>fs</code>) has been assigned to
+it.</p>
+<h3 id="2-detecting-newly-inserted-discs-map--r">2. Detecting Newly
+Inserted Discs (<code>map -r</code>)</h3>
+<p>Optical drives utilize removable media. If a disc is inserted after
+the UEFI Shell has already initialized, the shell does not automatically
+detect the new file system on that media. Executing <code>map -r</code>
+forces the UEFI subsystem to refresh and rescan all storage controllers
+and devices. This rescan probes the optical drive for valid media; if a
+supported file system (such as an El Torito boot partition or a standard
+ISO 9660/UDF volume with UEFI drivers) is detected, the shell
+dynamically creates a new <code>fs</code> mapping pointing directly to
+the disc.</p>
+<h3 id="3-enabling-navigation-and-execution">3. Enabling Navigation and
+Execution</h3>
+<p>Once the <code>map</code> command assigns a file system alias (for
+example, <code>fs2:</code>) to the optical disc, the user can navigate
+to the media simply by entering the alias name:</p>
+<pre class="text"><code>fs2:</code></pre>
+<p>From this prompt, standard file navigation commands such as
+<code>ls</code> and <code>cd</code> become available. Administrators can
+inspect the contents of the optical disc and directly execute EFI
+binaries (such as <code>\EFI\BOOT\BOOTX64.EFI</code>) to launch
+installation media, diagnostic suites, or offline recovery
+environments.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/using-uefi-shell-map-command-for-optical-media';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

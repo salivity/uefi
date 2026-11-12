@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Role of PEI Modules in UEFI Initialization - uefi</title>
+    <meta name="description" content="Pre-EFI Initialization Modules (PEIMs) are critical components that operate during the early Pre-EFI Initialization (PEI) phase of the UEFI boot process. Because main system memory is not yet available when the system powers on, these small, specialized d">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/role-of-pei-modules-in-uefi-initialization">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Role of PEI Modules in UEFI Initialization - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/role-of-pei-modules-in-uefi-initialization" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Pre-EFI Initialization Modules (PEIMs) are critical components that operate during the early Pre-EFI Initialization (PEI) phase of the UEFI boot process. Because main system memory is not yet available when the system powers on, these small, specialized d" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="role-of-pei-modules-in-uefi-initialization">Role of PEI Modules
+in UEFI Initialization</h1>
+<p>Pre-EFI Initialization Modules (PEIMs) are critical components that
+operate during the early Pre-EFI Initialization (PEI) phase of the UEFI
+boot process. Because main system memory is not yet available when the
+system powers on, these small, specialized drivers execute in a
+temporary memory environment to configure critical platform hardware,
+initialize system RAM, and package system state data into Hand-Off
+Blocks (HOBs). By handling these foundational tasks, PEIMs prepare the
+platform for the subsequent Driver Execution Environment (DXE) phase,
+enabling the full execution of complex drivers and the operating system
+loader.</p>
+<p>The PEI phase begins immediately after the Security (SEC) phase,
+where the platform verifies initial code integrity and configures the
+processor's L1/L2 cache to act as temporary storage, known as
+Cache-as-RAM (CAR). Operating under the management of the PEI Foundation
+(or PEI Core), PEIMs execute within this severely constrained memory
+footprint. Their primary objective is to configure the minimum set of
+hardware components required to wake the system and initialize permanent
+physical memory.</p>
+<p>Inter-module communication during this phase is governed by
+PEIM-to-PEIM Interfaces (PPIs). Since the formal protocol database used
+in later UEFI stages does not yet exist, PPIs serve as lightweight
+service interfaces. One PEIM can publish a PPI to provide specialized
+hardware services, such as register access or GPIO manipulation, which
+other PEIMs can locate and consume. This modular structure allows
+hardware vendors to isolate chip-specific code, such as memory
+controllers or CPU power management, into distinct, reusable units.</p>
+<p>One of the most vital tasks handled by a dedicated memory
+initialization PEIM is training and establishing system DRAM. This
+process includes detecting memory modules, configuring timings,
+voltages, and bus signals, and verifying stability. Once the memory
+controller is active and system memory is online, the PEI Core
+transitions execution from Cache-as-RAM to actual physical memory,
+dramatically expanding the execution space.</p>
+<p>In addition to memory training, PEIMs determine the boot path,
+distinguishing between a cold boot, warm restart, or an S3 sleep-state
+resume. If an S3 resume is detected, specific PEIMs restore the saved
+system state and bypass subsequent standard boot phases to quickly
+return control to the operating system.</p>
+<p>Finally, as the PEI phase nears completion, PEIMs synthesize the
+platform’s hardware status into a structured data list known as Hand-Off
+Blocks (HOBs). These HOBs describe the physical memory map, discovered
+hardware resources, and firmware volumes. With the HOB list finalized
+and main memory fully operational, the final architectural PEIM locates
+and invokes the DXE Core, successfully passing control to the broader
+UEFI driver environment.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/role-of-pei-modules-in-uefi-initialization';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

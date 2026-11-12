@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI DXE Phase: Driver Discovery and Execution - uefi</title>
+    <meta name="description" content="The Driver Execution Environment (DXE) phase is the central stage of the Unified Extensible Firmware Interface (UEFI) boot flow, responsible for initializing the vast majority of system hardware and setting up runtime services. This article explains how t">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-dxe-phase-driver-discovery-and-execution">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI DXE Phase: Driver Discovery and Execution - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-dxe-phase-driver-discovery-and-execution" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Driver Execution Environment (DXE) phase is the central stage of the Unified Extensible Firmware Interface (UEFI) boot flow, responsible for initializing the vast majority of system hardware and setting up runtime services. This article explains how t" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-dxe-phase-driver-discovery-and-execution">UEFI DXE Phase:
+Driver Discovery and Execution</h1>
+<p>The Driver Execution Environment (DXE) phase is the central stage of
+the Unified Extensible Firmware Interface (UEFI) boot flow, responsible
+for initializing the vast majority of system hardware and setting up
+runtime services. This article explains how the DXE Foundation
+initializes, processes the Hand-Off Block (HOB) list from the preceding
+Pre-EFI Initialization (PEI) phase, and uses the DXE Dispatcher to
+discover, evaluate, and execute firmware drivers stored in Firmware
+Volumes (FVs) through an event-driven, dependency-based model.</p>
+<h3 id="the-dxe-architecture-and-entry">The DXE Architecture and
+Entry</h3>
+<p>The DXE phase begins immediately after the PEI phase completes. The
+PEI Foundation produces the Hand-Off Block (HOB) list, which contains
+critical system state information such as physical memory maps, firmware
+volume locations, and hardware-specific configurations. Control is
+handed over to the DXE Foundation—a non-architectural core engine
+compiled as a single binary.</p>
+<p>Upon execution, the DXE Foundation establishes core services,
+including:</p>
+<ul>
+<li><strong>Boot Services:</strong> Memory allocation, event timers, and
+protocol database management.</li>
+<li><strong>Runtime Services:</strong> NVRAM variable access, time
+services, and system reset functionality.</li>
+<li><strong>Protocol Database:</strong> A central registry mapping
+Unique Identifiers (GUIDs) to data structures and function
+pointers.</li>
+</ul>
+<h3 id="driver-storage-and-firmware-volumes">Driver Storage and Firmware
+Volumes</h3>
+<p>UEFI drivers reside within flash memory encapsulated inside one or
+more Firmware Volumes (FVs). These FVs are formatted using the Firmware
+File System (FFS). Individual drivers are packaged as FFS files with
+specific attributes, typically marked with the file type
+<code>EFI_FV_FILETYPE_DRIVER</code> or
+<code>EFI_FV_FILETYPE_DXE_CORE</code>.</p>
+<p>Within each driver file, the binary contains:</p>
+<ol type="1">
+<li><strong>The Executable Image:</strong> Usually a PE32/PE32+
+formatted binary containing the driver's logic.</li>
+<li><strong>The Dependency Expression (Depex) Section:</strong> A
+compiled binary stream defining the prerequisites that must exist before
+the driver can safely run.</li>
+</ol>
+<h3 id="driver-discovery-the-role-of-the-dxe-dispatcher">Driver
+Discovery: The Role of the DXE Dispatcher</h3>
+<p>The DXE Dispatcher is the component inside the DXE Foundation
+responsible for scheduling and executing drivers. It discovers drivers
+through a systematic scanning process:</p>
+<ol type="1">
+<li><strong>Locating Firmware Volumes:</strong> The Dispatcher examines
+the HOB list to identify all published Firmware Volumes. It also listens
+for <code>EFI_FIRMWARE_VOLUME2_PROTOCOL</code> instances produced during
+the boot process to discover additional volumes, such as option ROMs on
+expansion cards.</li>
+<li><strong>Parsing the FFS Files:</strong> The Dispatcher iterates
+through each volume, inspecting the file headers to locate unexecuted
+drivers.</li>
+<li><strong>Building the Execution Queue:</strong> The Dispatcher adds
+discovered drivers to an internal list of candidate images, categorizing
+their dependencies and execution states.</li>
+</ol>
+<h3 id="prioritization-and-dependency-evaluation">Prioritization and
+Dependency Evaluation</h3>
+<p>To avoid race conditions and ensure correct hardware initialization
+order, the Dispatcher relies on two mechanisms: the <code>aPRIORI</code>
+file and Dependency Expressions (DEPEX).</p>
+<h4 id="the-apriori-file">The aPRIORI File</h4>
+<p>Firmware engineers can include an optional <code>aPRIORI</code> file
+within a Firmware Volume. This file lists GUIDs of critical drivers that
+must be executed first, in an explicit, linear order, bypassing
+dependency evaluation. This is commonly used to load fundamental
+services like memory managers or architectural protocols required by the
+Dispatcher itself.</p>
+<h4 id="dependency-expressions-depex">Dependency Expressions
+(DEPEX)</h4>
+<p>For all drivers not governed by an <code>aPRIORI</code> list, the
+Dispatcher evaluates their DEPEX section. A DEPEX consists of byte-code
+instructions representing Boolean logic (such as <code>AND</code>,
+<code>OR</code>, <code>NOT</code>, <code>TRUE</code>, <code>END</code>)
+evaluated against the GUIDs registered in the central Protocol
+Database.</p>
+<p>For example, a PCI host controller driver might have a DEPEX
+requiring the <code>EFI_CPU_IO2_PROTOCOL</code>. The Dispatcher reads
+this expression and queries the Protocol Database. If the protocol is
+not present, the expression evaluates to <code>FALSE</code>, and the
+driver remains deferred.</p>
+<h3 id="execution-and-the-protocol-loop">Execution and the Protocol
+Loop</h3>
+<p>Once the Dispatcher evaluates a driver's DEPEX to <code>TRUE</code>,
+execution proceeds through the following steps:</p>
+<ol type="1">
+<li><strong>Loading the Image:</strong> The Dispatcher uses the
+<code>LoadImage()</code> Boot Service to copy the PE32+ driver into
+system memory, fix up relocations, and assign it an
+<code>EFI_HANDLE</code>.</li>
+<li><strong>Calling the Entry Point:</strong> The Dispatcher invokes
+<code>StartImage()</code>, calling the driver's standard entry function
+(<code>EFI_IMAGE_ENTRY_POINT</code>).</li>
+<li><strong>Protocol Registration:</strong> During its execution, the
+driver initializes its hardware target and registers one or more
+protocols in the Protocol Database using
+<code>InstallProtocolInterface()</code> or
+<code>InstallMultipleProtocolInterfaces()</code>.</li>
+<li><strong>Re-evaluating the Queue:</strong> The addition of new
+protocols triggers the Dispatcher to re-evaluate the DEPEX expressions
+of all deferred drivers. A driver that previously evaluated to
+<code>FALSE</code> may now evaluate to <code>TRUE</code>.</li>
+</ol>
+<p>This process runs as an iterative loop. The Dispatcher continuously
+scans the firmware volumes, executes drivers whose dependencies are
+satisfied, publishes their new protocols, and evaluates deferred drivers
+until no more drivers can be executed.</p>
+<h3 id="transition-to-boot-device-selection-bds">Transition to Boot
+Device Selection (BDS)</h3>
+<p>The DXE phase ends when the Dispatcher can execute no further drivers
+and all core Architectural Protocols (such as Timer, Real Time Clock,
+Watchdog, and Variable Services) are installed. At this point, the
+Dispatcher passes execution control to the BDS Architectural Protocol
+(<code>EFI_BDS_ARCH_PROTOCOL</code>), transferring the platform into the
+Boot Device Selection phase to detect boot media and load the operating
+system.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-dxe-phase-driver-discovery-and-execution';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Applies CPU Microcode Updates at Boot - uefi</title>
+    <meta name="description" content="CPU microcode updates are hardware errata patches loaded into a processor&#39;s volatile static RAM (SRAM) every time a system powers on. During the earliest phases of a UEFI boot sequence—specifically the Security (SEC) and Pre-EFI Initialization (PEI) phase">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-applies-cpu-microcode-updates-at-boot">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Applies CPU Microcode Updates at Boot - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-applies-cpu-microcode-updates-at-boot" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="CPU microcode updates are hardware errata patches loaded into a processor&#39;s volatile static RAM (SRAM) every time a system powers on. During the earliest phases of a UEFI boot sequence—specifically the Security (SEC) and Pre-EFI Initialization (PEI) phase" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-applies-cpu-microcode-updates-at-boot">How UEFI Applies
+CPU Microcode Updates at Boot</h1>
+<p>CPU microcode updates are hardware errata patches loaded into a
+processor's volatile static RAM (SRAM) every time a system powers on.
+During the earliest phases of a UEFI boot sequence—specifically the
+Security (SEC) and Pre-EFI Initialization (PEI) phases—the firmware
+reads microcode binary containers from the flash ROM and writes them to
+the processor via architecture-specific Model-Specific Registers (MSRs).
+Because microcode updates do not persist across reboots, this low-level
+handoff ensures that stability, security, and functional fixes are
+active before the UEFI initializes system memory or hands control to the
+operating system.</p>
+<h3 id="location-and-packaging-of-microcode">Location and Packaging of
+Microcode</h3>
+<p>Modern UEFI firmware images store microcode patches within distinct
+Firmware Volumes (FVs) on the motherboard's SPI flash memory. These
+updates are packaged as binary blobs containing a structured header,
+cryptographic signatures, target CPU flags, stepping IDs, and the
+encrypted payload itself. During the build of the UEFI image, vendors
+aggregate updates for multiple CPU models and revisions into a microcode
+repository to ensure compatibility across supported processors.</p>
+<h3 id="early-sec-phase-application">Early SEC Phase Application</h3>
+<p>The initial loading sequence begins immediately after the processor
+executes its reset vector in the Security (SEC) phase:</p>
+<ol type="1">
+<li><strong>Reset Execution:</strong> The CPU starts executing
+instructions directly from SPI flash in a bare-metal state without
+access to physical RAM.</li>
+<li><strong>Pre-Memory Requirements:</strong> Before main memory is
+initialized, the firmware uses the processor’s L3/L2 cache as temporary
+memory, a technique known as Cache-as-RAM (CAR) or No-Eviction Mode
+(NEM).</li>
+<li><strong>BSP Patching:</strong> The Bootstrap Processor (BSP)—the
+primary core designated to lead initialization—must be stable enough to
+handle CAR. The SEC core searches the firmware storage for a microcode
+header matching the BSP’s CPUID and platform ID.</li>
+<li><strong>Triggering the Update:</strong> The BSP writes the 64-bit
+physical memory address of the microcode payload into a designated MSR
+(for example, MSR <code>0x79</code> / <code>IA32_BIOS_UPDT_TRIG</code>
+on Intel platforms). The CPU hardware takes over, validates the internal
+checksum and digital signature, and loads the patch into its internal
+volatile execution units.</li>
+</ol>
+<h3 id="multi-processor-handling-in-the-pei-phase">Multi-Processor
+Handling in the PEI Phase</h3>
+<p>Once the BSP finishes the initial SEC routine and initializes
+permanent system memory, the UEFI enters the Pre-EFI Initialization
+(PEI) phase. At this point, secondary cores—known as Application
+Processors (APs)—must also be updated:</p>
+<ul>
+<li><strong>Discovery via Modules:</strong> A dedicated PEI Module
+(PEIM), often named <code>CpuMpPei</code> or similar, initializes the
+multi-processor (MP) services protocol.</li>
+<li><strong>Waking the APs:</strong> The BSP sends Startup
+Inter-Processor Interrupts (SIPIs) across the local APIC bus to
+transition APs out of their halted <code>Wait-for-SIPI</code>
+state.</li>
+<li><strong>Per-Core Updating:</strong> Because microcode resides in
+volatile CPU-internal SRAM, every execution thread and physical core
+must independently trigger the update. The MP PEIM directs each AP to
+execute the update routine concurrently or sequentially, pointing to the
+same microcode buffer in memory.</li>
+<li><strong>Verification:</strong> Firmware reads the microcode revision
+register (such as MSR <code>0x8B</code> on Intel after executing
+<code>CPUID</code>) on each logical core to confirm that the patch level
+matches the expected revision across all processors.</li>
+</ul>
+<h3 id="transition-to-subsequent-phases">Transition to Subsequent
+Phases</h3>
+<p>By the time the UEFI transitions to the Driver Execution Environment
+(DXE) phase, all CPU cores are synchronized at the target microcode
+revision. This uniform execution environment prevents errata-induced
+crashes during PCI enumeration, ACPI table generation, and operating
+system loading. When the operating system eventually boots, its own
+kernel may re-check the microcode version and, if necessary, apply an
+even newer patch using an identical MSR-write mechanism to override the
+version supplied by the UEFI.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-applies-cpu-microcode-updates-at-boot';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

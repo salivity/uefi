@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Shell PCI Device Diagnostics Guide - uefi</title>
+    <meta name="description" content="The UEFI Shell allows system administrators, firmware developers, and hardware engineers to inspect, query, and troubleshoot PCI and PCIe devices directly at the firmware layer without an operating system installed. By utilizing native shell commands—prim">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-shell-pci-device-diagnostics-guide">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Shell PCI Device Diagnostics Guide - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-shell-pci-device-diagnostics-guide" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The UEFI Shell allows system administrators, firmware developers, and hardware engineers to inspect, query, and troubleshoot PCI and PCIe devices directly at the firmware layer without an operating system installed. By utilizing native shell commands—prim" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-shell-pci-device-diagnostics-guide">UEFI Shell PCI Device
+Diagnostics Guide</h1>
+<p>The UEFI Shell allows system administrators, firmware developers, and
+hardware engineers to inspect, query, and troubleshoot PCI and PCIe
+devices directly at the firmware layer without an operating system
+installed. By utilizing native shell commands—primarily the
+<code>pci</code> utility—users can retrieve extensive diagnostic
+telemetry, ranging from basic device identification to raw configuration
+space register dumps, memory allocations, and PCIe link negotiation
+states. This guide outlines the specific diagnostic data accessible via
+the UEFI Shell and how to extract it.</p>
+<h3 id="pci-device-identification-and-topology">PCI Device
+Identification and Topology</h3>
+<p>Running the <code>pci</code> command without parameters outputs a
+complete list of all PCI-compliant devices recognized by the firmware
+across all buses. This scan provides initial diagnostic
+identification:</p>
+<ul>
+<li><strong>Bus, Device, and Function (BDF) Numbers:</strong> Pinpoints
+the exact hardware address of each device within the system topology
+(e.g., <code>00:1F.2</code>).</li>
+<li><strong>Vendor ID (VID) and Device ID (DID):</strong> Identifies the
+silicon manufacturer and the specific product model.</li>
+<li><strong>Class Codes and Programming Interface:</strong> Identifies
+the device type (such as Mass Storage Controller, Network Controller, or
+Display Adapter) and its specific programming interface (e.g., NVMe,
+AHCI, xHCI).</li>
+</ul>
+<p>To pause output across long device lists, append the <code>-b</code>
+flag:</p>
+<pre class="text"><code>pci -b</code></pre>
+<h3 id="detailed-configuration-header-decoding">Detailed Configuration
+Header Decoding</h3>
+<p>Targeting a specific device using its BDF notation
+(<code>pci &lt;Bus&gt; &lt;Dev&gt; &lt;Func&gt;</code>) decodes the
+standard 64-byte PCI Configuration Header (Type 0 for endpoints, Type 1
+for root ports and bridges). This surfaces key diagnostic fields:</p>
+<ul>
+<li><strong>Command and Status Registers:</strong> Displays the current
+operational flags, such as Bus Master Enable (BME), Memory Space Enable
+(MSE), I/O Space Enable, and parity error conditions.</li>
+<li><strong>Revision ID:</strong> Displays the specific silicon stepping
+or hardware revision.</li>
+<li><strong>Subsystem Vendor ID and Subsystem ID:</strong> Distinguishes
+between OEM implementations of the same underlying chipset (e.g., a
+specific graphics board vendor versus the GPU chip designer).</li>
+<li><strong>Latency Timer and Cache Line Size:</strong> Reports
+system-level bus timing parameters assigned by firmware.</li>
+</ul>
+<p>For example, to diagnose a device at Bus 01, Device 00, Function
+0:</p>
+<pre class="text"><code>pci 01 00 00</code></pre>
+<h3 id="base-address-registers-bars-and-resource-allocation">Base
+Address Registers (BARs) and Resource Allocation</h3>
+<p>The decoded configuration space details the device's assigned
+resources, which is essential for troubleshooting memory mapping
+conflicts and resource exhaustion:</p>
+<ul>
+<li><strong>Memory and I/O Ranges:</strong> Lists the physical address
+boundaries assigned to each BAR.</li>
+<li><strong>BAR Type and Attributes:</strong> Indicates whether
+resources are mapped as 32-bit or 64-bit addresses, and whether the
+memory regions are marked as prefetchable.</li>
+<li><strong>Interrupt Line and Pin:</strong> Shows the legacy interrupt
+line assignment (e.g., INTA# mapped to IRQ 11).</li>
+</ul>
+<h3 id="pci-express-link-diagnostics">PCI Express Link Diagnostics</h3>
+<p>On modern systems, the <code>pci</code> utility walks the PCI Express
+Extended Capabilities structure, exposing real-time link health and
+operational metrics:</p>
+<ul>
+<li><strong>Link Speed:</strong> Displays both maximum supported speed
+(e.g., 2.5 GT/s, 5.0 GT/s, 8.0 GT/s, 16.0 GT/s) and current negotiated
+link speed, revealing whether a card is running below its design
+speed.</li>
+<li><strong>Link Width:</strong> Shows maximum capabilities versus
+negotiated lane count (e.g., configured as x4 instead of x16 due to slot
+limits, physical damage, or poor seating).</li>
+<li><strong>Active State Power Management (ASPM):</strong> Shows the
+current low-power states (L0s, L1) enabled for the device.</li>
+<li><strong>Max Payload Size (MPS) and Max Read Request Size
+(MRRS):</strong> Reports configured packet sizes, which directly impact
+data throughput and interface stability.</li>
+</ul>
+<h3 id="extended-capability-and-error-detection">Extended Capability and
+Error Detection</h3>
+<p>UEFI Shell's verbose output parses advanced PCIe capabilities:</p>
+<ul>
+<li><strong>Advanced Error Reporting (AER):</strong> If supported,
+reports uncorrectable errors, correctable errors, and bad TLP/DLLP
+packet counts to pinpoint failing links or faulty signal integrity.</li>
+<li><strong>Power Management Capabilities:</strong> Displays supported
+D-states (D0, D1, D2, D3hot, D3cold) and current power status.</li>
+<li><strong>MSI / MSI-X Registers:</strong> Shows Message Signaled
+Interrupt capability, configuration status, and assigned vector
+limits.</li>
+</ul>
+<h3 id="raw-configuration-space-inspection">Raw Configuration Space
+Inspection</h3>
+<p>When detailed register-level debugging is required beyond decoded
+text, the UEFI Shell can dump the raw configuration space:</p>
+<ul>
+<li><strong>Standard Space (First 256 bytes):</strong> Displays the raw
+hexadecimal representation of the legacy configuration space.</li>
+<li><strong>Extended Configuration Space (Bytes 256 to 4096):</strong>
+Available on PCIe hardware, providing direct access to vendor-specific
+registers and extended capability registers.</li>
+</ul>
+<p>To view the raw hex dump alongside the decoded structure:</p>
+<pre class="text"><code>pci 01 00 00 -i</code></pre></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-shell-pci-device-diagnostics-guide';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

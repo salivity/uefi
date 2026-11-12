@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How OS Kernels Orchestrate UEFI Capsule Updates - uefi</title>
+    <meta name="description" content="Operating systems update system and device firmware by leveraging Unified Extensible Firmware Interface (UEFI) capsule updates orchestrated through the kernel. This process bridges user-space update utilities, the OS kernel, and the pre-boot firmware envi">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-os-kernels-orchestrate-uefi-capsule-updates">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How OS Kernels Orchestrate UEFI Capsule Updates - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-os-kernels-orchestrate-uefi-capsule-updates" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Operating systems update system and device firmware by leveraging Unified Extensible Firmware Interface (UEFI) capsule updates orchestrated through the kernel. This process bridges user-space update utilities, the OS kernel, and the pre-boot firmware envi" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-os-kernels-orchestrate-uefi-capsule-updates">How OS Kernels
+Orchestrate UEFI Capsule Updates</h1>
+<p>Operating systems update system and device firmware by leveraging
+Unified Extensible Firmware Interface (UEFI) capsule updates
+orchestrated through the kernel. This process bridges user-space update
+utilities, the OS kernel, and the pre-boot firmware environment. By
+abstracting UEFI Runtime Services and the EFI System Partition (ESP),
+the kernel prepares firmware payloads, stages them in memory or on
+storage, and configures the system to apply these payloads securely
+during a warm reset.</p>
+<h3 id="firmware-discovery-and-esrt">Firmware Discovery and ESRT</h3>
+<p>Before orchestrating an update, the operating system inspects the EFI
+System Resource Table (ESRT). The ESRT is an EFI configuration table
+published by the system firmware during boot that enumerates every
+updatable component (such as the system BIOS, device controllers, and
+embedded controllers) via a unique GUID.</p>
+<p>The kernel parses the ESRT at boot time and exposes this information
+to user space (for instance, via <code>/sys/firmware/efi/esrt/</code> in
+Linux). User-space update managers, such as <code>fwupd</code> on Linux
+or Windows Update on Windows, query this interface to check current
+firmware versions and verify compatibility against available update
+binaries.</p>
+<h3 id="staging-the-capsule-payload">Staging the Capsule Payload</h3>
+<p>The kernel facilitates the handoff of the capsule payload using one
+of two primary pathways defined by the UEFI specification:</p>
+<ol type="1">
+<li><p><strong>In-Memory Delivery via
+<code>UpdateCapsule()</code>:</strong> The kernel uses the UEFI Runtime
+Service <code>UpdateCapsule()</code>. Because capsules can be many
+megabytes in size, the kernel allocates physical memory and constructs a
+Scatter-Gather List (SGL) represented by a chain of
+<code>EFI_CAPSULE_BLOCK_DESCRIPTOR</code> structures. Each descriptor
+points to physical data blocks containing slices of the capsule
+payload.</p>
+<p>Once mapped, the kernel calls <code>UpdateCapsule()</code>, passing
+the physical address of the descriptor list and setting the
+<code>CAPSULE_FLAGS_PERSIST_ACROSS_RESET</code> flag. This flag tells
+the firmware to preserve these designated physical memory regions across
+a system reset.</p></li>
+<li><p><strong>Disk-Based Delivery (Capsule-on-Disk):</strong> Due to
+memory constraints and driver complexities associated with massive
+in-memory scatter-gather buffers across reboots, modern platforms
+frequently use Capsule-on-Disk. In this flow:</p>
+<ul>
+<li>The kernel or user-space update tool writes the signed capsule file
+directly to the EFI System Partition under
+<code>\EFI\UpdateCapsule\</code>.</li>
+<li>The kernel modifies the persistent UEFI variable
+<code>OsIndications</code>, setting the
+<code>EFI_OS_INDICATIONS_FILE_CAPSULE_DELIVERY_SUPPORTED</code> bit.
+This acts as a hardware flag notifying the firmware that an update is
+waiting on disk.</li>
+</ul></li>
+</ol>
+<h3 id="execution-across-the-system-reset">Execution Across the System
+Reset</h3>
+<p>After the capsule is staged, the operating system initiates a reboot
+using the UEFI <code>ResetSystem()</code> runtime service with
+<code>EfiResetWarm</code> or <code>EfiResetCold</code>.</p>
+<p>During the subsequent boot sequence:</p>
+<ul>
+<li>The UEFI Security (SEC) and Pre-EFI Initialization (PEI) phases
+retain awareness of the staged capsule, either by reading the intact
+memory locations designated by the OS or by locating the payload on the
+ESP.</li>
+<li>Before the third-party OS bootloader or driver execution occurs, the
+Driver Execution Environment (DXE) phase verifies the cryptographic
+signature of the capsule against OEM public keys embedded within the
+firmware.</li>
+<li>If validation succeeds, the firmware flashes the target component,
+clears the staging flags and temporary files, updates the component
+status and version in the ESRT, and proceeds with the normal OS
+boot.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-os-kernels-orchestrate-uefi-capsule-updates';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

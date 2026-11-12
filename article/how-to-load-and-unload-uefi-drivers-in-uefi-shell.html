@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Load and Unload UEFI Drivers in UEFI Shell - uefi</title>
+    <meta name="description" content="The Unified Extensible Firmware Interface (UEFI) Shell provides an interactive pre-boot environment that allows firmware and hardware engineers to execute commands, manage storage, and test binaries. This article explains how developers dynamically load a">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-to-load-and-unload-uefi-drivers-in-uefi-shell">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How to Load and Unload UEFI Drivers in UEFI Shell - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-to-load-and-unload-uefi-drivers-in-uefi-shell" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Unified Extensible Firmware Interface (UEFI) Shell provides an interactive pre-boot environment that allows firmware and hardware engineers to execute commands, manage storage, and test binaries. This article explains how developers dynamically load a" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-to-load-and-unload-uefi-drivers-in-uefi-shell">How to Load
+and Unload UEFI Drivers in UEFI Shell</h1>
+<p>The Unified Extensible Firmware Interface (UEFI) Shell provides an
+interactive pre-boot environment that allows firmware and hardware
+engineers to execute commands, manage storage, and test binaries. This
+article explains how developers dynamically load and unload custom UEFI
+test drivers using native UEFI Shell commands, verify driver binding,
+and manage handle databases without rebuilding or reflashing the system
+firmware.</p>
+<h3 id="preparing-the-environment">Preparing the Environment</h3>
+<p>Before managing test drivers dynamically, you must access the UEFI
+Shell and prepare the compiled driver file (<code>.efi</code>):</p>
+<ol type="1">
+<li><p><strong>Build the Driver:</strong> Compile your driver using an
+environment such as the EDK II (EFI Development Kit II) targeting your
+platform's architecture (typically <code>X64</code> or
+<code>AARCH64</code>).</p></li>
+<li><p><strong>Transfer to Media:</strong> Copy the resulting
+<code>.efi</code> binary onto a FAT32-formatted USB drive or a dedicated
+EFI System Partition (ESP).</p></li>
+<li><p><strong>Boot into the Shell:</strong> Boot your target system or
+virtual machine (e.g., QEMU with OVMF) into the UEFI Shell.</p></li>
+<li><p><strong>Navigate to the File System:</strong> Identify the mapped
+drive corresponding to your storage device by running
+<code>map -r</code>. Change to that drive and verify the file
+exists:</p>
+<pre class="text"><code>fs0:
+ls</code></pre></li>
+</ol>
+<h3 id="dynamically-loading-a-driver">Dynamically Loading a Driver</h3>
+<p>To load an executable UEFI driver into system memory, use the
+<code>load</code> command.</p>
+<pre class="text"><code>load MyTestDriver.efi</code></pre>
+<p>When this command runs, the UEFI Boot Service
+<code>LoadImage()</code> loads the binary into memory, and
+<code>StartImage()</code> executes its entry point. If the driver is an
+EFI Driver Model-compliant driver, the entry point installs the
+<code>EFI_DRIVER_BINDING_PROTOCOL</code> onto the driver's image
+handle.</p>
+<p>If the operation is successful, the shell outputs a confirmation
+showing the assigned handle:</p>
+<pre class="text"><code>load: Image &#39;fs0:\MyTestDriver.efi&#39; loaded at [Handle] - Success</code></pre>
+<p>To automatically connect the newly loaded driver to compatible
+controllers, run:</p>
+<pre class="text"><code>connect -r</code></pre>
+<h3 id="verifying-and-inspecting-the-driver">Verifying and Inspecting
+the Driver</h3>
+<p>Once loaded, you must verify that the driver initialized correctly
+and bound to the intended hardware handles.</p>
+<ul>
+<li><p><strong>List Installed Drivers:</strong> Use the
+<code>drivers</code> command to see all active drivers and find your
+driver's Handle ID:</p>
+<pre class="text"><code>drivers</code></pre></li>
+<li><p><strong>Inspect Handles and Protocols:</strong> Use the
+<code>dh</code> (Dump Handle) command with your driver's handle
+identifier (e.g., <code>B4</code>) to inspect the protocols it
+produces:</p>
+<pre class="text"><code>dh -v B4</code></pre></li>
+<li><p><strong>Verify Device Binding:</strong> Check which devices the
+driver is managing using the <code>devices</code> command:</p>
+<pre class="text"><code>devices</code></pre></li>
+</ul>
+<h3 id="dynamically-unloading-a-driver">Dynamically Unloading a
+Driver</h3>
+<p>Unloading a driver allows developers to test deinitialization
+routines, ensure memory cleanup, and test code revisions without
+rebooting.</p>
+<p>To unload a driver, pass its handle identifier to the
+<code>unload</code> command:</p>
+<pre class="text"><code>unload B4</code></pre>
+<p>When <code>unload</code> executes:</p>
+<ol type="1">
+<li>The shell calls the driver's <code>Stop()</code> function on all
+managed controller handles.</li>
+<li>The driver uninstalls any installed protocols and frees allocated
+pools and pages.</li>
+<li>The shell calls <code>UnloadImage()</code> to purge the binary from
+memory.</li>
+</ol>
+<p>To force an unload if a device handle remains bound, you can first
+manually disconnect the driver:</p>
+<pre class="text"><code>disconnect [DeviceHandle] [DriverHandle]
+unload [DriverHandle]</code></pre>
+<h3 id="common-error-codes">Common Error Codes</h3>
+<ul>
+<li><strong><code>EFI_NOT_FOUND</code> /
+<code>EFI_UNSUPPORTED</code>:</strong> Often occurs when required
+protocol dependencies are missing from the system.</li>
+<li><strong><code>EFI_ALREADY_STARTED</code>:</strong> Occurs when
+attempting to bind a driver to a controller handle that is already being
+managed by an active driver.</li>
+<li><strong><code>EFI_ACCESS_DENIED</code>:</strong> Typically returned
+during an <code>unload</code> operation if the driver does not implement
+an <code>Unload</code> pointer in its
+<code>EFI_LOADED_IMAGE_PROTOCOL</code>, preventing safe removal.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-to-load-and-unload-uefi-drivers-in-uefi-shell';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

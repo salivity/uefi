@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Where Is the Primary GPT Header Located? - uefi</title>
+    <meta name="description" content="This article explains the exact physical and logical location of the primary GUID Partition Table (GPT) header on a storage drive managed by UEFI. You will learn about its position within the Logical Block Addressing (LBA) scheme, why it resides immediate">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/where-is-the-primary-gpt-header-located">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Where Is the Primary GPT Header Located? - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/where-is-the-primary-gpt-header-located" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article explains the exact physical and logical location of the primary GUID Partition Table (GPT) header on a storage drive managed by UEFI. You will learn about its position within the Logical Block Addressing (LBA) scheme, why it resides immediate" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="where-is-the-primary-gpt-header-located">Where Is the Primary
+GPT Header Located?</h1>
+<p>This article explains the exact physical and logical location of the
+primary GUID Partition Table (GPT) header on a storage drive managed by
+UEFI. You will learn about its position within the Logical Block
+Addressing (LBA) scheme, why it resides immediately after the protective
+Master Boot Record, and the structural role it plays in managing storage
+partitions on modern systems.</p>
+<h3 id="the-exact-location-logical-block-address-1-lba-1">The Exact
+Location: Logical Block Address 1 (LBA 1)</h3>
+<p>On any storage device initialized with a standard GUID Partition
+Table under UEFI specifications, the primary GPT header is located at
+<strong>LBA 1</strong> (Logical Block Address 1).</p>
+<p>In standard modern storage systems using 512-byte sector emulation
+(512e) or legacy 512-byte native sectors, LBA 1 corresponds to byte
+offset <strong>512</strong> to <strong>1023</strong> on the physical
+disk. On native 4K (4Kn) advanced format drives, LBA 1 corresponds to
+byte offset <strong>4096</strong> to <strong>8191</strong>. Regardless
+of the physical sector size, the primary GPT header always occupies the
+second logical block on the disk.</p>
+<h3 id="the-surrounding-disk-layout">The Surrounding Disk Layout</h3>
+<p>To understand why the primary GPT header is located at LBA 1, it
+helps to examine the contiguous layout of the disk:</p>
+<ul>
+<li><strong>LBA 0: Protective MBR:</strong> The first block (LBA 0) is
+reserved for a Protective Master Boot Record (MBR). This legacy
+structure contains a single partition entry of type <code>0xEE</code>
+spanning the entire disk. Its purpose is to prevent legacy disk
+management utilities that do not recognize GPT from identifying the disk
+as unpartitioned and accidentally overwriting data.</li>
+<li><strong>LBA 1: Primary GPT Header:</strong> Immediately following
+the Protective MBR is the primary GPT header itself. It defines the
+disk's layout, identifying partition boundaries and integrity
+checks.</li>
+<li><strong>LBA 2 to 33: Partition Entry Array:</strong> Directly after
+the primary header sits the table of partition entries. By default, UEFI
+specifications allocate a minimum of 16,384 bytes for partition entries,
+accommodating at least 128 partition records (each 128 bytes in size),
+spanning from LBA 2 through LBA 33.</li>
+</ul>
+<h3 id="contents-of-the-primary-gpt-header">Contents of the Primary GPT
+Header</h3>
+<p>The primary header at LBA 1 serves as the central directory for the
+storage device. It contains crucial metadata that the UEFI firmware
+reads during initialization:</p>
+<ul>
+<li><strong>Signature:</strong> An 8-byte ASCII string reading
+<code>"EFI PART"</code> (bytes <code>45 46 49 20 50 41 52 54</code>) to
+identify the GPT structure.</li>
+<li><strong>Revision:</strong> The specific UEFI specification version
+supported by the header.</li>
+<li><strong>Header Size and Checksum:</strong> The size of the header
+(typically 92 bytes) and a CRC32 checksum of the header itself to detect
+corruption.</li>
+<li><strong>Current LBA:</strong> The block location of the header
+itself (recorded as <code>1</code>).</li>
+<li><strong>Backup LBA:</strong> The logical address of the secondary
+(backup) GPT header, located at the very last accessible block of the
+storage device.</li>
+<li><strong>First Usable LBA and Last Usable LBA:</strong> Defines the
+block range available for actual data partitions.</li>
+<li><strong>Disk GUID:</strong> A unique identifier assigned to the
+entire disk.</li>
+<li><strong>Partition Entry Starting LBA:</strong> Points to LBA 2, the
+start of the partition array, along with the total number of partition
+entries and the size of each entry.</li>
+</ul>
+<h3 id="redundancy-and-recovery">Redundancy and Recovery</h3>
+<p>Because the primary GPT header at LBA 1 is critical for reading the
+partition structure, the UEFI standard mandates a redundant backup. The
+secondary GPT header is placed at the final sector of the disk
+(<code>LBA -1</code>), preceded by a backup copy of the partition entry
+array. If the primary header at LBA 1 is corrupted or fails its CRC32
+checksum, UEFI firmware automatically references the secondary header at
+the end of the drive to recover the partition scheme.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/where-is-the-primary-gpt-header-located';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OEM-Specific GUIDs in UEFI Partitioning Schemes - uefi</title>
+    <meta name="description" content="OEM-specific Globally Unique Identifiers (GUIDs) serve as critical markers in the GUID Partition Table (GPT) format recognized by Unified Extensible Firmware Interface (UEFI) systems. This article explains how these 128-bit identifiers function within UEF">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/oem-specific-gui-ds-in-uefi-partitioning-schemes">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="OEM-Specific GUIDs in UEFI Partitioning Schemes - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/oem-specific-gui-ds-in-uefi-partitioning-schemes" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="OEM-specific Globally Unique Identifiers (GUIDs) serve as critical markers in the GUID Partition Table (GPT) format recognized by Unified Extensible Firmware Interface (UEFI) systems. This article explains how these 128-bit identifiers function within UEF" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="oem-specific-guids-in-uefi-partitioning-schemes">OEM-Specific
+GUIDs in UEFI Partitioning Schemes</h1>
+<p>OEM-specific Globally Unique Identifiers (GUIDs) serve as critical
+markers in the GUID Partition Table (GPT) format recognized by Unified
+Extensible Firmware Interface (UEFI) systems. This article explains how
+these 128-bit identifiers function within UEFI-compliant architectures,
+detailing their role in device recovery, hardware diagnostics, partition
+protection, and pre-boot firmware execution.</p>
+<p>In a UEFI architecture, storage drives use the GPT standard rather
+than the legacy Master Boot Record (MBR) scheme. Under GPT, every
+partition contains two types of GUIDs: a Unique Partition GUID, which is
+a randomized identifier unique to that specific instance, and a
+Partition Type GUID, which indicates the partition's intended purpose.
+While the UEFI specification defines standard type GUIDs—such as those
+for the EFI System Partition (ESP)—it allows original equipment
+manufacturers (OEMs) and operating system vendors to define proprietary
+GUIDs for specialized functions.</p>
+<p>OEM-specific GUIDs primarily identify partitions dedicated to factory
+recovery environments, hardware diagnostics, system restore images, and
+pre-boot utility software. Manufacturers like Dell, HP, and Lenovo use
+these GUIDs so their proprietary firmware can locate and launch pre-boot
+diagnostic routines or system repair environments independently of the
+main operating system. During the boot sequence, UEFI-compliant firmware
+scans the GPT for these specific identifiers to present recovery options
+in the boot menu or trigger fail-safe environments if the primary OS
+fails to boot.</p>
+<p>Additionally, OEM GUIDs provide crucial operating system-level
+protection. Modern operating systems, such as Microsoft Windows and
+Linux distributions, read the partition type GUIDs during disk
+discovery. When an OS identifies an OEM-specific partition, it typically
+conceals the volume from the user interface, prevents automatic drive
+letter assignment, and restricts modification or deletion. This
+separation prevents users from inadvertently formatting or corrupting
+recovery images and essential system utilities.</p>
+<p>OEM-specific GUIDs are also frequently paired with GPT partition
+attribute flags, such as the "Platform Required" flag (bit 0). When this
+flag is combined with an OEM GUID, the operating system and standard
+partitioning utilities treat the partition as essential for the system
+to function, blocking basic disk management tools from altering the
+partition structure.</p>
+<p>Through this combination of standardized identification and
+proprietary functionality, OEM-specific GUIDs allow hardware vendors to
+implement customized maintenance and recovery tools while maintaining
+strict compatibility with the core UEFI specification.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/oem-specific-gui-ds-in-uefi-partitioning-schemes';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

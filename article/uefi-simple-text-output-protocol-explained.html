@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Simple Text Output Protocol Explained - uefi</title>
+    <meta name="description" content="The Unified Extensible Firmware Interface (UEFI) relies on specialized protocols to interact with platform hardware before an operating system boots. The Simple Text Output protocol (EFISIMPLETEXTOUTPUTPROTOCOL) serves as the fundamental abstraction layer">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-simple-text-output-protocol-explained">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Simple Text Output Protocol Explained - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-simple-text-output-protocol-explained" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Unified Extensible Firmware Interface (UEFI) relies on specialized protocols to interact with platform hardware before an operating system boots. The Simple Text Output protocol (EFISIMPLETEXTOUTPUTPROTOCOL) serves as the fundamental abstraction layer" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-simple-text-output-protocol-explained">UEFI Simple Text
+Output Protocol Explained</h1>
+<p>The Unified Extensible Firmware Interface (UEFI) relies on
+specialized protocols to interact with platform hardware before an
+operating system boots. The Simple Text Output protocol
+(<code>EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL</code>) serves as the fundamental
+abstraction layer for rendering text to the console during this pre-boot
+phase. This article covers the architecture of the Simple Text Output
+protocol, its core capabilities and functions, how it abstracts
+underlying display hardware, and its essential role in firmware menus
+and bootloader execution.</p>
+<h3 id="core-role-in-the-uefi-environment">Core Role in the UEFI
+Environment</h3>
+<p>In UEFI firmware, standard C library I/O operations (like
+<code>printf</code>) do not exist natively. Instead, firmware
+applications, drivers, and operating system bootloaders communicate with
+devices through interfaces identified by Globally Unique Identifiers
+(GUIDs). The Simple Text Output protocol provides a basic,
+character-oriented interface used to control console output devices,
+typically bound to standard output (<code>ConOut</code>) and standard
+error (<code>StdErr</code>) handles in the UEFI System Table.</p>
+<p>Its primary role is to accept character data from the system and
+display it to the user without requiring the calling program to manage
+video memory, font rendering, or hardware-specific display
+controllers.</p>
+<h3 id="key-capabilities-and-functions">Key Capabilities and
+Functions</h3>
+<p>The protocol is defined as a structure containing state data and
+function pointers that manage the visual presentation of text:</p>
+<ul>
+<li><strong><code>OutputString</code>:</strong> The central function
+used to write null-terminated UTF-16 (UCS-2) strings to the output
+device. It handles standard control characters such as carriage return
+(<code>\r</code>), line feed (<code>\n</code>), and backspace
+(<code>\b</code>).</li>
+<li><strong><code>TestString</code>:</strong> Evaluates whether a target
+output device supports a specific string of characters, preventing
+rendering errors when dealing with non-standard glyphs.</li>
+<li><strong><code>SetAttribute</code>:</strong> Controls foreground and
+background text colors. UEFI defines 16 foreground colors and 8
+background colors, enabling color-coded status messages and basic visual
+styling.</li>
+<li><strong><code>ClearScreen</code>:</strong> Clears the display buffer
+and resets the cursor to the upper-left coordinate (0, 0) using the
+currently assigned background attribute.</li>
+<li><strong><code>SetCursorPosition</code> and
+<code>EnableCursor</code>:</strong> Manages cursor visibility and
+movement across the display grid defined by column and row
+coordinates.</li>
+<li><strong><code>QueryMode</code> and <code>SetMode</code>:</strong>
+Allows callers to discover supported text resolutions (such as the
+standard 80 columns by 25 rows) and switch between them
+dynamically.</li>
+</ul>
+<h3 id="abstraction-of-underlying-hardware">Abstraction of Underlying
+Hardware</h3>
+<p>The Simple Text Output protocol does not directly write to display
+registers. Instead, it serves as a uniform frontend that sits on top of
+hardware-specific drivers:</p>
+<ol type="1">
+<li><strong>Graphics Hardware:</strong> When rendering to a physical
+monitor, a terminal driver layer sits between the Simple Text Output
+protocol and the Graphics Output Protocol (GOP). This terminal driver
+converts text characters into graphical glyphs from an embedded font
+bitmap and writes the pixels directly into the video frame buffer.</li>
+<li><strong>Serial Terminals:</strong> If the system routes console
+output to a serial port (UART), the protocol implementation translates
+characters into raw byte streams sent over serial lines, facilitating
+headless server management.</li>
+</ol>
+<p>Because of this design, a bootloader or diagnostic tool can call
+<code>OutputString</code> without knowing whether the message will
+appear on a 4K display, a legacy VGA monitor, or a remote serial
+console.</p>
+<h3 id="significance-in-pre-boot-execution">Significance in Pre-Boot
+Execution</h3>
+<p>During system startup, complex operating system graphics stacks are
+not yet initialized. The Simple Text Output protocol fills this critical
+gap by providing reliable, lightweight communication. It powers the UEFI
+setup utility (BIOS setup menu), displays diagnostic codes, and prints
+boot selection menus (such as GRUB or the Windows Boot Manager). By
+offering a standardized text-rendering pipeline, UEFI ensures that
+essential system information can be observed and acted upon long before
+the operating system kernel assumes control of the hardware.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-simple-text-output-protocol-explained';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Shell Script Syntax for Automation - uefi</title>
+    <meta name="description" content="UEFI Shell scripting provides a pre-boot environment for automating hardware diagnostics, firmware updates, and operating system provisioning using script files with the .nsh extension. This article details the core syntax rules of the UEFI Shell scriptin">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-shell-script-syntax-for-automation">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Shell Script Syntax for Automation - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-shell-script-syntax-for-automation" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI Shell scripting provides a pre-boot environment for automating hardware diagnostics, firmware updates, and operating system provisioning using script files with the .nsh extension. This article details the core syntax rules of the UEFI Shell scriptin" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-shell-script-syntax-for-automation">UEFI Shell Script
+Syntax for Automation</h1>
+<p>UEFI Shell scripting provides a pre-boot environment for automating
+hardware diagnostics, firmware updates, and operating system
+provisioning using script files with the <code>.nsh</code> extension.
+This article details the core syntax rules of the UEFI Shell scripting
+language, outlining how to implement variables, conditions, loops, and
+control flow directives to build functional automation routines before
+an operating system loads.</p>
+<h3 id="script-files-and-comments">Script Files and Comments</h3>
+<p>UEFI Shell scripts use the <code>.nsh</code> file extension. The
+shell automatically executes a script named <code>startup.nsh</code>
+upon boot if it resides in the root of an accessible EFI System
+Partition.</p>
+<p>Comments are designated using either the <code>#</code> symbol or the
+<code>rem</code> command. The interpreter ignores text following these
+markers on the same line:</p>
+<pre class="text"><code># This is a comment
+rem This is also a valid comment</code></pre>
+<p>Commands are case-insensitive. Standard CLI utilities (such as
+<code>ls</code>, <code>cp</code>, <code>map</code>, and
+<code>echo</code>) can be directly embedded into scripts.</p>
+<h3 id="variables-and-parameters">Variables and Parameters</h3>
+<p>Variables in UEFI Shell scripts are created, modified, and
+dereferenced using a syntax similar to traditional DOS batch files:</p>
+<ul>
+<li><p><strong>Environment Variables:</strong> Defined using the
+<code>set</code> command and dereferenced by enclosing the identifier in
+percent signs:</p>
+<pre class="text"><code>set TargetDisk FS0:
+echo The selected disk is %TargetDisk%</code></pre></li>
+<li><p><strong>Script Arguments:</strong> Positional parameters passed
+into a script are accessed using numeric identifiers from
+<code>%0</code> to <code>%9</code>:</p>
+<ul>
+<li><code>%0</code> represents the name of the executing script.</li>
+<li><code>%1</code> through <code>%9</code> represent the first through
+ninth command-line arguments.</li>
+<li><code>%*</code> expands to all parameters passed to the script.</li>
+</ul></li>
+</ul>
+<h3 id="conditional-statements">Conditional Statements</h3>
+<p>The <code>if</code> construct handles decision-making logic. Every
+<code>if</code> block must be closed with an <code>endif</code>
+directive, and optional alternative paths are defined using
+<code>else</code>.</p>
+<pre class="text"><code>if condition then
+    # commands
+else
+    # alternate commands
+endif</code></pre>
+<p>Common conditions include:</p>
+<ul>
+<li><p><strong>String Comparison:</strong> Checks equivalence between
+two values:</p>
+<pre class="text"><code>if %1 == &quot;flash&quot; then
+    echo Flashing firmware...
+endif</code></pre></li>
+<li><p><strong>File Existence:</strong> Determines if a specified file
+or directory path exists:</p>
+<pre class="text"><code>if exist FS0:\EFI\BOOT\BOOTX64.EFI then
+    echo Bootloader found.
+endif</code></pre></li>
+<li><p><strong>Error Level:</strong> Evaluates the exit code of the
+preceding command:</p>
+<pre class="text"><code>if errorlevel 1 then
+    echo The previous command failed.
+endif</code></pre></li>
+</ul>
+<p>Negation is supported by placing <code>not</code> immediately after
+<code>if</code> (for example,
+<code>if not exist file.txt then</code>).</p>
+<h3 id="loops">Loops</h3>
+<p>The UEFI Shell provides the <code>for</code> loop to iterate through
+sets of items, files, or devices. The iteration block begins with
+<code>for</code> and ends with <code>endfor</code>:</p>
+<pre class="text"><code>for %i in FS0: FS1: FS2: do
+    if exist %i\startup.nsh then
+        echo Found startup script on %i
+    endif
+endfor</code></pre>
+<p>To iterate over files matching a pattern:</p>
+<pre class="text"><code>for %f in *.efi do
+    echo Found binary: %f
+endfor</code></pre>
+<p>The loop variable must be preceded by a single <code>%</code>
+sign.</p>
+<h3 id="branching-and-control-flow">Branching and Control Flow</h3>
+<p>Execution flow within scripts can be altered using labels and
+jumps:</p>
+<ul>
+<li><p><strong>Labels:</strong> Defined by a leading colon
+(<code>:</code>):</p>
+<pre class="text"><code>:RetryBlock</code></pre></li>
+<li><p><strong>Jumps:</strong> The <code>goto</code> command redirects
+execution to a declared label:</p>
+<pre class="text"><code>goto RetryBlock</code></pre></li>
+<li><p><strong>Terminating Execution:</strong> The <code>exit</code>
+command halts script processing:</p>
+<pre class="text"><code>exit /b 0</code></pre>
+<p>The <code>/b</code> switch terminates only the current script instead
+of closing the entire UEFI Shell, and appending an integer sets the
+return exit code.</p></li>
+</ul>
+<h3 id="redirection-and-output">Redirection and Output</h3>
+<p>Standard output and error streams can be redirected to text files
+using output operators:</p>
+<ul>
+<li><code>&gt;</code> writes or overwrites standard output to a file
+(e.g., <code>pci &gt; pci_dump.txt</code>).</li>
+<li><code>&gt;&gt;</code> appends standard output to an existing
+file.</li>
+<li><code>echo -off</code> suppresses the printing of command lines to
+the console during script execution, while <code>echo -on</code>
+restores it.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-shell-script-syntax-for-automation';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

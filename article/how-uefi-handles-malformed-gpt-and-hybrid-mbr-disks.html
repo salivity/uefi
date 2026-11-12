@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Handles Malformed GPT and Hybrid MBR Disks - uefi</title>
+    <meta name="description" content="This article examines how UEFI firmware parsers process partition schemes, specifically addressing the mechanisms used to detect, validate, and recover from malformed GUID Partition Tables (GPT) and non-standard hybrid MBR layouts. It covers the defensive">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-handles-malformed-gpt-and-hybrid-mbr-disks">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Handles Malformed GPT and Hybrid MBR Disks - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-handles-malformed-gpt-and-hybrid-mbr-disks" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article examines how UEFI firmware parsers process partition schemes, specifically addressing the mechanisms used to detect, validate, and recover from malformed GUID Partition Tables (GPT) and non-standard hybrid MBR layouts. It covers the defensive" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-handles-malformed-gpt-and-hybrid-mbr-disks">How UEFI
+Handles Malformed GPT and Hybrid MBR Disks</h1>
+<p>This article examines how UEFI firmware parsers process partition
+schemes, specifically addressing the mechanisms used to detect,
+validate, and recover from malformed GUID Partition Tables (GPT) and
+non-standard hybrid MBR layouts. It covers the defensive validation
+steps defined by the UEFI specification, the fallback pathways between
+primary and backup headers, how firmware treats legacy partition entries
+juxtaposed with GPT headers, and the security implications of parsing
+corrupt storage structures.</p>
+<h2 id="standard-gpt-validation-flow">Standard GPT Validation Flow</h2>
+<p>The UEFI specification mandates a strict sequence of checks when
+scanning a block device to locate bootable partitions. The process
+begins at Logical Block Address 0 (LBA 0), which must contain a
+Protective Master Boot Record (PMBR). The parser checks the PMBR
+partition table for a partition record with an OS Type of
+<code>0xEE</code>. If this structure is present and formatted according
+to spec, the parser advances to LBA 1 to inspect the Primary GPT
+Header.</p>
+<p>To validate the Primary GPT Header, the parser performs several
+deterministic checks:</p>
+<ol type="1">
+<li><strong>Signature Verification:</strong> It checks for the 8-byte
+ASCII string <code>"EFI PART"</code>.</li>
+<li><strong>Header CRC32:</strong> It zeroes out the
+<code>HeaderCRC32</code> field in a temporary buffer and computes the
+CRC32 checksum across the byte length specified by
+<code>HeaderSize</code>. The result must match the recorded CRC32.</li>
+<li><strong>LBA Consistency:</strong> It confirms that the
+<code>MyLBA</code> field equals 1, and that <code>FirstUsableLBA</code>
+and <code>LastUsableLBA</code> fall within physical disk limits.</li>
+<li><strong>Partition Array CRC32:</strong> It reads the partition entry
+array located at <code>PartitionEntryLBA</code> and verifies that the
+computed CRC32 matches <code>PartitionEntryArrayCRC32</code>.</li>
+</ol>
+<h2 id="handling-malformed-or-corrupt-gpt-headers">Handling Malformed or
+Corrupt GPT Headers</h2>
+<p>When corruption occurs in a GPT layout, the firmware relies on
+structural redundancy. Every GPT-formatted drive includes a Primary GPT
+at the beginning of the disk and an Alternate (Secondary) GPT at the
+final LBA of the drive.</p>
+<p>If the Primary GPT Header at LBA 1 fails any verification step—such
+as an invalid signature, an incorrect header CRC32, or a mismatched
+partition array checksum—the parser marks the primary structure as
+invalid. It then immediately attempts to read the Alternate GPT Header
+from the last logical block of the disk.</p>
+<p>If the Alternate GPT Header is intact, passes its own CRC32 checks,
+and features a valid partition entry array, the UEFI firmware uses the
+backup data to construct the device path and mount the
+<code>EFI_SIMPLE_FILE_SYSTEM_PROTOCOL</code>. In conformant
+implementations like TianoCore EDK II, the parser handles this recovery
+dynamically in memory. While the UEFI driver may permit the operating
+system to boot from the backup table, it generally leaves the physical
+repair of the primary table to administrative OS-level utilities.</p>
+<p>If both the primary and backup headers fail validation, the GPT
+parser rejects the disk structure entirely, returning
+<code>EFI_UNSUPPORTED</code> or <code>EFI_NOT_FOUND</code>. At this
+point, the block device is rendered unbootable under standard UEFI
+routines.</p>
+<h2 id="handling-hybrid-mbr-configurations">Handling Hybrid MBR
+Configurations</h2>
+<p>A Hybrid MBR is a non-standard layout originally designed to allow
+dual-booting between legacy BIOS systems (which require an MBR) and UEFI
+systems (which require GPT). In a pure UEFI implementation, LBA 0
+contains only a single <code>0xEE</code> partition that spans either the
+size of the disk or the maximum 32-bit sector limit
+(<code>0xFFFFFFFF</code>). In a Hybrid MBR, LBA 0 contains up to three
+additional legacy MBR partition entries alongside the <code>0xEE</code>
+entry, or defines a truncated <code>0xEE</code> partition.</p>
+<p>When a UEFI parser encounters a Hybrid MBR:</p>
+<ul>
+<li><strong>Detection:</strong> If the parser detects at least one
+partition of type <code>0xEE</code>, it treats the disk as a GPT disk
+and bypasses all other legacy MBR slice entries.</li>
+<li><strong>Synchronization Hazards:</strong> UEFI partition drivers do
+not synchronize or reconcile MBR partition entries with GPT partition
+entries. If a user modifies partitions using a legacy MBR tool, the
+primary GPT remains unchanged. The UEFI firmware will only mount
+partitions defined inside the GPT array, ignoring any legacy partition
+boundaries defined in the MBR.</li>
+<li><strong>Compatibility Support Module (CSM) Fallback:</strong> On
+older firmware that incorporates a CSM, an ambiguous or malformed PMBR
+may cause the firmware boot manager to misclassify the drive as a legacy
+MBR disk. If the <code>0xEE</code> marker is not strictly in the first
+slot or if it does not encompass the GPT structures, firmware with
+active CSM might prioritize legacy boot paths over native UEFI
+execution.</li>
+</ul>
+<h2 id="defensive-parsing-and-malformed-entry-handling">Defensive
+Parsing and Malformed Entry Handling</h2>
+<p>Modern UEFI implementations harden partition table parsing routines
+against structural exploits, such as integer overflows, overlapping
+boundaries, and infinite loops:</p>
+<ul>
+<li><strong>Entry Size and Count Validation:</strong> The parser
+calculates the total size of the partition entry array by multiplying
+<code>NumberOfPartitionEntries</code> by
+<code>SizeOfPartitionEntry</code>. Firmware validates that
+<code>SizeOfPartitionEntry</code> is an integer multiple of 128 (often
+checking specifically for values <span class="math inline">\(\ge
+128\)</span>) and that the multiplication does not trigger an integer
+overflow before allocating pool memory.</li>
+<li><strong>LBA Bounds Checking:</strong> Each individual partition
+entry contains a <code>StartingLBA</code> and an <code>EndingLBA</code>.
+Parsers enforce that <code>StartingLBA &lt;= EndingLBA</code>, that both
+values reside strictly between <code>FirstUsableLBA</code> and
+<code>LastUsableLBA</code>, and that partition ranges do not extend
+beyond the actual disk capacity reported by the underlying
+<code>EFI_BLOCK_IO_PROTOCOL</code>.</li>
+<li><strong>Zeroed Entries:</strong> Unused partition entries are
+identified by a completely zeroed <code>PartitionTypeGUID</code>. The
+parser safely ignores these entries and continues iterating until
+<code>NumberOfPartitionEntries</code> is reached.</li>
+</ul>
+<p>If an individual partition entry within an otherwise valid GPT
+contains impossible geometry (such as an inverted LBA range), modern
+implementations ignore that specific partition or decline to expose it
+via the device hierarchy, preventing subsequent filesystem drivers from
+processing corrupted storage bounds.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-handles-malformed-gpt-and-hybrid-mbr-disks';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

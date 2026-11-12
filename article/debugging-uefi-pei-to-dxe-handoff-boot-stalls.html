@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debugging UEFI PEI-to-DXE Handoff Boot Stalls - uefi</title>
+    <meta name="description" content="Troubleshooting boot stalls during the transition from the Pre-EFI Initialization (PEI) phase to the Driver Execution Environment (DXE) phase requires identifying failures that occur as firmware migrates execution from temporary cache to permanent system">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/debugging-uefi-pei-to-dxe-handoff-boot-stalls">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Debugging UEFI PEI-to-DXE Handoff Boot Stalls - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/debugging-uefi-pei-to-dxe-handoff-boot-stalls" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Troubleshooting boot stalls during the transition from the Pre-EFI Initialization (PEI) phase to the Driver Execution Environment (DXE) phase requires identifying failures that occur as firmware migrates execution from temporary cache to permanent system" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="debugging-uefi-pei-to-dxe-handoff-boot-stalls">Debugging UEFI
+PEI-to-DXE Handoff Boot Stalls</h1>
+<p>Troubleshooting boot stalls during the transition from the Pre-EFI
+Initialization (PEI) phase to the Driver Execution Environment (DXE)
+phase requires identifying failures that occur as firmware migrates
+execution from temporary cache to permanent system memory. This guide
+details the technical mechanisms behind the PEI-to-DXE handoff, outlines
+common root causes of execution hangs, and provides step-by-step
+methodologies firmware engineers use to isolate and resolve these issues
+using hardware and software diagnostics.</p>
+<h3 id="the-mechanics-of-the-pei-to-dxe-transition">The Mechanics of the
+PEI-to-DXE Transition</h3>
+<p>The handoff is managed by the DXE Initial Program Loader (DxeIpl) PEI
+Module (PEIM). To understand where execution freezes, developers monitor
+these sequential operations:</p>
+<ol type="1">
+<li><strong>Memory Initialization:</strong> The system transitions from
+temporary Cache-as-RAM (CAR) to permanent system memory (DRAM).</li>
+<li><strong>HOB List Finalization:</strong> PEI collects platform data,
+memory maps, and boot status into the Hand-Off Block (HOB) list.</li>
+<li><strong>Firmware Volume (FV) Discovery:</strong> The DxeIpl locates
+the Firmware Volume containing the DXE Foundation (DXE Core).</li>
+<li><strong>Architectural State Transition:</strong> If PEI operates in
+32-bit mode (IA32) and DXE executes in 64-bit mode (X64), the DxeIpl
+constructs 64-bit page tables, configures control registers (such as
+enabling PAE and Long Mode via CR0, CR3, and CR4), and switches
+processor execution modes.</li>
+<li><strong>Entry Point Invocation:</strong> DxeIpl calls the DXE Core
+entry point, passing the address of the HOB list.</li>
+</ol>
+<h3 id="common-failure-modes">Common Failure Modes</h3>
+<p>Stalls at this boundary typically stem from hardware state changes or
+memory structure corruption:</p>
+<ul>
+<li><strong>Stack and Memory Migration Failures:</strong> If DRAM
+initialization succeeds but memory timings, termination resistances, or
+refresh rates are unstable, tearing down CAR and copying the stack to
+DRAM causes silent corruption.</li>
+<li><strong>Corrupt or Malformed HOBs:</strong> If a PEIM produces an
+invalid HOB (e.g., miscalculated length, missing terminator HOB, or
+overlapping memory resource descriptors), the DXE Core will crash or
+loop infinitely while parsing the list.</li>
+<li><strong>Paging and Mode Switching Errors:</strong> When
+transitioning to 64-bit long mode, incorrect page table mappings,
+unaligned page directories, or mapping execution-disabled (NX/XD)
+attributes over the DXE Core code region trigger immediate General
+Protection (<code>#GP</code>) or Page Fault (<code>#PF</code>)
+exceptions.</li>
+<li><strong>Firmware Volume Decompression Errors:</strong> If the DXE
+Firmware Volume is compressed (e.g., using Tiano or LZMA compression)
+and the decompressor receives corrupted headers or insufficient scratch
+space, execution deadlocks.</li>
+</ul>
+<h3 id="primary-troubleshooting-methodologies">Primary Troubleshooting
+Methodologies</h3>
+<p>Firmware engineers employ a combination of hardware instruments,
+telemetry, and source instrumentation to isolate the stall point.</p>
+<h4 id="1-port-80h-checkpoints">1. Port 80h Checkpoints</h4>
+<p>Port 80h POST codes provide the fastest indicator of handoff
+progress. Developers monitor POST codes output by
+<code>DxeIplPeim</code> and the early <code>DxeMain</code> function. A
+freeze between the last PEI status code (such as memory configured) and
+the first DXE status code (such as DXE Core loaded) narrows the failure
+to the mode switch, relocation, or HOB verification.</p>
+<h4 id="2-early-serial-telemetry">2. Early Serial Telemetry</h4>
+<p>When POST codes are too coarse, developers route debug prints to a
+low-overhead interface, typically an on-chip UART, LPC debug card, or
+USB debug port.</p>
+<ul>
+<li><p>Enable high-verbosity logging (<code>DEBUG_VERBOSE</code> or
+<code>DEBUG_INFO</code>) in <code>MdeModulePkg/Core/DxeIplPeim</code>
+and <code>MdeModulePkg/Core/Dxe</code>.</p></li>
+<li><p>Insert explicit raw I/O writes or assembly-level character writes
+directly before and after the DXE Core invocation:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Direct serial write inside DxeLoadCore before handoff</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>DebugPrint <span class="op">(</span>DEBUG_INFO<span class="op">,</span> <span class="st">&quot;Handing off to DXE Core at: 0x</span><span class="sc">%p\n</span><span class="st">&quot;</span><span class="op">,</span> <span class="op">(</span>VOID<span class="op">*)(</span>UINTN<span class="op">)</span>DxeCoreEntryPoint<span class="op">);</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>DxeCoreEntryPoint <span class="op">(</span>HobList<span class="op">);</span></span></code></pre></div></li>
+<li><p>If serial output ceases before the DXE Core header prints, verify
+whether the serial controller's base address changed or if its clock
+gating was altered during the transition.</p></li>
+</ul>
+<h4 id="3-hardware-jtagice-debugging">3. Hardware JTAG/ICE
+Debugging</h4>
+<p>In-Circuit Emulators (ICE) connected via JTAG/XDP provide
+non-intrusive visibility when the CPU halts without emitting serial
+data.</p>
+<ul>
+<li><strong>Halt and Inspect PC/IP:</strong> Halt the target immediately
+after the stall occurs to observe the Instruction Pointer
+(<code>RIP</code>/<code>EIP</code>).</li>
+<li><strong>Inspect Registers:</strong> If the core has entered an
+exception loop, check the Interrupt Descriptor Table
+(<code>IDTR</code>), <code>CR2</code> (Page Fault Linear Address), and
+<code>CR3</code> (Page Table Base) to diagnose access violations.</li>
+<li><strong>Stack Backtrace:</strong> Verify that the stack pointer
+(<code>RSP</code>/<code>ESP</code>) points to valid, accessible DRAM
+addresses and matches the location assigned during the CAR
+teardown.</li>
+</ul>
+<h4 id="4-validating-the-hob-list-structure">4. Validating the HOB List
+Structure</h4>
+<p>If the DXE Core entry point is reached but hangs immediately, the HOB
+list is frequently the cause. Developers validate HOB integrity by
+implementing a validation routine at the start of
+<code>DxeMain</code>:</p>
+<ul>
+<li>Verify the first HOB is <code>EFI_HOB_TYPE_HANDOFF</code> and
+contains valid boot modes and memory ranges.</li>
+<li>Traverse the list using <code>GetNextHob()</code> to ensure every
+block has a valid, non-zero length and ends with
+<code>EFI_HOB_TYPE_END_OF_HOB_LIST</code>.</li>
+<li>Confirm that memory allocation HOBs do not overlap with the DXE Core
+image relocation target.</li>
+</ul>
+<h4 id="5-page-table-and-memory-map-auditing">5. Page Table and Memory
+Map Auditing</h4>
+<p>When switching to Long Mode, developers inspect the identity-mapped
+page tables created by DxeIpl. Engineers verify that:</p>
+<ul>
+<li>The page directory entries accurately map all physical memory where
+the DXE Core and stacks reside.</li>
+<li>The Global Descriptor Table (<code>GDT</code>) registers are loaded
+with valid 64-bit code and data segment selectors before jumping to the
+DXE Core.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/debugging-uefi-pei-to-dxe-handoff-boot-stalls';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

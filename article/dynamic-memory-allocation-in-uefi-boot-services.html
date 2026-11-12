@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Memory Allocation in UEFI Boot Services - uefi</title>
+    <meta name="description" content="In bare-metal UEFI (Unified Extensible Firmware Interface) programming, standard C runtime environments do not exist natively, making traditional functions like malloc() and free() unavailable. Instead, developers interact directly with the UEFI System Ta">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/dynamic-memory-allocation-in-uefi-boot-services">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Dynamic Memory Allocation in UEFI Boot Services - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/dynamic-memory-allocation-in-uefi-boot-services" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="In bare-metal UEFI (Unified Extensible Firmware Interface) programming, standard C runtime environments do not exist natively, making traditional functions like malloc() and free() unavailable. Instead, developers interact directly with the UEFI System Ta" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="dynamic-memory-allocation-in-uefi-boot-services">Dynamic Memory
+Allocation in UEFI Boot Services</h1>
+<p>In bare-metal UEFI (Unified Extensible Firmware Interface)
+programming, standard C runtime environments do not exist natively,
+making traditional functions like <code>malloc()</code> and
+<code>free()</code> unavailable. Instead, developers interact directly
+with the UEFI System Table to perform dynamic memory management through
+UEFI Boot Services. This article explores how developers allocate,
+manage, and free dynamic memory using UEFI Boot Services APIs such as
+<code>AllocatePool</code>, <code>FreePool</code>,
+<code>AllocatePages</code>, and <code>FreePages</code>, while addressing
+memory types, alignment, and lifecycle constraints.</p>
+<h2 id="the-role-of-uefi-boot-services">The Role of UEFI Boot
+Services</h2>
+<p>When developing UEFI applications or drivers via the EDK II (EFI
+Development Kit II) framework, dynamic memory management is facilitated
+by the Global Boot Services pointer (<code>gBS</code>). The firmware
+manages all system RAM prior to the operating system loading and exposes
+functions to request arbitrary buffers or page-aligned blocks.</p>
+<p>Unlike standard application-level memory allocation, UEFI requires
+developers to specify the <em>memory type</em> being allocated. This
+designation determines how the memory is treated and whether it persists
+after the operating system takes control via
+<code>ExitBootServices()</code>.</p>
+<h2 id="pool-allocation-the-malloc-equivalent">Pool Allocation: The
+<code>malloc</code> Equivalent</h2>
+<p>For variable-sized, arbitrary byte allocations similar to
+<code>malloc()</code>, developers use
+<code>gBS-&gt;AllocatePool()</code>. Releasing this memory is
+accomplished using <code>gBS-&gt;FreePool()</code>.</p>
+<h3 id="syntax-and-parameters">Syntax and Parameters</h3>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>EFI_STATUS</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>EFIAPI</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>AllocatePool <span class="op">(</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  IN  EFI_MEMORY_TYPE  PoolType<span class="op">,</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  IN  UINTN            Size<span class="op">,</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  OUT VOID             <span class="op">**</span>Buffer</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">);</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>EFI_STATUS</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>EFIAPI</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>FreePool <span class="op">(</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  IN VOID  <span class="op">*</span>Buffer</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>  <span class="op">);</span></span></code></pre></div>
+<ul>
+<li><strong><code>PoolType</code></strong>: Identifies the intended
+purpose of the memory block. Common types include:
+<ul>
+<li><code>EfiBootServicesData</code>: General-purpose memory used during
+the pre-boot phase. It is released back to the OS after
+<code>ExitBootServices()</code> is called.</li>
+<li><code>EfiRuntimeServicesData</code>: Memory that remains intact and
+accessible even after the OS kernel has booted.</li>
+<li><code>EfiLoaderData</code>: Memory reserved for loading executable
+images such as OS loaders or UEFI drivers.</li>
+</ul></li>
+<li><strong><code>Size</code></strong>: The number of bytes to
+allocate.</li>
+<li><strong><code>Buffer</code></strong>: A pointer to a pointer that
+receives the base address of the allocated block.</li>
+</ul>
+<h3 id="example-implementation">Example Implementation</h3>
+<div class="sourceCode" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;Uefi.h&gt;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;Library/UefiBootServicesTableLib.h&gt;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="pp">#include </span><span class="im">&lt;Library/UefiLib.h&gt;</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>EFI_STATUS</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>AllocateExampleBuffer <span class="op">(</span>VOID<span class="op">)</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="op">{</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    EFI_STATUS Status<span class="op">;</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    UINT8      <span class="op">*</span>Buffer <span class="op">=</span> NULL<span class="op">;</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    UINTN      BufferSize <span class="op">=</span> <span class="dv">1024</span><span class="op">;</span> <span class="co">// 1 KB</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Allocate memory from the boot services pool</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    Status <span class="op">=</span> gBS<span class="op">-&gt;</span>AllocatePool <span class="op">(</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>                    EfiBootServicesData<span class="op">,</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>                    BufferSize<span class="op">,</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>                    <span class="op">(</span>VOID <span class="op">**)&amp;</span>Buffer</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>                    <span class="op">);</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>EFI_ERROR <span class="op">(</span>Status<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> Status<span class="op">;</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Use the allocated buffer</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    Buffer<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> <span class="bn">0xAA</span><span class="op">;</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Free the allocated memory</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    Status <span class="op">=</span> gBS<span class="op">-&gt;</span>FreePool <span class="op">(</span>Buffer<span class="op">);</span></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> Status<span class="op">;</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>Unlike <code>free()</code>, which does not typically return a status
+code, <code>FreePool()</code> returns an <code>EFI_STATUS</code> (such
+as <code>EFI_INVALID_PARAMETER</code> if an invalid pointer is passed),
+allowing developers to directly verify deallocation success.</p>
+<h2 id="page-allocation-coarse-grained-management">Page Allocation:
+Coarse-Grained Management</h2>
+<p>When an allocation requires page alignment (typically 4 KB
+boundaries) or physical address constraints—often necessary for Direct
+Memory Access (DMA) or loading executable images—developers use
+<code>gBS-&gt;AllocatePages()</code> and
+<code>gBS-&gt;FreePages()</code>.</p>
+<h3 id="syntax-and-types">Syntax and Types</h3>
+<div class="sourceCode" id="cb3"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>EFI_STATUS</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>EFIAPI</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>AllocatePages <span class="op">(</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  IN     EFI_ALLOCATE_TYPE     Type<span class="op">,</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  IN     EFI_MEMORY_TYPE       MemoryType<span class="op">,</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  IN     UINTN                 Pages<span class="op">,</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  IN OUT EFI_PHYSICAL_ADDRESS  <span class="op">*</span>Memory</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="op">);</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>EFI_STATUS</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>EFIAPI</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>FreePages <span class="op">(</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>  IN EFI_PHYSICAL_ADDRESS  Memory<span class="op">,</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  IN UINTN                 Pages</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  <span class="op">);</span></span></code></pre></div>
+<ul>
+<li><strong><code>Type</code></strong>: Dictates address placement
+constraints:
+<ul>
+<li><code>AllocateAnyPages</code>: Allocates any available pages that
+fit the requirement.</li>
+<li><code>AllocateMaxAddress</code>: Allocates pages at or below a
+specified maximum physical address.</li>
+<li><code>AllocateAddress</code>: Allocates pages starting at a specific
+physical address (useful for legacy hardware constraints).</li>
+</ul></li>
+<li><strong><code>Pages</code></strong>: The number of 4 KB pages
+requested.</li>
+<li><strong><code>Memory</code></strong>: For
+<code>AllocateAnyPages</code>, this is an output parameter receiving the
+base address. For fixed types, it is an input containing the target
+boundary or address.</li>
+</ul>
+<h2
+id="critical-differences-between-malloc-and-uefi-allocation">Critical
+Differences Between <code>malloc</code> and UEFI Allocation</h2>
+<ol type="1">
+<li><strong>Explicit Memory Lifecycles</strong>: Standard
+<code>malloc</code> creates heap space tied to the lifecycle of the
+user-space process. In UEFI, developers must choose whether data
+persists into runtime OS operations or gets purged at
+<code>ExitBootServices()</code>.</li>
+<li><strong>Granular Error Reporting</strong>: UEFI memory APIs return
+explicit error codes, such as <code>EFI_OUT_OF_RESOURCES</code> or
+<code>EFI_NOT_FOUND</code>, making it straightforward to diagnose
+failure modes compared to a simple <code>NULL</code> return from
+<code>malloc</code>.</li>
+<li><strong>Alignment Guarantees</strong>: <code>AllocatePages()</code>
+guarantees 4 KB alignment by default, removing the need for auxiliary
+alignment functions like <code>posix_memalign()</code> or
+<code>_aligned_malloc()</code>.</li>
+<li><strong>No Implicit Garbage Collection</strong>: If an application
+exits without calling <code>FreePool()</code>, memory allocated with
+types like <code>EfiRuntimeServicesData</code> can remain reserved,
+potentially reducing the usable memory pool for the incoming operating
+system.</li>
+</ol></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/dynamic-memory-allocation-in-uefi-boot-services';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

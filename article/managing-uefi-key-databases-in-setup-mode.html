@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Managing UEFI Key Databases in Setup Mode - uefi</title>
+    <meta name="description" content="UEFI Setup Mode is a specialized administrative state within the Secure Boot architecture that grants administrators unrestricted access to the system&#39;s cryptographic key databases. This article explains how entering Setup Mode disables standard signature">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/managing-uefi-key-databases-in-setup-mode">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Managing UEFI Key Databases in Setup Mode - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/managing-uefi-key-databases-in-setup-mode" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI Setup Mode is a specialized administrative state within the Secure Boot architecture that grants administrators unrestricted access to the system&#39;s cryptographic key databases. This article explains how entering Setup Mode disables standard signature" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="managing-uefi-key-databases-in-setup-mode">Managing UEFI Key
+Databases in Setup Mode</h1>
+<p>UEFI Setup Mode is a specialized administrative state within the
+Secure Boot architecture that grants administrators unrestricted access
+to the system's cryptographic key databases. This article explains how
+entering Setup Mode disables standard signature verification
+requirements, allowing users to safely clear, replace, or customize the
+Platform Key (PK), Key Exchange Key (KEK), and authorized or forbidden
+signature databases (db and dbx), before locking the system back into
+User Mode.</p>
+<h3 id="the-role-of-setup-mode-in-uefi-architecture">The Role of Setup
+Mode in UEFI Architecture</h3>
+<p>Secure Boot operates in one of two primary states: <strong>User
+Mode</strong> and <strong>Setup Mode</strong>. This status is defined by
+the presence or absence of a Platform Key (PK), tracked internally by
+the UEFI variable <code>SetupMode</code>.</p>
+<ul>
+<li><strong>User Mode (<code>SetupMode = 0</code>):</strong> The system
+has an active Platform Key installed. In this state, any update to the
+signature databases (<code>db</code>, <code>dbx</code>, or
+<code>KEK</code>) must be cryptographically signed by an existing,
+authorized key higher up in the hierarchy.</li>
+<li><strong>Setup Mode (<code>SetupMode = 1</code>):</strong> The system
+has no Platform Key installed. In this state, the platform is considered
+"unowned" from a cryptographic standpoint.</li>
+</ul>
+<h3 id="bypassing-cryptographic-verification">Bypassing Cryptographic
+Verification</h3>
+<p>Under normal conditions in User Mode, the UEFI firmware enforces a
+strict hierarchy to prevent unauthorized modification of boot
+policies:</p>
+<ol type="1">
+<li>The <strong>Platform Key (PK)</strong> authorizes updates to the PK
+and the Key Exchange Key (KEK).</li>
+<li>The <strong>Key Exchange Key (KEK)</strong> authorizes updates to
+the allowed signature database (<code>db</code>) and the forbidden
+signature database (<code>dbx</code>).</li>
+<li>The <strong>Signature Databases (<code>db</code> and
+<code>dbx</code>)</strong> authorize or block UEFI binaries, operating
+system bootloaders, and drivers.</li>
+</ol>
+<p>When a device is placed into Setup Mode, the firmware suspends the
+requirement for updates to be cryptographically signed by an existing
+key. Because no Platform Key exists to validate incoming changes, the
+firmware accepts unsigned payload structures directly into non-volatile
+memory (NVRAM). This mechanism allows users to alter the entire security
+hierarchy without possessing original OEM private keys.</p>
+<h3 id="how-users-clear-key-databases">How Users Clear Key
+Databases</h3>
+<p>Clearing keys is typically the first step in taking control of the
+Secure Boot environment:</p>
+<ol type="1">
+<li><strong>Firmware Interface Action:</strong> Users access the
+UEFI/BIOS settings menu and locate the Secure Boot administration
+section. Selecting options such as "Clear Secure Boot Keys," "Delete
+PK," or "Erase All Security Keys" triggers the reset.</li>
+<li><strong>Deletion of the Platform Key:</strong> Deleting the PK
+immediately causes the firmware to set the <code>SetupMode</code>
+variable to <code>1</code>.</li>
+<li><strong>Database Purge:</strong> Once the PK is cleared, the system
+permits the deletion of the <code>KEK</code>, <code>db</code>, and
+<code>dbx</code> without prompting for cryptographic authorization. Many
+UEFI menus offer a one-step action that deletes all databases
+simultaneously.</li>
+</ol>
+<h3 id="modifying-and-enrolling-custom-keys">Modifying and Enrolling
+Custom Keys</h3>
+<p>Once in Setup Mode, the user can populate the empty databases with
+custom certificates to build a custom trust chain:</p>
+<ul>
+<li><strong>Firmware Enrollment:</strong> Many modern UEFI
+implementations allow users to browse local filesystems (such as a
+FAT32-formatted USB drive) to import <code>.cer</code>,
+<code>.der</code>, or <code>.auth</code> files directly into
+<code>db</code>, <code>dbx</code>, and <code>KEK</code>.</li>
+<li><strong>Programmatic Enrollment:</strong> Because signature checks
+are bypassed, users can run custom OS-level utilities (such as
+<code>sbctl</code> or <code>efi-updatevar</code> on Linux) to push new
+certificates directly into the UEFI NVRAM variables.</li>
+<li><strong>Granular Updates:</strong> Administrators can append
+specific hash values or certificates to <code>dbx</code> to block known
+vulnerable bootloaders, or append custom signing certificates to
+<code>db</code> to allow self-compiled kernels and drivers to
+execute.</li>
+</ul>
+<h3 id="closing-setup-mode">Closing Setup Mode</h3>
+<p>Setup Mode is strictly a temporary administrative state. While in
+Setup Mode, the system cannot enforce Secure Boot protections, as any
+executable can run without validation.</p>
+<p>To exit Setup Mode and re-establish security enforcement, a new
+Platform Key must be enrolled. The moment a valid public key is written
+to the <code>PK</code> variable, the UEFI firmware automatically sets
+<code>SetupMode</code> to <code>0</code>, transitioning the machine back
+into User Mode. From that point forward, all further changes to any key
+database require signatures validated by the newly installed key
+hierarchy.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/managing-uefi-key-databases-in-setup-mode';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

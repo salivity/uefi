@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Handles Fatal Errors During PEI Phase - uefi</title>
+    <meta name="description" content="During the Pre-EFI Initialization (PEI) phase of UEFI, the firmware operates in a constrained environment with limited memory, relying primarily on Cache-as-RAM (CAR) to configure critical platform hardware. This article examines how the PEI Foundation an">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-handles-fatal-errors-during-pei-phase">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Handles Fatal Errors During PEI Phase - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-handles-fatal-errors-during-pei-phase" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="During the Pre-EFI Initialization (PEI) phase of UEFI, the firmware operates in a constrained environment with limited memory, relying primarily on Cache-as-RAM (CAR) to configure critical platform hardware. This article examines how the PEI Foundation an" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-handles-fatal-errors-during-pei-phase">How UEFI Handles
+Fatal Errors During PEI Phase</h1>
+<p>During the Pre-EFI Initialization (PEI) phase of UEFI, the firmware
+operates in a constrained environment with limited memory, relying
+primarily on Cache-as-RAM (CAR) to configure critical platform hardware.
+This article examines how the PEI Foundation and individual PEI Modules
+(PEIMs) identify, communicate, and react to unrecoverable system faults.
+It outlines the architectural mechanisms used to signal failures,
+trigger system recovery procedures, output diagnostics, and safely halt
+execution to prevent hardware damage.</p>
+<h3 id="status-code-reporting-and-hardware-diagnostics">Status Code
+Reporting and Hardware Diagnostics</h3>
+<p>When a PEIM encounters a fatal condition—such as a failure in CPU
+initialization, critical chipset initialization, or early clock
+configuration—it immediately notifies the platform through the
+<code>EFI_PEI_REPORT_STATUS_CODE_PPI</code> service. Because standard
+operating system displays, graphics drivers, and advanced logging
+services are not yet available, the firmware broadcasts these status
+codes through low-level hardware interfaces.</p>
+<p>These diagnostic mechanisms typically include:</p>
+<ul>
+<li><strong>I/O Port Writes (Port 80h/84h):</strong> The firmware sends
+hexadecimal POST codes to physical diagnostic ports, which can be read
+using onboard two-digit seven-segment displays or dedicated PCI/PCIe
+diagnostic cards.</li>
+<li><strong>Serial Debugging:</strong> If enabled, raw ASCII text or
+structured debug packets are transmitted over an embedded UART or LPC
+serial port.</li>
+<li><strong>Acoustic and Visual Signals:</strong> The platform may
+trigger specific beep code patterns via the platform speaker or blink
+designated motherboard LEDs to indicate the broad category of the
+failure.</li>
+</ul>
+<h3 id="invoking-crisis-recovery">Invoking Crisis Recovery</h3>
+<p>A fatal error that prevents normal booting often stems from corrupted
+non-volatile storage (such as corrupt SPI flash) or a catastrophic
+failure during main memory (DRAM) detection and training. When normal
+boot paths cannot proceed, the PEI Foundation checks for recovery
+readiness by querying the <code>EFI_PEI_RECOVERY_MODULE_PPI</code>.</p>
+<p>If the core platform hardware is sufficiently functional to execute
+recovery routines, the firmware switches into Crisis Recovery Mode:</p>
+<ol type="1">
+<li>The firmware initializes minimal storage controllers (such as basic
+USB, SATA, or eMMC host controllers) using dedicated recovery
+PEIMs.</li>
+<li>It scans external media for a valid recovery capsule or firmware
+image.</li>
+<li>If a valid, cryptographically verified recovery image is found, the
+firmware flashes the corrupted firmware regions or boots from the
+payload to restore the platform to a working state.</li>
+</ol>
+<h3 id="system-reset-and-fallback-boot-paths">System Reset and Fallback
+Boot Paths</h3>
+<p>If recovery is not supported or fails, the PEIM can request a
+system-level reset via the <code>EFI_PEI_RESET_PPI</code> service. The
+firmware specifies the reset type depending on the error severity:</p>
+<ul>
+<li><strong>Warm Reset:</strong> Used to retry memory training or adjust
+hardware timings if an early negotiation phase failed transiently.</li>
+<li><strong>Cold Reset:</strong> Strips power to reset all platform
+registers and re-execute from the reset vector in the Security (SEC)
+phase.</li>
+<li><strong>Reset with Platform-Specific Fallbacks:</strong> Some
+implementations utilize a dual-BIOS or dual-image architecture. If the
+primary image repeatedly produces a fatal status code, a dedicated
+hardware watchdog or programmable logic device (such as an FPGA, CPLD,
+or EC) swaps the active SPI flash chip to a redundant backup image
+before triggering a cold reset.</li>
+</ul>
+<h3 id="execution-halting-via-deadloops">Execution Halting via
+Deadloops</h3>
+<p>When an error cannot be resolved via recovery, retried via reset, or
+safely bypassed, the PEI phase halts execution entirely to prevent
+physical hardware damage and data corruption.</p>
+<p>The firmware calls architecture-specific halt functions, typically
+implemented as <code>CpuDeadLoop()</code>. This routine disables
+hardware interrupts (<code>CLI</code> instruction on x86/x64) and
+executes an infinite loop:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>VOID</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>EFIAPI</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>CpuDeadLoop <span class="op">(</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  VOID</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="op">)</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="op">{</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">volatile</span> UINTN  Index<span class="op">;</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> <span class="op">(</span>Index <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> Index <span class="op">==</span> <span class="dv">0</span><span class="op">;);</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>This effectively freezes the CPU core in a known, static state while
+retaining register contents, allowing firmware engineers to attach a
+hardware-level debugger (such as JTAG or Intel DCI) to inspect the call
+stack, global descriptors, and processor status at the exact moment of
+failure.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-handles-fatal-errors-during-pei-phase';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

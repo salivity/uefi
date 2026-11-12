@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Socket ARM Servers and UEFI Runtime Services - uefi</title>
+    <meta name="description" content="This article examines how server-grade ARM platforms execute UEFI runtime services across multi-socket, Non-Uniform Memory Access (NUMA) topologies. Implementing unified firmware services on multi-socket ARM systems requires complex coordination between A">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/multi-socket-arm-servers-and-uefi-runtime-services">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Multi-Socket ARM Servers and UEFI Runtime Services - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/multi-socket-arm-servers-and-uefi-runtime-services" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article examines how server-grade ARM platforms execute UEFI runtime services across multi-socket, Non-Uniform Memory Access (NUMA) topologies. Implementing unified firmware services on multi-socket ARM systems requires complex coordination between A" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="multi-socket-arm-servers-and-uefi-runtime-services">Multi-Socket
+ARM Servers and UEFI Runtime Services</h1>
+<p>This article examines how server-grade ARM platforms execute UEFI
+runtime services across multi-socket, Non-Uniform Memory Access (NUMA)
+topologies. Implementing unified firmware services on multi-socket ARM
+systems requires complex coordination between ARM's Exception Level
+architecture, hardware-enforced cache coherency protocols, and runtime
+memory mapping. The following sections break down the underlying
+hardware fabrics, memory management workflows, cross-socket
+synchronization, and the delegation of critical runtime tasks to secure
+firmware environments.</p>
+<h3
+id="cache-coherent-interconnects-and-topology-discovery">Cache-Coherent
+Interconnects and Topology Discovery</h3>
+<p>At the hardware layer, multi-socket ARM platforms—such as those built
+on ARM Neoverse N-series or V-series cores—rely on coherent mesh
+networks and chip-to-chip links (e.g., CCIX, CXL, or vendor-specific
+inter-socket fabrics). Before UEFI runtime services can function across
+sockets, the boot firmware must initialize these interconnects during
+the Pre-EFI Initialization (PEI) and Driver Execution Environment (DXE)
+phases.</p>
+<p>The hardware fabric enforces hardware-managed cache coherency across
+physical socket boundaries using directory-based snooping protocols.
+When the primary socket's core executes a UEFI runtime service, any
+shared data structure residing in memory attached to a secondary socket
+is transparently cached and synchronized by the interconnect. System
+hardware presents this physical memory map as a coherent NUMA space,
+managed downstream by the ARM Generic Interrupt Controller (GICv3/GICv4)
+to route inter-processor interrupts (IPIs) across socket domains.</p>
+<h3 id="memory-allocation-and-setvirtualaddressmap">Memory Allocation
+and SetVirtualAddressMap</h3>
+<p>UEFI defines two distinct execution stages for memory: physical mode
+prior to OS handover, and virtual mode after the operating system boots.
+Because UEFI runtime services persist alongside the operating system,
+they must transition into the OS's virtual address space.</p>
+<ol type="1">
+<li><strong>Memory Reservation:</strong> During early boot, the DXE
+foundation allocates memory regions tagged specifically as
+<code>EfiRuntimeServicesCode</code> and
+<code>EfiRuntimeServicesData</code>. On multi-socket systems, firmware
+implementations typically allocate these regions from the boot socket's
+local memory to minimize early memory-controller dependencies, though
+the pages remain globally accessible across all sockets via the coherent
+fabric.</li>
+<li><strong>Virtual Mapping Transition:</strong> When the operating
+system initializes, it calls the <code>SetVirtualAddressMap()</code>
+runtime service. The OS provides a descriptor array mapping UEFI's
+physical runtime pages into the operating system’s high-memory virtual
+address space.</li>
+<li><strong>Descriptor Fixups:</strong> The UEFI runtime drivers update
+their internal pointers to reflect these new virtual addresses. On ARM
+platforms compliant with the Server Base Boot Requirements (SBBR) and
+Server Base System Architecture (SBSA), this virtual mapping must be
+homogeneous across all online cores and sockets. Every core on Socket 0
+and Socket 1 shares the identical page-table translations for UEFI
+runtime services.</li>
+</ol>
+<h3 id="concurrency-and-cross-socket-synchronization">Concurrency and
+Cross-Socket Synchronization</h3>
+<p>Standard UEFI runtime services are strictly non-reentrant. Functions
+such as <code>GetVariable</code>, <code>SetVariable</code>,
+<code>GetTime</code>, and <code>ResetSystem</code> cannot be executed
+concurrently by multiple processing cores.</p>
+<p>In a system spanning multiple sockets and hundreds of physical
+threads, firmware mitigates concurrency issues through explicit software
+locking:</p>
+<ul>
+<li><strong>Spinlocks and Barriers:</strong> Runtime drivers utilize
+architectural ARM spinlocks based on Load-Exclusive/Store-Exclusive
+primitives (<code>LDREX</code>/<code>STREX</code> in ARMv8-A or
+Load-Acquire/Store-Release instructions in ARMv8.1+). These operations
+trigger coherency updates across the inter-socket fabric to ensure
+atomic variable access.</li>
+<li><strong>Operating System Responsibility:</strong> The UEFI
+specification mandates that the calling operating system must serialize
+calls to runtime services. If a kernel thread on Socket 1 executes
+<code>SetVariable</code>, the OS kernel must prevent another thread on
+Socket 0 from entering a runtime service until the first invocation
+completes.</li>
+</ul>
+<h3
+id="firmware-partitioning-and-secure-execution-el3--standalone-mm">Firmware
+Partitioning and Secure Execution (EL3 / Standalone MM)</h3>
+<p>In modern server-grade ARM implementations, standard UEFI runtime
+drivers running in Non-Secure EL1 or EL2 do not directly manipulate
+critical platform components. Instead, they act as thin dispatchers that
+delegate requests to higher privilege levels:</p>
+<h4 id="power-management-via-psci-el3">Power Management via PSCI
+(EL3)</h4>
+<p>Services like <code>ResetSystem()</code> delegate system resets, core
+power-downs, and socket-level power transitions to the Power State
+Coordination Interface (PSCI). PSCI runs within Secure EL3 under ARM
+Trusted Firmware (TF-A). When a reset call is triggered, the core
+executes a Secure Monitor Call (<code>SMC</code>), elevating execution
+to EL3, where the firmware coordinates with platform power-management
+integrated circuits (PMICs) and intra-socket logic to reboot the entire
+topology coherently.</p>
+<h4
+id="non-volatile-variables-via-standalone-mm-secure-el0el1">Non-Volatile
+Variables via Standalone MM (Secure EL0/EL1)</h4>
+<p>Modifications to UEFI variables via <code>SetVariable</code> must be
+persistently stored in SPI-NOR flash or dedicated non-volatile storage,
+which usually resides on a specific socket's bus. Rather than allowing
+raw access from the non-secure operating system, platforms utilize ARM
+Standalone Management Mode (Standalone MM):</p>
+<ul>
+<li>The OS invokes the UEFI runtime service at Non-Secure EL1.</li>
+<li>The runtime driver triggers an <code>SMC</code>, transitioning the
+CPU to EL3.</li>
+<li>EL3 dispatches the payload to Secure Partition Manager (SPM),
+routing execution to a Standalone MM instance operating in Secure EL0 or
+Secure EL1.</li>
+<li>If the SPI controller resides physically on Socket 0, but the
+runtime call originated on Socket 1, the hardware fabric bridges the
+memory and I/O accesses, or the secure firmware issues an authenticated
+Inter-Processor Interrupt to dispatch the operation directly on the
+target socket.</li>
+</ul>
+<p>Through the combination of hardware-enforced cache coherency across
+interconnects, unified virtual memory mapping during OS handoff, and
+secure isolation via ARM's Exception Levels, multi-socket ARM chips
+provide stable and standard-compliant UEFI runtime interfaces regardless
+of system scale.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/multi-socket-arm-servers-and-uefi-runtime-services';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

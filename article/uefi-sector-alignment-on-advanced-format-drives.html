@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Sector Alignment on Advanced Format Drives - uefi</title>
+    <meta name="description" content="Modern storage drives frequently use Advanced Format architecture, transitioning from legacy 512-byte physical sectors to 4096-byte (4Kn) or emulated 512-byte (512e) sectors. In a Unified Extensible Firmware Interface (UEFI) environment, block drivers man">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-sector-alignment-on-advanced-format-drives">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Sector Alignment on Advanced Format Drives - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-sector-alignment-on-advanced-format-drives" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Modern storage drives frequently use Advanced Format architecture, transitioning from legacy 512-byte physical sectors to 4096-byte (4Kn) or emulated 512-byte (512e) sectors. In a Unified Extensible Firmware Interface (UEFI) environment, block drivers man" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-sector-alignment-on-advanced-format-drives">UEFI Sector
+Alignment on Advanced Format Drives</h1>
+<p>Modern storage drives frequently use Advanced Format architecture,
+transitioning from legacy 512-byte physical sectors to 4096-byte (4Kn)
+or emulated 512-byte (512e) sectors. In a Unified Extensible Firmware
+Interface (UEFI) environment, block drivers manage sector alignment by
+querying drive geometry, exposing physical-to-logical translation
+metrics through standard firmware protocols, aligning memory transfer
+buffers, and relying on partition tables structured around 4K boundaries
+to prevent costly read-modify-write cycles during pre-boot
+operations.</p>
+<p>Advanced Format drives generally present as either native 4K (4Kn),
+where both logical and physical sectors are 4096 bytes, or 512 emulation
+(512e), where the drive reports 512-byte logical sectors while
+physically committing data in 4096-byte blocks. When writes to a 512e
+drive do not align with physical sector boundaries, the storage
+controller must perform a read-modify-write (RMW) operation. RMW
+requires the drive to read the full 4096-byte physical sector into
+internal cache, modify the requested 512-byte segment, and write the
+entire 4096 bytes back to disk. This process introduces severe latency
+and degrades I/O performance.</p>
+<p>UEFI block drivers identify and handle this architecture primarily
+through the <code>EFI_BLOCK_IO_PROTOCOL</code> and the
+<code>EFI_BLOCK_IO_MEDIA</code> structure. When initializing a storage
+device, such as an NVMe, AHCI, or SAS controller, the driver executes
+low-level device queries—such as the ATA <code>IDENTIFY DEVICE</code>
+command, SCSI <code>READ CAPACITY (16)</code>, or NVMe
+<code>Identify Controller/Namespace</code> data structures. These
+commands retrieve the logical block size, the physical block size, and
+alignment metadata, which the driver records into the media
+structure.</p>
+<p>To inform upper firmware layers and bootloaders about alignment
+properties, the driver populates specific fields within
+<code>EFI_BLOCK_IO_MEDIA</code>:</p>
+<ul>
+<li><strong>BlockSize:</strong> Indicates the logical block size
+presented by the drive (e.g., 512 bytes for 512e or 4096 bytes for
+4Kn).</li>
+<li><strong>LogicalBlocksPerPhysicalBlock:</strong> Defines how many
+logical sectors fit into one physical sector (e.g., 8 for a 512e drive
+with 4K physical sectors, or 1 for 4Kn).</li>
+<li><strong>LowestAlignedLba:</strong> Identifies the first logical
+block address (LBA) aligned to a physical sector boundary. This offset
+helps upper-level partition managers compensate for non-zero starting
+alignments.</li>
+<li><strong>IoAlign:</strong> Specifies memory alignment requirements
+for caller buffers. UEFI requires callers to pass transfer buffers
+aligned according to this power-of-two value, ensuring direct memory
+access (DMA) engines can transfer data without byte-shifting or
+boundary-crossing overhead.</li>
+</ul>
+<p>Beyond device-level reporting, UEFI system design achieves sector
+alignment through the default use of the GUID Partition Table (GPT)
+scheme. Unlike legacy MBR partitioning, which historically started the
+first partition at LBA 63 (causing inherent misalignment on 4K physical
+sectors), GPT implementations in UEFI commonly align partition
+boundaries to 1 MiB boundaries (LBA 2048 on 512-byte systems). Because 1
+MiB is evenly divisible by 4096 bytes, every partition boundary
+inherently aligns with the drive’s underlying physical sector
+layout.</p>
+<p>During runtime I/O operations, the block driver checks incoming LBA
+requests. When accessing a 4Kn drive, the driver rejects any request
+that is not an exact multiple of the 4096-byte block size. For 512e
+drives, the block driver fulfills requests at the 512-byte logical
+layer, but upper-layer file system drivers (such as the UEFI FAT driver)
+optimize their read and write clusters to match physical sector
+multiples. By pairing proper partition offsets, memory buffer alignment
+constraints, and hardware-level geometry reporting, UEFI block drivers
+minimize or eliminate unaligned access penalties during system
+initialization and OS loading.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-sector-alignment-on-advanced-format-drives';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

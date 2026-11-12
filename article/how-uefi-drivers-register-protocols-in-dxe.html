@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Drivers Register Protocols in DXE - uefi</title>
+    <meta name="description" content="This article explains how UEFI drivers publish and register protocols during the Driver Execution Environment (DXE) phase. In UEFI architecture, protocols act as standardized interfaces enabling inter-module communication. Drivers register these interface">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-drivers-register-protocols-in-dxe">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Drivers Register Protocols in DXE - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-drivers-register-protocols-in-dxe" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article explains how UEFI drivers publish and register protocols during the Driver Execution Environment (DXE) phase. In UEFI architecture, protocols act as standardized interfaces enabling inter-module communication. Drivers register these interface" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-drivers-register-protocols-in-dxe">How UEFI Drivers
+Register Protocols in DXE</h1>
+<p>This article explains how UEFI drivers publish and register protocols
+during the Driver Execution Environment (DXE) phase. In UEFI
+architecture, protocols act as standardized interfaces enabling
+inter-module communication. Drivers register these interfaces by
+attaching them to handles via DXE Core Boot Services, allowing other
+drivers, system applications, and the firmware core to discover, bind,
+and execute protocol-defined functionality.</p>
+<h2 id="the-role-of-protocols-and-handles">The Role of Protocols and
+Handles</h2>
+<p>In the DXE environment, communication is fundamentally modular. A
+protocol is a C structure containing function pointers and data
+structures, uniquely identified by a 128-bit Globally Unique Identifier
+(<code>EFI_GUID</code>). Protocols do not exist in isolation; they are
+attached to an <code>EFI_HANDLE</code>. A handle is an opaque pointer
+maintained by the DXE Core that serves as a container for one or more
+protocols representing a device, a controller, or an abstract system
+service.</p>
+<h2 id="core-registration-apis">Core Registration APIs</h2>
+<p>To register a protocol, a DXE driver uses the UEFI Boot Services
+table (<code>EFI_BOOT_SERVICES</code>, commonly accessible via the
+global pointer <code>gBS</code>). The two primary functions used for
+registration are:</p>
+<ul>
+<li><strong><code>gBS-&gt;InstallProtocolInterface()</code></strong>:
+Installs a single protocol interface onto an existing handle or creates
+a new handle if the handle pointer is initialized to
+<code>NULL</code>.</li>
+<li><strong><code>gBS-&gt;InstallMultipleProtocolInterfaces()</code></strong>:
+A variable-argument function that can install multiple protocols onto a
+single handle atomically. This is generally preferred for modern drivers
+because it reduces overhead and avoids race conditions.</li>
+</ul>
+<h2 id="the-registration-process">The Registration Process</h2>
+<ol type="1">
+<li><p><strong>Protocol Definition</strong>: The driver defines the
+protocol structure containing pointers to its internal functions and
+defines the unique <code>EFI_GUID</code> corresponding to that
+protocol.</p></li>
+<li><p><strong>Handle Allocation and Binding</strong>: Within the
+driver's entry point (e.g., <code>UefiMain</code> or
+<code>InitializeDriver</code>), the driver prepares the interface
+instance. If the protocol represents a new service or virtual device,
+the driver initializes an <code>EFI_HANDLE</code> variable to
+<code>NULL</code>. If the driver is augmenting an existing hardware
+device, it uses the device's existing handle.</p></li>
+<li><p><strong>Invoking Boot Services</strong>: The driver calls
+<code>InstallMultipleProtocolInterfaces()</code>, passing:</p>
+<ul>
+<li>The address of the target <code>EFI_HANDLE</code>.</li>
+<li>The protocol's <code>EFI_GUID</code>.</li>
+<li>The pointer to the protocol's interface structure.</li>
+<li>A terminating <code>NULL</code> parameter.</li>
+</ul></li>
+</ol>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>EFI_STATUS Status<span class="op">;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>EFI_HANDLE DriverHandle <span class="op">=</span> NULL<span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>Status <span class="op">=</span> gBS<span class="op">-&gt;</span>InstallMultipleProtocolInterfaces <span class="op">(</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>                <span class="op">&amp;</span>DriverHandle<span class="op">,</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>                <span class="op">&amp;</span>gMyCustomProtocolGuid<span class="op">,</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>                <span class="op">&amp;</span>mMyCustomProtocolInstance<span class="op">,</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>                NULL</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>                <span class="op">);</span></span></code></pre></div>
+<ol start="4" type="1">
+<li><strong>Handle Database Update</strong>: Upon receiving the call,
+the DXE Core creates a handle entry (if <code>NULL</code> was passed)
+and links the protocol GUID and interface pointer to that handle in the
+global DXE handle database.</li>
+</ol>
+<h2 id="notification-and-consumption-by-other-modules">Notification and
+Consumption by Other Modules</h2>
+<p>Once a protocol is registered, the DXE Core signals any protocol
+notification events registered via
+<code>gBS-&gt;RegisterProtocolNotify()</code>. This mechanism allows
+dependent drivers to stay dormant until their prerequisite protocols are
+installed.</p>
+<p>Other DXE modules can then locate and consume the registered protocol
+using one of several methods:</p>
+<ul>
+<li><strong><code>gBS-&gt;LocateProtocol()</code></strong>: Finds the
+first available instance of a protocol in the system.</li>
+<li><strong><code>gBS-&gt;OpenProtocol()</code></strong>: Opens a
+protocol on a specific handle with defined attributes, ensuring proper
+tracking of driver-to-device bindings.</li>
+<li><strong><code>gBS-&gt;LocateHandleBuffer()</code></strong>:
+Retrieves all handles that support a specific protocol GUID, enabling
+drivers to iterate over multiple instances of an interface across the
+platform.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-drivers-register-protocols-in-dxe';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

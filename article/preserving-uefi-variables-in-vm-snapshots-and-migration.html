@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preserving UEFI Variables in VM Snapshots and Migration - uefi</title>
+    <meta name="description" content="Unified Extensible Firmware Interface (UEFI) runtime variables store critical configuration and security metadata, such as Secure Boot keys, boot order, and operating system crash logs. In virtual environments, these variables must remain consistent acros">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/preserving-uefi-variables-in-vm-snapshots-and-migration">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Preserving UEFI Variables in VM Snapshots and Migration - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/preserving-uefi-variables-in-vm-snapshots-and-migration" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Unified Extensible Firmware Interface (UEFI) runtime variables store critical configuration and security metadata, such as Secure Boot keys, boot order, and operating system crash logs. In virtual environments, these variables must remain consistent acros" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1
+id="preserving-uefi-variables-in-vm-snapshots-and-migration">Preserving
+UEFI Variables in VM Snapshots and Migration</h1>
+<p>Unified Extensible Firmware Interface (UEFI) runtime variables store
+critical configuration and security metadata, such as Secure Boot keys,
+boot order, and operating system crash logs. In virtual environments,
+these variables must remain consistent across state-altering operations.
+Virtualization platforms and snapshot tools preserve UEFI runtime
+variables by synchronizing the hypervisor's emulated Non-Volatile RAM
+(NVRAM) storage files with active system memory states during live
+migrations and snapshot creation.</p>
+<h2 id="the-architecture-of-virtual-uefi-variables">The Architecture of
+Virtual UEFI Variables</h2>
+<p>Unlike legacy BIOS, UEFI maintains state that persists across system
+reboots and can be modified while the operating system is actively
+running via UEFI Runtime Services (such as <code>GetVariable</code> and
+<code>SetVariable</code>). In a virtual machine (VM), these variables do
+not write to physical motherboard flash chips. Instead, the hypervisor
+emulates non-volatile storage using dedicated virtual flash images (such
+as OVMF/EDK2 NVRAM files in QEMU/KVM, <code>.nvram</code> files in
+VMware ESXi, or VHDX-embedded state in Hyper-V).</p>
+<p>Because modern operating systems cache these variables in physical
+memory (RAM) and flush updates to emulated flash asynchronously,
+maintaining variable consistency requires treating both the disk-backed
+NVRAM and the guest memory as interdependent states.</p>
+<h2 id="how-snapshot-tools-preserve-uefi-state">How Snapshot Tools
+Preserve UEFI State</h2>
+<p>Snapshots capture a point-in-time state of a virtual machine. The
+approach taken depends on whether the snapshot includes running
+memory:</p>
+<ul>
+<li><strong>Crash-Consistent (Disk-Only) Snapshots:</strong> The
+hypervisor creates a copy-on-write (CoW) layer for both the VM’s virtual
+disks and its NVRAM file. If changes are written to the UEFI variables
+after the snapshot is taken, the updates route to the delta/redo log,
+leaving the original NVRAM state intact. However, because memory is
+discarded, any variable updates sitting purely in OS buffers or
+uncommitted hardware caches at the moment of capture are lost, mimicking
+a sudden power loss.</li>
+<li><strong>Live (Memory-Included) Snapshots:</strong> The hypervisor
+pauses guest vCPU execution and generates a simultaneous dump of the
+guest RAM, CPU registers, and the emulated flash device state. By
+checkpointing the memory contents alongside the NVRAM file, the snapshot
+ensures that the OS-level memory pointers to runtime services match the
+exact state of the underlying NVRAM device. When reverting, the
+hypervisor restores both files concurrently, preventing
+desynchronization between OS-cached variables and firmware tables.</li>
+</ul>
+<h2 id="how-live-migration-tools-preserve-uefi-state">How Live Migration
+Tools Preserve UEFI State</h2>
+<p>During live migration (such as VMware vMotion or QEMU Pre-Copy Live
+Migration), the goal is to transfer the VM between distinct physical
+hosts with zero observable downtime. Preserving UEFI runtime variables
+involves coordinated device state serialization:</p>
+<ol type="1">
+<li><strong>NVRAM Device Serialization:</strong> Hypervisors use
+internal device models (such as QEMU’s <code>vmstate</code> subsystem or
+ESXi's VMX device tracking) to serialize the register states, buffers,
+and active read/write commands of the emulated parallel flash (pflash)
+device.</li>
+<li><strong>Iterative Memory Transfer:</strong> While the VM continues
+running on the source host, dirty memory pages are iteratively copied to
+the destination host. Since the guest kernel’s UEFI runtime variable
+cache resides in RAM, it transfers naturally via the iterative memory
+copy loop.</li>
+<li><strong>Storage Hand-off:</strong>
+<ul>
+<li>In <strong>shared-storage architectures</strong>, the NVRAM file
+remains on a shared cluster file system (e.g., VMFS, NFS, or Ceph).
+During the final switchover phase (the "stun" period), the source host
+relinquishes the lock on the NVRAM file, and the destination host
+assumes read/write ownership.</li>
+<li>In <strong>shared-nothing (storage migration)</strong> scenarios,
+the hypervisor mirror-writes NVRAM blocks over the network alongside
+virtual disk blocks, finalizing the transfer before switching vCPU
+execution.</li>
+</ul></li>
+<li><strong>Final Synchronization:</strong> During the brief pause when
+vCPUs are switched to the destination node, any final uncommitted
+variable writes held in emulated hardware queues are flushed to the
+NVRAM file, ensuring the destination host boots the vCPUs with
+completely synchronized NVRAM and memory.</li>
+</ol>
+<h2
+id="security-implications-rollback-prevention-and-secure-boot">Security
+Implications: Rollback Prevention and Secure Boot</h2>
+<p>UEFI runtime variable preservation is crucial for maintaining
+platform security. If an attacker could trigger a rollback of only the
+NVRAM file while running newer software, they could potentially revert
+Secure Boot signature databases (<code>db</code>, <code>dbx</code>) to
+bypass blacklisted bootloader restrictions.</p>
+<p>Hypervisors prevent this vulnerability by strictly binding NVRAM
+configurations to parent disk chains and VM descriptors. Any operation
+that reverts disks or memory automatically forces the NVRAM device to
+revert to the matching cryptographic and configuration state,
+maintaining the chain of trust established at the VM's creation.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/preserving-uefi-variables-in-vm-snapshots-and-migration';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

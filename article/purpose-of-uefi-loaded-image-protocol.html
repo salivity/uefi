@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purpose of UEFI Loaded Image Protocol - uefi</title>
+    <meta name="description" content="This article provides an overview of the Unified Extensible Firmware Interface (UEFI) Loaded Image Protocol, detailing how the firmware uses it to track and inspect executing binaries. It explores the protocol&#39;s primary data fields, its role in lifecycle">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/purpose-of-uefi-loaded-image-protocol">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Purpose of UEFI Loaded Image Protocol - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/purpose-of-uefi-loaded-image-protocol" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article provides an overview of the Unified Extensible Firmware Interface (UEFI) Loaded Image Protocol, detailing how the firmware uses it to track and inspect executing binaries. It explores the protocol&#39;s primary data fields, its role in lifecycle" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="purpose-of-uefi-loaded-image-protocol">Purpose of UEFI Loaded
+Image Protocol</h1>
+<p>This article provides an overview of the Unified Extensible Firmware
+Interface (UEFI) Loaded Image Protocol, detailing how the firmware uses
+it to track and inspect executing binaries. It explores the protocol's
+primary data fields, its role in lifecycle management, and its critical
+function in debugging, system security, and memory profiling within the
+pre-boot environment.</p>
+<h2 id="defining-the-loaded-image-protocol">Defining the Loaded Image
+Protocol</h2>
+<p>In the UEFI architecture, every executable—whether it is a DXE
+driver, a UEFI application, or an operating system bootloader—is treated
+as an image. When an image is loaded into system memory using the core
+boot service <code>LoadImage()</code>, the firmware creates a unique
+handle for that image. The firmware then installs the
+<code>EFI_LOADED_IMAGE_PROTOCOL</code> directly onto this newly created
+image handle.</p>
+<p>The primary purpose of this protocol is to serve as the definitive
+descriptor for the active binary, exposing essential metadata about its
+origin, current memory location, and operational parameters.</p>
+<h2 id="locating-and-identifying-binaries-in-memory">Locating and
+Identifying Binaries in Memory</h2>
+<p>A core function of tracking executing binaries is knowing where they
+reside in physical memory. The <code>EFI_LOADED_IMAGE_PROTOCOL</code>
+interface contains two vital fields for this purpose:</p>
+<ul>
+<li><strong><code>ImageBase</code></strong>: A pointer to the starting
+address in memory where the binary's image was relocated and
+loaded.</li>
+<li><strong><code>ImageSize</code></strong>: The total continuous size
+of the loaded binary in bytes.</li>
+</ul>
+<p>By providing these boundaries, the protocol allows runtime debuggers,
+crash loggers, and system profilers to map instruction pointers back to
+specific binaries. When a fault occurs, exception handlers inspect these
+fields across known image handles to identify which module triggered the
+exception and to load the corresponding symbol tables for stack
+unwinding.</p>
+<h2 id="tracing-provenance-and-source-media">Tracing Provenance and
+Source Media</h2>
+<p>The Loaded Image Protocol links an executing binary to its physical
+or logical storage source. It tracks provenance through:</p>
+<ul>
+<li><strong><code>DeviceHandle</code></strong>: Points to the handle of
+the device from which the image was fetched, such as a specific NVMe
+drive, USB partition, or network interface.</li>
+<li><strong><code>FilePath</code></strong>: Points to an
+<code>EFI_DEVICE_PATH_PROTOCOL</code> structure containing the precise
+filesystem path or Firmware Volume (FV) GUID where the binary
+originated.</li>
+</ul>
+<p>This capability is essential for tracking boot chains. It allows
+binaries to load secondary files (such as configuration files or
+auxiliary drivers) relative to their own source location, and it enables
+logging mechanisms to record exactly which device initiated a given
+process.</p>
+<h2 id="managing-binary-lifecycles-and-execution-chains">Managing Binary
+Lifecycles and Execution Chains</h2>
+<p>The protocol also tracks the relationship between parent and child
+processes. Through the <code>ParentHandle</code> field, an executing
+image retains a reference to the binary or firmware component that
+invoked it. This establishes an auditable execution chain from the
+initial firmware platform initialization down to the OS loader.</p>
+<p>Additionally, the protocol facilitates binary lifecycle control:</p>
+<ul>
+<li><strong>Execution Arguments</strong>: The <code>LoadOptions</code>
+and <code>LoadOptionsSize</code> fields store command-line parameters
+passed to the executable upon launch.</li>
+<li><strong>Clean Termination</strong>: The protocol contains an
+<code>Unload</code> function pointer. When an image needs to be
+terminated or removed from memory via <code>UnloadImage()</code>, the
+firmware calls this routine to allow the binary to free allocated
+resources, uninstall protocols, and safely shut down.</li>
+</ul>
+<h2 id="role-in-security-and-measurement">Role in Security and
+Measurement</h2>
+<p>Modern UEFI systems rely on tracking executing binaries to enforce
+platform security. During Secure Boot and Measured Boot workflows,
+platform firmware must verify signatures and record cryptographic hashes
+of executables into the Trusted Platform Module (TPM).</p>
+<p>The <code>EFI_LOADED_IMAGE_PROTOCOL</code> acts as the anchor point
+for these security mechanisms. Security drivers locate the protocol to
+inspect the raw image data at <code>ImageBase</code>, verify that the
+binary has not been tampered with in memory, and measure the binary into
+TPM Platform Configuration Registers (PCRs) before execution is
+permitted.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/purpose-of-uefi-loaded-image-protocol';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Implementing Asynchronous I/O Callbacks in UEFI - uefi</title>
+    <meta name="description" content="The Unified Extensible Firmware Interface (UEFI) operates in a single-threaded, cooperative execution environment, yet it frequently requires non-blocking hardware operations to maintain performance. This article explains how UEFI drivers implement asynch">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/implementing-asynchronous-i-o-callbacks-in-uefi">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Implementing Asynchronous I/O Callbacks in UEFI - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/implementing-asynchronous-i-o-callbacks-in-uefi" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Unified Extensible Firmware Interface (UEFI) operates in a single-threaded, cooperative execution environment, yet it frequently requires non-blocking hardware operations to maintain performance. This article explains how UEFI drivers implement asynch" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="implementing-asynchronous-io-callbacks-in-uefi">Implementing
+Asynchronous I/O Callbacks in UEFI</h1>
+<p>The Unified Extensible Firmware Interface (UEFI) operates in a
+single-threaded, cooperative execution environment, yet it frequently
+requires non-blocking hardware operations to maintain performance. This
+article explains how UEFI drivers implement asynchronous I/O completion
+callbacks using the native <code>EFI_EVENT</code> architecture, Task
+Priority Levels (TPL), and token-based driver protocols. By leveraging
+these primitives, drivers can initiate hardware requests, register
+completion handlers, and invoke callbacks when data transfers finish
+without stalling execution.</p>
+<h3 id="the-uefi-event-driven-architecture">The UEFI Event-Driven
+Architecture</h3>
+<p>Because UEFI does not support native preemptive multithreading,
+asynchronous operations rely entirely on an event-driven architecture
+managed by UEFI Boot Services. The foundation of this system is the
+<code>EFI_EVENT</code> type.</p>
+<p>To implement an asynchronous model, a driver or caller creates an
+event associated with a notification function (the callback) and assigns
+it a specific Task Priority Level (TPL). The firmware core executes this
+callback only when the event is explicitly signaled and the current
+execution context operates at a lower priority level.</p>
+<h3 id="creating-and-registering-completion-events">Creating and
+Registering Completion Events</h3>
+<p>An asynchronous workflow begins with the creation of an event using
+the <code>CreateEvent</code> or <code>CreateEventEx</code> Boot Services
+API:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>EFI_STATUS Status<span class="op">;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>EFI_EVENT  CompletionEvent<span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>Status <span class="op">=</span> gBS<span class="op">-&gt;</span>CreateEvent <span class="op">(</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>                EVT_NOTIFY_SIGNAL<span class="op">,</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>                TPL_CALLBACK<span class="op">,</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>                MyIoCompletionCallback<span class="op">,</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>                ContextData<span class="op">,</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>                <span class="op">&amp;</span>CompletionEvent</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>                <span class="op">);</span></span></code></pre></div>
+<ul>
+<li><strong><code>EVT_NOTIFY_SIGNAL</code></strong>: Specifies that the
+event's callback function will execute when the event transitions to the
+signaled state via <code>gBS-&gt;SignalEvent()</code>.</li>
+<li><strong><code>TPL_CALLBACK</code></strong>: Sets the execution
+priority of the callback. UEFI defines hierarchical levels
+(<code>TPL_APPLICATION</code>, <code>TPL_CALLBACK</code>,
+<code>TPL_NOTIFY</code>, and <code>TPL_HIGH_LEVEL</code>). Using
+<code>TPL_CALLBACK</code> ensures the completion routine can execute
+safely without interrupting critical system state changes or high-level
+timer interrupts.</li>
+<li><strong><code>MyIoCompletionCallback</code></strong>: The function
+pointer executed upon completion.</li>
+<li><strong><code>ContextData</code></strong>: A pointer to
+caller-defined state information passed directly to the callback
+routine.</li>
+</ul>
+<h3 id="token-based-asynchronous-protocols">Token-Based Asynchronous
+Protocols</h3>
+<p>Modern UEFI specifications standardize asynchronous operations using
+token structures. Protocols such as <code>EFI_BLOCK_IO2_PROTOCOL</code>,
+<code>EFI_DISK_IO2_PROTOCOL</code>, and
+<code>EFI_SIMPLE_NETWORK_PROTOCOL</code> implement this pattern.</p>
+<p>For example, <code>EFI_BLOCK_IO2_PROTOCOL</code> defines operations
+that take an <code>EFI_BLOCK_IO2_TOKEN</code>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">typedef</span> <span class="kw">struct</span> <span class="op">{</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    EFI_EVENT   Event<span class="op">;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    EFI_STATUS  TransactionStatus<span class="op">;</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="op">}</span> EFI_BLOCK_IO2_TOKEN<span class="op">;</span></span></code></pre></div>
+<p>When an asynchronous read or write is issued:</p>
+<ol type="1">
+<li>The consumer allocates the token, initializes
+<code>Token-&gt;Event</code> (either via a registered callback or as an
+event that can be polled/waited upon), and sets
+<code>Token-&gt;TransactionStatus</code> to
+<code>EFI_NOT_READY</code>.</li>
+<li>The consumer calls the protocol method (e.g.,
+<code>ReadBlocksEx</code>), passing the token.</li>
+<li>The underlying driver enqueues the request to the hardware queue
+(e.g., NVMe submission queue or AHCI command list) and returns
+<code>EFI_SUCCESS</code> immediately, signaling that the operation has
+been queued rather than completed.</li>
+</ol>
+<h3 id="hardware-monitoring-and-completion-signaling">Hardware
+Monitoring and Completion Signaling</h3>
+<p>Because traditional hardware interrupts (IRQs) are often disabled or
+severely restricted in UEFI environments, drivers typically monitor
+asynchronous requests using periodic timer events or driver-level
+polling hooks.</p>
+<ol type="1">
+<li><p><strong>Timer-Based Polling</strong>: When an asynchronous
+transaction is queued, the underlying driver maintains an internal list
+of pending requests. The driver registers a periodic timer event
+(<code>EVT_TIMER</code>) that fires at <code>TPL_NOTIFY</code>.</p></li>
+<li><p><strong>Checking Hardware Status</strong>: Inside the timer
+callback, the driver queries the hardware's completion ring or status
+register (such as an NVMe Completion Queue).</p></li>
+<li><p><strong>Updating Status and Signaling</strong>: When the hardware
+indicates the transfer has completed, the driver updates
+<code>Token-&gt;TransactionStatus</code> with the final status code
+(such as <code>EFI_SUCCESS</code> or <code>EFI_DEVICE_ERROR</code>) and
+calls:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode c"><code class="sourceCode c"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>gBS<span class="op">-&gt;</span>SignalEvent<span class="op">(</span>Token<span class="op">-&gt;</span>Event<span class="op">);</span></span></code></pre></div></li>
+</ol>
+<h3 id="callback-execution-lifecycle">Callback Execution Lifecycle</h3>
+<p>Once <code>gBS-&gt;SignalEvent</code> is called:</p>
+<ul>
+<li>The UEFI core places the associated callback function on the event
+queue at the priority level defined during <code>CreateEvent</code>
+(e.g., <code>TPL_CALLBACK</code>).</li>
+<li>If the processor is currently running at
+<code>TPL_APPLICATION</code>, the core immediately raises the TPL and
+dispatches the callback function.</li>
+<li>If the processor is executing at an equal or higher TPL (such as
+inside the driver's polling routine at <code>TPL_NOTIFY</code>), the
+callback remains queued until the TPL drops back below
+<code>TPL_CALLBACK</code>.</li>
+<li>The callback executes with the provided <code>ContextData</code>,
+allowing the consumer to process received data, handle errors, free
+resources, or trigger subsequent I/O operations.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/implementing-asynchronous-i-o-callbacks-in-uefi';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

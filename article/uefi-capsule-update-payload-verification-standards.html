@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Capsule Update Payload Verification Standards - uefi</title>
+    <meta name="description" content="UEFI capsule updates rely on asymmetric digital signatures and cryptographic hashing rather than symmetric encryption to ensure payload authenticity and integrity prior to flashing. Defined within the UEFI Specification and aligned with industry guideline">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-capsule-update-payload-verification-standards">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Capsule Update Payload Verification Standards - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-capsule-update-payload-verification-standards" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="UEFI capsule updates rely on asymmetric digital signatures and cryptographic hashing rather than symmetric encryption to ensure payload authenticity and integrity prior to flashing. Defined within the UEFI Specification and aligned with industry guideline" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-capsule-update-payload-verification-standards">UEFI Capsule
+Update Payload Verification Standards</h1>
+<p>UEFI capsule updates rely on asymmetric digital signatures and
+cryptographic hashing rather than symmetric encryption to ensure payload
+authenticity and integrity prior to flashing. Defined within the UEFI
+Specification and aligned with industry guidelines like NIST SP 800-147,
+these standards use public key cryptography packaged in standard formats
+to verify that a firmware payload originates from an authorized vendor
+and has not been altered in transit.</p>
+<h3 id="digital-signature-schemes">Digital Signature Schemes</h3>
+<p>Payload verification primarily utilizes asymmetric key cryptography
+to validate digital signatures against a root certificate or public key
+embedded in the existing trusted firmware image:</p>
+<ul>
+<li><strong>RSA (Rivest–Shamir–Adleman):</strong> RSA is the most widely
+adopted standard across hardware vendors. Typical implementations use
+<strong>RSA-2048</strong>, <strong>RSA-3072</strong>, or
+<strong>RSA-4096</strong>. The signature schemes usually follow
+<strong>PKCS #1 v1.5</strong> or the more modern
+<strong>RSA-PSS</strong> (Probabilistic Signature Scheme).</li>
+<li><strong>ECDSA (Elliptic Curve Digital Signature Algorithm):</strong>
+Supported in modern UEFI implementations to offer equivalent security to
+high-bit RSA keys with smaller key sizes and faster compute times.
+Common elliptic curves utilized include <strong>NIST P-256</strong>,
+<strong>P-384</strong>, and <strong>P-521</strong>.</li>
+</ul>
+<h3 id="cryptographic-hash-algorithms">Cryptographic Hash
+Algorithms</h3>
+<p>Signatures are computed over a secure cryptographic hash of the
+update payload. The UEFI specification deprecates legacy algorithms in
+favor of the Secure Hash Algorithm 2 (SHA-2) family:</p>
+<ul>
+<li><strong>SHA-256:</strong> The baseline standard mandated by most
+hardware and operating system platforms.</li>
+<li><strong>SHA-384 &amp; SHA-512:</strong> Frequently used in
+enterprise, server, and high-security environments to pair with
+higher-grade keys such as RSA-3072/4096 or ECDSA P-384/P-521.</li>
+<li><strong>SHA-1 and MD5:</strong> Historically supported in older
+firmware implementations, but now strictly deprecated and rejected by
+modern UEFI secure boot and capsule verification engines due to
+collision vulnerabilities.</li>
+</ul>
+<h3 id="container-and-certificate-packaging-formats">Container and
+Certificate Packaging Formats</h3>
+<p>Firmware binaries are packaged with their verification metadata using
+standardized message formats:</p>
+<ul>
+<li><strong>PKCS #7 / CMS (Cryptographic Message Syntax):</strong>
+Capsule payloads typically wrap the signed binary along with the vendor
+signature inside a PKCS #7 SignedData structure (RFC 5652).</li>
+<li><strong>X.509 v3 Certificates:</strong> Public key infrastructure
+(PKI) inside the firmware relies on X.509 format certificates to
+establish the trust chain. A pre-enrolled root or intermediate
+certificate stored in non-volatile, write-protected system memory
+validates the signer's certificate.</li>
+</ul>
+<h3 id="industry-and-ecosystem-mandates">Industry and Ecosystem
+Mandates</h3>
+<p>While the core UEFI specification permits multiple cryptographic
+primitives, commercial implementations follow stricter platform
+guidelines:</p>
+<ul>
+<li><strong>Microsoft Windows Secure Boot and Update
+Requirements:</strong> Mandate a minimum of RSA-2048 with SHA-256 or
+ECDSA with SHA-256 for firmware updates.</li>
+<li><strong>NIST SP 800-147 (BIOS Protection Guidelines):</strong>
+Recommends cryptographic mechanisms using minimum 112-bit security
+strength (equivalent to RSA-2048 / SHA-256) for system firmware
+authenticity verification.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-capsule-update-payload-verification-standards';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

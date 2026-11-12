@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customizing UEFI BDS Phase Boot Splash Logos - uefi</title>
+    <meta name="description" content="This article provides an overview of how system integrators and Original Equipment Manufacturers (OEMs) replace the standard firmware logo with a custom boot splash during the UEFI Boot Device Selection (BDS) phase. It covers the firmware architecture res">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/customizing-uefi-bds-phase-boot-splash-logos">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Customizing UEFI BDS Phase Boot Splash Logos - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/customizing-uefi-bds-phase-boot-splash-logos" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This article provides an overview of how system integrators and Original Equipment Manufacturers (OEMs) replace the standard firmware logo with a custom boot splash during the UEFI Boot Device Selection (BDS) phase. It covers the firmware architecture res" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="customizing-uefi-bds-phase-boot-splash-logos">Customizing UEFI
+BDS Phase Boot Splash Logos</h1>
+<p>This article provides an overview of how system integrators and
+Original Equipment Manufacturers (OEMs) replace the standard firmware
+logo with a custom boot splash during the UEFI Boot Device Selection
+(BDS) phase. It covers the firmware architecture responsible for
+rendering graphics, image format constraints, integration methods via
+source code or vendor binaries, and the handoff mechanism to the
+operating system using ACPI tables.</p>
+<p>During the UEFI boot sequence, the Boot Device Selection (BDS)
+architectural phase executes after the Driver Execution Environment
+(DXE) initializes platform hardware. The BDS phase is responsible for
+connecting consoles, locating boot targets, and rendering the platform
+splash screen via the Graphics Output Protocol (GOP). System integrators
+customize this visual experience using three primary approaches: source
+tree integration, Independent BIOS Vendor (IBV) utility modification,
+and ACPI table population for operating system continuity.</p>
+<h3 id="image-format-and-constraints">Image Format and Constraints</h3>
+<p>Regardless of the integration method, the UEFI specification and
+display drivers impose strict limitations on the splash image:</p>
+<ul>
+<li><strong>File Format:</strong> Typically an uncompressed 24-bit or
+32-bit Windows Bitmap (<code>.bmp</code>). Run-length encoded (RLE) or
+compressed bitmaps are generally unsupported by standard UEFI GOP
+decoders.</li>
+<li><strong>Dimensions:</strong> Images are constrained by the native
+resolution of the platform's target panel or standard fallback
+resolutions (such as 1024x768 or 1920x1080).</li>
+<li><strong>Color Depth and Padding:</strong> Bitmaps must adhere
+strictly to 4-byte boundary row padding to prevent visual artifacts or
+memory misalignment during blitting operations.</li>
+</ul>
+<h3 id="method-1-source-level-customization-edk-ii">Method 1:
+Source-Level Customization (EDK II)</h3>
+<p>Integrators compiling firmware directly from an open-source EDK II
+base or an OEM code repository modify the image asset within the
+platform's package space:</p>
+<ol type="1">
+<li><strong>Locate the Asset:</strong> The default logo resides within
+the platform's module package, historically at
+<code>MdeModulePkg/Logo/Logo.bmp</code> or within a vendor-specific
+directory like <code>PlatformPkg/Logo/</code>.</li>
+<li><strong>Firmware File System (FFS) Definition:</strong> The logo is
+declared in the package description file (<code>.dec</code>) and
+component description file (<code>.inf</code>) as a raw binary asset
+within a Firmware Volume (FV).</li>
+<li><strong>BDS Blit Execution:</strong> The BDS driver—specifically
+within the <code>PlatformBootManagerLib</code> or
+<code>BdsDxe</code>—calls
+<code>EFI_GRAPHICS_OUTPUT_PROTOCOL.Blt()</code> to transfer the decoded
+pixel buffer directly to the display frame buffer. Modifying the C code
+allows integrators to specify precise horizontal and vertical offsets to
+center the logo.</li>
+</ol>
+<h3 id="method-2-post-build-binary-injection-ibv-tooling">Method 2:
+Post-Build Binary Injection (IBV Tooling)</h3>
+<p>When working with compiled firmware binaries supplied by IBVs such as
+AMI (Aptio), Insyde (InsydeH2O), or Phoenix (SecureCore), integrators
+use proprietary binary modification utilities rather than rebuilding
+from source:</p>
+<ol type="1">
+<li><strong>AMI ChangeLogo:</strong> Integrators open the target
+<code>.ROM</code> or <code>.CAP</code> file in the utility. The tool
+scans the Firmware Volume for the specific GUID assigned to the splash
+logo FFS file (such as the default AMI splash GUID). The user imports
+the new bitmap, and the tool replaces the raw data section while
+automatically recalculating checksums.</li>
+<li><strong>Insyde H2OLogo:</strong> Similar to AMI’s solution, this
+tool allows integrators to inject multiple resolutions of a splash
+screen to support different display aspect ratios.</li>
+<li><strong>Firmware Integrity:</strong> If the target platform enforces
+Intel Boot Guard or AMD Hardware Validated Boot, any post-build
+modification to an existing binary must be re-signed using the OEM’s
+private key to ensure the Root of Trust remains unbroken.</li>
+</ol>
+<h3 id="method-3-seamless-os-handoff-via-the-acpi-bgrt">Method 3:
+Seamless OS Handoff via the ACPI BGRT</h3>
+<p>Displaying the logo during the BDS phase is only the first half of
+the process; modern platforms require a seamless transition into the
+operating system loader. This is governed by the Boot Graphics Resource
+Table (BGRT) defined in the ACPI specification.</p>
+<p>During the BDS phase, the firmware driver:</p>
+<ol type="1">
+<li>Allocates a runtime memory buffer of type
+<code>EfiBootServicesData</code> or
+<code>EfiACPIReclaimMemory</code>.</li>
+<li>Copies the uncompressed in-memory bitmap into this buffer.</li>
+<li>Populates the ACPI BGRT structure with the memory address, image
+orientation, and X/Y screen coordinates.</li>
+<li>Publishes the BGRT into the system's ACPI table array.</li>
+</ol>
+<p>When an operating system such as Windows or Linux boots, its boot
+loader reads the BGRT, verifies the memory address, and keeps the BDS
+splash logo static on the screen while superimposing its own loading
+animation. If the BDS phase fails to configure the GOP correctly or
+passes an invalid memory pointer in the BGRT, the operating system
+discards the boot splash and defaults to a standard fallback
+display.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/customizing-uefi-bds-phase-boot-splash-logos';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

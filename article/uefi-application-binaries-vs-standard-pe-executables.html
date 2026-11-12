@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Application Binaries vs Standard PE Executables - uefi</title>
+    <meta name="description" content="At a foundational level, UEFI application binaries adopt the Microsoft Portable Executable/Common Object File Format (PE/COFF or PE32+) structure, but they serve an entirely different execution environment than standard Windows PE executables. While stand">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-application-binaries-vs-standard-pe-executables">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Application Binaries vs Standard PE Executables - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-application-binaries-vs-standard-pe-executables" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="At a foundational level, UEFI application binaries adopt the Microsoft Portable Executable/Common Object File Format (PE/COFF or PE32+) structure, but they serve an entirely different execution environment than standard Windows PE executables. While stand" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-application-binaries-vs-standard-pe-executables">UEFI
+Application Binaries vs Standard PE Executables</h1>
+<p>At a foundational level, UEFI application binaries adopt the
+Microsoft Portable Executable/Common Object File Format (PE/COFF or
+PE32+) structure, but they serve an entirely different execution
+environment than standard Windows PE executables. While standard PE
+files rely on an operating system kernel, dynamic link libraries (DLLs),
+and user-mode subsystems, UEFI binaries operate directly on bare-metal
+firmware. This fundamental difference shapes how the PE headers are
+populated, how memory relocation is handled, and how APIs are linked and
+invoked.</p>
+<h3 id="the-subsystem-field">The Subsystem Field</h3>
+<p>The most explicit structural difference within the file header is
+located in the PE Optional Header's <code>Subsystem</code> field.
+Standard Windows executables typically declare:</p>
+<ul>
+<li><code>IMAGE_SUBSYSTEM_WINDOWS_GUI</code> (value <code>2</code>)</li>
+<li><code>IMAGE_SUBSYSTEM_WINDOWS_CUI</code> (value <code>3</code>, for
+command-line programs)</li>
+</ul>
+<p>UEFI images target specific pre-boot environments and must declare
+one of the following subsystem values:</p>
+<ul>
+<li><code>IMAGE_SUBSYSTEM_EFI_APPLICATION</code> (value
+<code>10</code>): A standalone program that unloads when it exits.</li>
+<li><code>IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER</code> (value
+<code>11</code>): A driver that remains resident until the OS loader
+calls <code>ExitBootServices()</code>.</li>
+<li><code>IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER</code> (value
+<code>12</code>): A driver that remains in memory even after the
+operating system boots.</li>
+<li><code>IMAGE_SUBSYSTEM_EFI_ROM</code> (value <code>13</code>):
+Firmware intended to be executed from a ROM chip.</li>
+</ul>
+<p>The UEFI firmware boot manager inspects this field to determine
+memory allocation rules, execution lifetime, and permission boundaries
+before running the image.</p>
+<h3 id="import-and-export-tables">Import and Export Tables</h3>
+<p>Standard PE executables rely heavily on the Import Address Table
+(IAT) to link against user-space dynamic libraries such as
+<code>ntdll.dll</code> or <code>kernel32.dll</code>. The Windows loader
+resolves these external symbols dynamically at runtime.</p>
+<p>In contrast, UEFI binaries do not use an external dynamic linker or
+OS-provided DLLs. As a result:</p>
+<ul>
+<li>The Import Table is generally absent, empty, or unpopulated.</li>
+<li>UEFI applications access system APIs through function pointers
+provided in the <code>EFI_SYSTEM_TABLE</code> structure passed directly
+to the binary's entry point.</li>
+<li>Communication between different UEFI modules occurs via "Protocols"
+discovered dynamically at runtime through GUID lookups rather than named
+PE imports.</li>
+</ul>
+<h3 id="relocation-section-requirements">Relocation Section
+Requirements</h3>
+<p>While modern 64-bit Windows PE files can sometimes omit base
+relocations if they support fixed base addresses, the relocation section
+(<code>.reloc</code>) is strictly mandatory for UEFI binaries.</p>
+<p>UEFI firmware initializes memory dynamically at boot. Because memory
+layouts vary significantly between hardware platforms and motherboard
+designs, the firmware can load a binary at virtually any arbitrary
+physical memory address. The UEFI image loader requires base relocation
+data to patch absolute addresses in the code during load time; a UEFI
+binary missing its <code>.reloc</code> section will fail to execute.</p>
+<h3 id="entry-point-signature-and-calling-convention">Entry Point
+Signature and Calling Convention</h3>
+<p>Standard PE binaries compile to an entry point that expects
+conventional C runtime initialization (such as
+<code>mainCRTStartup</code> or <code>WinMainCRTStartup</code>), which
+sets up thread environments, handles, and command-line arguments.</p>
+<p>A UEFI binary requires a standardized entry point adhering to the
+UEFI specification:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>EFI_STATUS EFIAPI UefiMain<span class="op">(</span>IN EFI_HANDLE ImageHandle<span class="op">,</span> IN EFI_SYSTEM_TABLE <span class="op">*</span>SystemTable<span class="op">);</span></span></code></pre></div>
+<p>The binary's headers point to this function, which takes an image
+handle and a pointer to the system table as parameters. The standard
+Microsoft x64 calling convention is preserved in 64-bit UEFI binaries,
+ensuring CPU register consistency during function calls even before an
+operating system is present.</p>
+<h3 id="execution-environment-constraints">Execution Environment
+Constraints</h3>
+<p>Standard PE executables are mapped into isolated virtual address
+spaces using paging mechanisms managed by the OS kernel, generally
+executing in Ring 3 (User Mode).</p>
+<p>UEFI application binaries execute in Ring 0 (Privileged Mode) on
+flat, identity-mapped physical memory. They possess direct access to CPU
+control registers, I/O ports, and hardware devices, operating without
+the thread management, security tokens, or memory isolation native to
+conventional PE execution.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-application-binaries-vs-standard-pe-executables';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

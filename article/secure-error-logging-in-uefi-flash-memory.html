@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Error Logging in UEFI Flash Memory - uefi</title>
+    <meta name="description" content="Firmware vendors implement secure error logging within UEFI flash memory regions by isolating write operations behind privileged runtime environments, enforcing hardware-based write protections, and utilizing cryptographically authenticated, append-only d">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/secure-error-logging-in-uefi-flash-memory">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Secure Error Logging in UEFI Flash Memory - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/secure-error-logging-in-uefi-flash-memory" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Firmware vendors implement secure error logging within UEFI flash memory regions by isolating write operations behind privileged runtime environments, enforcing hardware-based write protections, and utilizing cryptographically authenticated, append-only d" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="secure-error-logging-in-uefi-flash-memory">Secure Error Logging
+in UEFI Flash Memory</h1>
+<p>Firmware vendors implement secure error logging within UEFI flash
+memory regions by isolating write operations behind privileged runtime
+environments, enforcing hardware-based write protections, and utilizing
+cryptographically authenticated, append-only data structures. Because
+the Serial Peripheral Interface (SPI) flash chip contains
+mission-critical boot code alongside non-volatile storage, vendors must
+ensure that hardware error records—such as Common Platform Error Records
+(CPER)—remain tamper-proof, resilient to rollback attacks, and protected
+from flash-wear exhaustion caused by malicious or runaway operating
+system processes.</p>
+<h3 id="dedicated-flash-partitioning-and-nvram-organization">Dedicated
+Flash Partitioning and NVRAM Organization</h3>
+<p>Vendors structure SPI flash memory into distinct logical regions
+defined by the Flash Descriptor. While the firmware image itself resides
+in read-only partitions post-boot, error logging is directed to a
+dedicated Non-Volatile RAM (NVRAM) region. Instead of mixing system
+error records with standard, general-purpose UEFI variables, vendors
+frequently allocate a reserved Fault Tolerant Write (FTW) or
+Reliability, Availability, and Serviceability (RAS) logging block. This
+prevents corrupted or overflowing error records from compromising core
+boot variables.</p>
+<h3
+id="privilege-isolation-through-system-management-mode-smm">Privilege
+Isolation Through System Management Mode (SMM)</h3>
+<p>To prevent the operating system or a compromised ring-0 kernel from
+tampering with historical error telemetry, the logging interface is
+isolated within System Management Mode (SMM). During the pre-boot phase,
+the UEFI core locks down direct write access to the SPI flash controller
+via chipset configuration registers (such as the BIOS Control
+Register).</p>
+<p>When the operating system's platform error handler or Windows
+Hardware Error Architecture (WHEA) subsystem reports an error:</p>
+<ol type="1">
+<li>The OS populates a pre-allocated memory buffer with the error data
+(such as a CPER structure).</li>
+<li>The OS triggers a software System Management Interrupt (SMI).</li>
+<li>The CPU enters SMM, executing trusted, vendor-signed SMM drivers
+(such as an Error Injection/Logging SMI Handler).</li>
+<li>The SMI handler validates the structure and securely writes the log
+to the flash region before returning execution to the OS.</li>
+</ol>
+<p>Because the SPI controller’s write-enable bits are locked to SMM
+execution, no unprivileged software can modify, overwrite, or delete
+historical logs.</p>
+<h3 id="authenticated-and-append-only-structures">Authenticated and
+Append-Only Structures</h3>
+<p>Vendors implement cryptographic protections using UEFI Authenticated
+Variables to protect against physical or local tamper attempts:</p>
+<ul>
+<li><strong>Digital Signatures:</strong> Critical audit logs are signed
+using hardware-anchored keys (such as the vendor's private key verified
+by the Public Key in the OEM database).</li>
+<li><strong>Monotonic Counters and Timestamps:</strong> Log entries
+include monotonic counters managed by secure hardware (such as a TPM or
+secure RTC) or time-based authenticated variables to prevent replay and
+rollback attacks, where an attacker writes an older, error-free flash
+image over an image containing failure forensic data.</li>
+<li><strong>Append-Only Circular Buffers:</strong> Error partitions are
+typically configured as structured circular buffers with strict index
+validation. Log entries are written sequentially to clean sectors. SMM
+handlers reject requests that attempt to overwrite intermediate records
+without a full authenticated flash-erase cycle.</li>
+</ul>
+<h3 id="hardware-enforced-protection-rings">Hardware-Enforced Protection
+Rings</h3>
+<p>Beyond firmware-level access checks, vendors utilize silicon-level
+security features to guard the logging regions:</p>
+<ul>
+<li><strong>Protected Range Registers (PRRs):</strong> Chipset-level
+registers (like Intel PRRs) define physical base and limit addresses on
+the SPI bus that deny write commands entirely, or permit them only when
+specific hardware validation criteria are met.</li>
+<li><strong>TPM Measurement:</strong> In measured boot configurations,
+any update or modification to key logging variables can be extended to
+Platform Configuration Registers (PCRs) in the Trusted Platform Module
+(TPM), providing an attestation trail to remote verifiers if an
+unauthorized modification occurs.</li>
+</ul>
+<h3 id="flash-wear-mitigation-and-denial-of-service-defense">Flash Wear
+Mitigation and Denial-of-Service Defense</h3>
+<p>Flash memory has finite write/erase cycles. To protect against
+malicious software intentionally exhausting the flash memory through
+rapid error generation, vendor implementations apply rate limiting
+within the SMM logging dispatchers. If error rates exceed a predefined
+threshold, records are temporarily cached in system RAM or aggregated
+into high-level event summaries rather than committed directly to flash.
+Furthermore, wear-leveling algorithms allocate write targets dynamically
+across the designated logging block to extend the physical lifespan of
+the SPI flash hardware.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/secure-error-logging-in-uefi-flash-memory';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

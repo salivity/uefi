@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Memory Types and OS Physical RAM Mapping - uefi</title>
+    <meta name="description" content="When a modern system boots, the Unified Extensible Firmware Interface (UEFI) constructs a detailed memory map that profiles every physical address range across the platform&#39;s hardware. This article examines how operating systems ingest UEFI memory descrip">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-memory-types-and-os-physical-ram-mapping">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Memory Types and OS Physical RAM Mapping - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-memory-types-and-os-physical-ram-mapping" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="When a modern system boots, the Unified Extensible Firmware Interface (UEFI) constructs a detailed memory map that profiles every physical address range across the platform&#39;s hardware. This article examines how operating systems ingest UEFI memory descrip" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-memory-types-and-os-physical-ram-mapping">UEFI Memory Types
+and OS Physical RAM Mapping</h1>
+<p>When a modern system boots, the Unified Extensible Firmware Interface
+(UEFI) constructs a detailed memory map that profiles every physical
+address range across the platform's hardware. This article examines how
+operating systems ingest UEFI memory descriptors, interpret specific
+memory types and cacheability attributes, and apply those definitions to
+configure architectural page tables, memory caching behaviors, and
+runtime access protections across physical RAM.</p>
+<h2 id="the-uefi-memory-map-structure">The UEFI Memory Map
+Structure</h2>
+<p>During the pre-boot environment, the operating system's bootloader
+invokes the UEFI boot service <code>GetMemoryMap()</code>. This function
+returns an array of <code>EFI_MEMORY_DESCRIPTOR</code> structures. Each
+descriptor defines:</p>
+<ul>
+<li><strong>Type:</strong> An enumeration (<code>EFI_MEMORY_TYPE</code>)
+describing the intended role of the memory range.</li>
+<li><strong>PhysicalStart:</strong> The base physical address of the
+range.</li>
+<li><strong>VirtualStart:</strong> The virtual address reserved for
+runtime services (if mapped).</li>
+<li><strong>NumberOfPages:</strong> The size of the region measured in 4
+KiB pages.</li>
+<li><strong>Attribute:</strong> Bitmask flags specifying hardware
+capabilities such as cacheability, write protection, and execution
+privileges.</li>
+</ul>
+<p>Operating systems parse these descriptors to differentiate between
+general-purpose memory, hardware-mapped I/O, and regions reserved
+strictly for firmware execution.</p>
+<h2 id="memory-types-and-os-allocation-strategies">Memory Types and OS
+Allocation Strategies</h2>
+<p>The <code>EFI_MEMORY_TYPE</code> field dictates how the operating
+system treats each region of physical memory once it assumes control of
+the hardware:</p>
+<h3 id="reclaimable-memory">Reclaimable Memory</h3>
+<ul>
+<li><strong><code>EfiConventionalMemory</code>:</strong> Free physical
+RAM with no firmware dependencies. The operating system places this
+memory directly into its free page pools for general allocation to
+kernel and user space.</li>
+<li><strong><code>EfiBootServicesCode</code> and
+<code>EfiBootServicesData</code>:</strong> Memory used by UEFI drivers
+and applications during the boot sequence. Once the operating system
+issues the <code>ExitBootServices()</code> call, these regions are no
+longer needed by firmware, allowing the OS memory manager to reclaim the
+underlying physical frames as standard RAM.</li>
+<li><strong><code>EfiLoaderCode</code> and
+<code>EfiLoaderData</code>:</strong> Memory allocated by the OS loader.
+The kernel reclaims this memory once initialization completes.</li>
+</ul>
+<h3 id="preserved-and-firmware-reserved-memory">Preserved and
+Firmware-Reserved Memory</h3>
+<ul>
+<li><strong><code>EfiRuntimeServicesCode</code> and
+<code>EfiRuntimeServicesData</code>:</strong> Regions containing
+firmware code and data structures that the operating system must execute
+while running (for example, to update UEFI NVRAM variables or set system
+wake timers). The OS must map these regions into its virtual address
+space—often preserving identity mapping or applying page mappings
+specified by <code>SetVirtualAddressMap()</code>.</li>
+<li><strong><code>EfiACPIReclaimMemory</code>:</strong> Contains
+Advanced Configuration and Power Interface (ACPI) tables. The OS can
+reclaim this space only after reading and copying the ACPI tables into
+internal structures.</li>
+<li><strong><code>EfiACPIMemoryNVS</code>:</strong> Non-Volatile Sleep
+memory used by firmware. The operating system must never overwrite or
+reclaim this memory; it must remain intact across low-power system sleep
+states.</li>
+<li><strong><code>EfiReservedMemoryType</code>:</strong> Ranges reserved
+by hardware or firmware implementations that the OS must leave
+untouched.</li>
+</ul>
+<h3 id="device-and-io-space">Device and I/O Space</h3>
+<ul>
+<li><strong><code>EfiMemoryMappedIO</code> and
+<code>EfiMemoryMappedIOPortSpace</code>:</strong> Physical address
+ranges assigned to peripheral device registers rather than real RAM. The
+OS maps these regions without caching to allow memory-mapped device
+communication.</li>
+</ul>
+<h2 id="translating-cache-attributes-to-page-table-flags">Translating
+Cache Attributes to Page Table Flags</h2>
+<p>The <code>Attribute</code> field within
+<code>EFI_MEMORY_DESCRIPTOR</code> informs the OS of the
+platform-supported cache attributes for each memory range. The OS
+translates these flags into CPU-specific page table entry (PTE) bits and
+memory type registers:</p>
+<ul>
+<li><strong><code>EFI_MEMORY_UC</code> (Uncacheable):</strong> Informs
+the OS that accesses to this memory must not be cached by the CPU. The
+OS sets the PTE caching bits accordingly (such as configuring Page
+Attribute Tables (PAT) or MTRRs on x86, or MAIR Device/Non-Cacheable
+attributes on ARM). This is standard for MMIO regions.</li>
+<li><strong><code>EFI_MEMORY_WC</code> (Write-Combining):</strong>
+Allows loose write ordering and combines multiple writes into single
+transactions. The OS applies this primarily to video framebuffers.</li>
+<li><strong><code>EFI_MEMORY_WT</code> (Write-Through) and
+<code>EFI_MEMORY_WB</code> (Write-Back):</strong> Dictate standard
+caching behaviors. For general RAM (<code>EfiConventionalMemory</code>),
+the OS applies <code>EFI_MEMORY_WB</code> to maximize performance by
+utilizing L1–L3 processor caches.</li>
+</ul>
+<p>The operating system enforces the strictest supported cacheability
+attribute to avoid cache-coherency hazards, ensuring it does not map an
+uncacheable hardware range as write-back RAM.</p>
+<h2 id="security-and-protection-attributes">Security and Protection
+Attributes</h2>
+<p>Modern UEFI specifications (UEFI 2.5+) provide fine-grained execution
+and access attributes to harden the firmware-to-OS interface:</p>
+<ul>
+<li><strong><code>EFI_MEMORY_RO</code> (Read-Only):</strong> The OS maps
+the target physical range with read-only permissions in its page tables,
+preventing modification of static firmware data or code.</li>
+<li><strong><code>EFI_MEMORY_XP</code> (Execute-Protect):</strong>
+Dictates that the OS must set the No-Execute (NX) or Execute-Disable
+(XD) bit on the corresponding page table entries. Data regions—such as
+<code>EfiRuntimeServicesData</code>—are mapped with the execute-disable
+bit set to mitigate memory corruption vulnerabilities within
+firmware.</li>
+</ul>
+<p>By adhering strictly to the memory types and attribute flags supplied
+by UEFI, the operating system ensures that general RAM is fully
+harvested, critical firmware services remain functional, hardware
+registers remain uncorrupted by CPU caches, and platform security
+boundaries are maintained from initial boot through active runtime.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-memory-types-and-os-physical-ram-mapping';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

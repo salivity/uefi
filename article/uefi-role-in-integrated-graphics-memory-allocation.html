@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Role in Integrated Graphics Memory Allocation - uefi</title>
+    <meta name="description" content="Unified Extensible Firmware Interface (UEFI) platform policies serve as the foundational governance layer that manages how system memory is apportioned to an integrated graphics processor (iGPU). Because an iGPU lacks dedicated VRAM, it relies on shared s">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-role-in-integrated-graphics-memory-allocation">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Role in Integrated Graphics Memory Allocation - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-role-in-integrated-graphics-memory-allocation" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Unified Extensible Firmware Interface (UEFI) platform policies serve as the foundational governance layer that manages how system memory is apportioned to an integrated graphics processor (iGPU). Because an iGPU lacks dedicated VRAM, it relies on shared s" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-role-in-integrated-graphics-memory-allocation">UEFI Role in
+Integrated Graphics Memory Allocation</h1>
+<p>Unified Extensible Firmware Interface (UEFI) platform policies serve
+as the foundational governance layer that manages how system memory is
+apportioned to an integrated graphics processor (iGPU). Because an iGPU
+lacks dedicated VRAM, it relies on shared system RAM. UEFI platform
+policies dictate the initial static memory allocations during the
+pre-boot phase, define upper boundaries for dynamic memory sharing, and
+establish hardware-level parameters that ensure the operating system and
+graphics drivers can access video memory without conflicts.</p>
+<h3 id="pre-boot-initialization-and-stolen-memory">Pre-Boot
+Initialization and Stolen Memory</h3>
+<p>During the early boot phases—specifically the Pre-EFI Initialization
+(PEI) and Driver Execution Environment (DXE) phases—the system memory
+map is established. UEFI platform policies execute silicon-specific
+reference code (such as Intel Silicon Reference Code or AMD AGESA) to
+reserve a dedicated block of system RAM, traditionally referred to as
+"stolen memory" or the UMA (Unified Memory Architecture) frame
+buffer.</p>
+<p>This static allocation is critical because the display engine
+requires an active frame buffer to render video before the operating
+system or dedicated graphics drivers are loaded. The UEFI platform
+policy programs the integrated memory controller and system address
+decoders to lock this physical region, rendering it completely invisible
+to the operating system's general memory manager to prevent memory
+corruption.</p>
+<h3 id="dvmt-and-dynamic-allocation-thresholds">DVMT and Dynamic
+Allocation Thresholds</h3>
+<p>Modern architectures balance static reservations with dynamic
+allocations, such as Intel's Dynamic Video Memory Technology (DVMT).
+UEFI platform policies define both the baseline floor and the structural
+ceiling of this architecture:</p>
+<ul>
+<li><strong>Pre-Allocated Memory (Floor):</strong> Platform policies
+enforce the minimum amount of RAM (commonly between 32 MB and 512 MB)
+guaranteed solely for graphics initialization, display pipes, and basic
+hardware management.</li>
+<li><strong>Maximum Dynamic Memory (Ceiling):</strong> Policies define
+the maximum system memory that the graphics driver can request on-demand
+from the OS during graphics-intensive workloads.</li>
+</ul>
+<p>By defining these boundaries, UEFI ensures that integrated graphics
+do not starve operating system processes of critical system memory while
+still scaling performance dynamically during heavy graphics tasks.</p>
+<h3 id="firmware-menus-and-oem-customization">Firmware Menus and OEM
+Customization</h3>
+<p>Original Equipment Manufacturers (OEMs) use UEFI platform policies to
+tailor hardware behavior according to a device's form factor, power
+budget, and thermal limits. In desktop motherboards, UEFI policies are
+often exposed to users through setup menus under labels such as "UMA
+Frame Buffer Size" or "DVMT Pre-Allocated."</p>
+<p>In mobile, embedded, or thin-and-light devices, OEMs lock these
+settings via platform policy tables to ensure optimal performance,
+thermal compliance, and memory efficiency based on the fixed physical
+memory installed on the board.</p>
+<h3 id="data-handoff-via-hobs-and-acpi">Data Handoff via HOBs and
+ACPI</h3>
+<p>For the operating system to interact cleanly with integrated
+graphics, it must understand the memory partitions established before
+boot. UEFI platform policies record memory configurations into Hand-Off
+Blocks (HOBs) and translate them into ACPI (Advanced Configuration and
+Power Interface) tables.</p>
+<p>When the OS boots, graphics drivers parse these tables to locate the
+Graphics Translation Table (GTT), aperture base addresses, and reserved
+memory ranges. This handoff, orchestrated by the platform policy,
+guarantees that both the host CPU and the integrated GPU operate with
+memory coherency and without address overlap.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-role-in-integrated-graphics-memory-allocation';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

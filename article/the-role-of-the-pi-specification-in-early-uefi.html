@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Role of the PI Specification in Early UEFI - uefi</title>
+    <meta name="description" content="The transition from legacy BIOS to modern firmware required not only a standardized operating system interface, but also a standardized method for building the firmware itself. While the Unified Extensible Firmware Interface (UEFI) specification defined t">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/the-role-of-the-pi-specification-in-early-uefi">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="The Role of the PI Specification in Early UEFI - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/the-role-of-the-pi-specification-in-early-uefi" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The transition from legacy BIOS to modern firmware required not only a standardized operating system interface, but also a standardized method for building the firmware itself. While the Unified Extensible Firmware Interface (UEFI) specification defined t" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="the-role-of-the-pi-specification-in-early-uefi">The Role of the
+PI Specification in Early UEFI</h1>
+<p>The transition from legacy BIOS to modern firmware required not only
+a standardized operating system interface, but also a standardized
+method for building the firmware itself. While the Unified Extensible
+Firmware Interface (UEFI) specification defined the outward-facing
+boundary between the platform firmware and the operating system, the
+Platform Innovation (PI) specification—originally developed by Intel as
+the "Framework"—defined the internal architecture of the firmware. This
+article explains how the PI specification complemented the early
+evolution of UEFI by standardizing internal boot phases, fostering
+modular hardware initialization, and enabling multi-vendor firmware
+collaboration.</p>
+<h3 id="dividing-interface-from-implementation">Dividing Interface from
+Implementation</h3>
+<p>When Intel originally created EFI (which later evolved into UEFI),
+the goal was to replace the 16-bit real-mode limitations of legacy BIOS
+with a modern, 32-bit and 64-bit environment. However, the early EFI
+specifications deliberately defined only the interface: the protocols,
+runtime services, and boot services exposed to an OS bootloader. EFI did
+not dictate how the firmware initialized the processor, memory, or
+platform chipsets behind the scenes.</p>
+<p>To prevent firmware engineers from reverting to proprietary,
+fragmented methods to initialize hardware before launching EFI, Intel
+introduced the Intel Platform Innovation Framework for EFI (often
+referred to simply as "the Framework"). This framework served as the
+implementation blueprint that executed under the hood to instantiate the
+interfaces EFI promised.</p>
+<h3 id="standardizing-the-boot-execution-phases">Standardizing the Boot
+Execution Phases</h3>
+<p>The primary technical contribution of the Platform Innovation
+specification was decomposing the chaotic platform initialization
+sequence into discrete, standardized phases:</p>
+<ol type="1">
+<li><strong>SEC (Security):</strong> The initial execution phase
+directly at the processor reset vector, responsible for setting up
+temporary memory (Cache-as-RAM) and establishing a root of trust.</li>
+<li><strong>PEI (Pre-EFI Initialization):</strong> A minimal environment
+designed to discover and initialize permanent system memory (DRAM) using
+specialized Pre-EFI Initialization Modules (PEIMs).</li>
+<li><strong>DXE (Driver Execution Environment):</strong> Once main
+memory is available, the DXE dispatcher loads drivers in dependency
+order to initialize system buses, silicon, storage, and graphics.</li>
+<li><strong>BDS (Boot Device Selection):</strong> Executes the platform
+boot policy, initializes the console, and prepares to launch an
+operating system.</li>
+</ol>
+<p>By standardizing these phases, the PI architecture ensured that every
+phase had defined inputs, outputs, and handoff blocks (HOBs). This
+replaced monolithic assembly codebases with structured, C-based modular
+drivers.</p>
+<h3 id="enabling-silicon-and-vendor-interoperability">Enabling Silicon
+and Vendor Interoperability</h3>
+<p>Prior to the Platform Innovation architecture, Independent BIOS
+Vendors (IBVs) such as AMI, Insyde, and Phoenix had to write custom
+board-support packages for every motherboard and chipset iteration.</p>
+<p>The PI specification introduced a common binary and source interface
+for silicon drivers. Silicon vendors could write a single PEI module
+(PEIM) for memory training or a DXE driver for a PCI controller, and
+that module could run across any compliant firmware codebase regardless
+of the IBV. This modularity drastically reduced time-to-market for new
+hardware platforms and lowered the engineering overhead needed to
+support emerging CPU architectures.</p>
+<h3 id="absorption-into-the-uefi-forum">Absorption into the UEFI
+Forum</h3>
+<p>Recognizing that an industry standard could not rely on a single
+company's proprietary framework, Intel transitioned the Framework
+specifications to the UEFI Forum. The forum formed the Platform
+Initialization Working Group (PIWG) to formally govern and standardize
+these internal mechanisms under the name "UEFI Platform Initialization
+(PI) Specification."</p>
+<p>Together, the UEFI and PI specifications formed a complete, two-sided
+architecture. UEFI handled the contract between the firmware and the
+operating system, while the PI specification handled the contract
+between the silicon, hardware boards, and the firmware developers. This
+dual-standard approach provided the stability, scalability, and
+modularity necessary for UEFI to completely displace the legacy PC BIOS
+across the computing industry.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/the-role-of-the-pi-specification-in-early-uefi';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEFI Configuration Tables in Hardware Description - uefi</title>
+    <meta name="description" content="During the Unified Extensible Firmware Interface (UEFI) boot phase, configuration tables serve as the standardized mechanism for firmware to advertise and hand off platform hardware descriptions to the operating system loader. By aggregating diverse data">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/uefi-configuration-tables-in-hardware-description">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="UEFI Configuration Tables in Hardware Description - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/uefi-configuration-tables-in-hardware-description" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="During the Unified Extensible Firmware Interface (UEFI) boot phase, configuration tables serve as the standardized mechanism for firmware to advertise and hand off platform hardware descriptions to the operating system loader. By aggregating diverse data" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="uefi-configuration-tables-in-hardware-description">UEFI
+Configuration Tables in Hardware Description</h1>
+<p>During the Unified Extensible Firmware Interface (UEFI) boot phase,
+configuration tables serve as the standardized mechanism for firmware to
+advertise and hand off platform hardware descriptions to the operating
+system loader. By aggregating diverse data structures—such as ACPI,
+SMBIOS, and Device Trees—into a centralized array of globally unique
+identifier (GUID) and pointer pairs, UEFI configuration tables decouple
+the underlying platform hardware specifics from the operating system,
+ensuring seamless hardware discovery and boot initialization.</p>
+<h3 id="structure-of-uefi-configuration-tables">Structure of UEFI
+Configuration Tables</h3>
+<p>At the core of the UEFI architecture is the
+<code>EFI_SYSTEM_TABLE</code>, which acts as the primary data structure
+passed to the operating system bootloader. Embedded within this
+structure is an array of <code>EFI_CONFIGURATION_TABLE</code> entries.
+Each entry consists of two fundamental components:</p>
+<ul>
+<li><strong>VendorGuid:</strong> A 128-bit GUID that explicitly defines
+the specification, format, and purpose of the table (for example, the
+ACPI 2.0 table GUID or the SMBIOS table GUID).</li>
+<li><strong>VendorTable:</strong> A 64-bit physical memory pointer
+referencing the base address where the corresponding hardware
+description data structure resides in memory.</li>
+</ul>
+<h3 id="exposing-standardized-hardware-interfaces">Exposing Standardized
+Hardware Interfaces</h3>
+<p>Modern hardware architectures rely on diverse frameworks to describe
+non-enumerable buses, platform controllers, and system topologies. UEFI
+configuration tables act as the delivery vehicle for these
+frameworks:</p>
+<ul>
+<li><strong>ACPI (Advanced Configuration and Power Interface):</strong>
+For x86 and enterprise ARM systems, UEFI firmware builds ACPI tables
+(DSDT, SSDT, MADT, etc.) during the Driver Execution Environment (DXE)
+phase. The firmware places the pointer to the Root System Description
+Pointer (RSDP) into a configuration table entry using standard ACPI
+GUIDs. This allows the OS to discover processor cores, interrupt
+controllers, and power states.</li>
+<li><strong>SMBIOS (System Management BIOS):</strong> Configuration
+tables expose the SMBIOS entry point, providing the OS with data
+regarding chassis, motherboard, BIOS revision, and installed RAM
+modules.</li>
+<li><strong>Flattened Device Tree (FDT):</strong> In embedded systems
+and non-ACPI ARM/RISC-V platforms, the firmware registers an FDT pointer
+via its assigned GUID. The kernel parses this Device Tree blob directly
+from memory to enumerate memory-mapped peripherals and clock trees.</li>
+</ul>
+<h3 id="the-registration-and-handoff-lifecycle">The Registration and
+Handoff Lifecycle</h3>
+<p>The delivery of hardware descriptions via configuration tables
+follows a strict sequence across the UEFI boot phases:</p>
+<ol type="1">
+<li><strong>Generation (PEI/DXE Phases):</strong> Platform-specific
+initialization drivers detect hardware configurations, allocate runtime
+or boot-service memory, and populate the relevant hardware tables.</li>
+<li><strong>Registration:</strong> Firmware components invoke the
+<code>InstallConfigurationTable()</code> boot service. This service
+either appends a new GUID-pointer mapping to the array or updates an
+existing entry.</li>
+<li><strong>Handoff (BDS Phase to OS):</strong> The Boot Device
+Selection (BDS) phase loads the target OS bootloader, passing a pointer
+to the <code>EFI_SYSTEM_TABLE</code>.</li>
+<li><strong>Consumption:</strong> The OS bootloader scans the
+configuration table array, matches the GUIDs against its supported
+hardware frameworks (such as ACPI or FDT), and saves the memory
+addresses.</li>
+<li><strong>Runtime Transition:</strong> When
+<code>ExitBootServices()</code> is called, boot-time services terminate,
+but tables residing in designated runtime memory or ACPI reserved memory
+persist, enabling the operating system kernel to maintain full control
+over the platform's hardware topology and power management.</li>
+</ol></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/uefi-configuration-tables-in-hardware-description';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

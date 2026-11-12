@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inspect and Modify UEFI Variables in UEFI Shell - uefi</title>
+    <meta name="description" content="This guide explains how to view, export, edit, and delete non-volatile UEFI runtime variables using native commands within the UEFI Shell environment. By using the built-in dmpstore and setvar commands, system administrators and developers can inspect NVR">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/inspect-and-modify-uefi-variables-in-uefi-shell">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Inspect and Modify UEFI Variables in UEFI Shell - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/inspect-and-modify-uefi-variables-in-uefi-shell" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="This guide explains how to view, export, edit, and delete non-volatile UEFI runtime variables using native commands within the UEFI Shell environment. By using the built-in dmpstore and setvar commands, system administrators and developers can inspect NVR" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="inspect-and-modify-uefi-variables-in-uefi-shell">Inspect and
+Modify UEFI Variables in UEFI Shell</h1>
+<p>This guide explains how to view, export, edit, and delete
+non-volatile UEFI runtime variables using native commands within the
+UEFI Shell environment. By using the built-in <code>dmpstore</code> and
+<code>setvar</code> commands, system administrators and developers can
+inspect NVRAM configurations, modify boot behavior, or clear corrupted
+variable entries directly at the firmware level without booting into an
+operating system.</p>
+<hr />
+<h3 id="inspecting-variables-with-dmpstore">Inspecting Variables with
+<code>dmpstore</code></h3>
+<p>The <code>dmpstore</code> (Dump Variable Store) command displays the
+contents of the UEFI variable store. It provides variable names, vendor
+GUIDs, attributes, and data payloads.</p>
+<h4 id="1-list-all-variables">1. List All Variables</h4>
+<p>To display all variables currently stored in the system's NVRAM:</p>
+<pre class="text"><code>dmpstore</code></pre>
+<h4 id="2-page-through-variable-output">2. Page Through Variable
+Output</h4>
+<p>Because the variable store contains dozens of entries, pipe the
+command to pause per page:</p>
+<pre class="text"><code>dmpstore -b</code></pre>
+<h4 id="3-search-for-a-specific-variable">3. Search for a Specific
+Variable</h4>
+<p>To inspect a single variable across all namespaces, provide its
+name:</p>
+<pre class="text"><code>dmpstore BootOrder
+dmpstore Boot0001</code></pre>
+<h4 id="4-filter-by-variable-guid">4. Filter by Variable GUID</h4>
+<p>To inspect variables belonging to a specific vendor or specification
+GUID:</p>
+<pre class="text"><code>dmpstore -guid 8BE4DF61-93CA-11D2-AA0D-00E098032B8C</code></pre>
+<h4 id="5-export-variables-to-a-file">5. Export Variables to a File</h4>
+<p>To export the entire variable store or specific variables to a binary
+file on a mounted filesystem (e.g., <code>FS0:</code>):</p>
+<pre class="text"><code>dmpstore -s FS0:\vars_backup.bin</code></pre>
+<p>To export only a specific variable:</p>
+<pre class="text"><code>dmpstore BootOrder -s FS0:\BootOrder.bin</code></pre>
+<hr />
+<h3 id="modifying-variables-with-setvar">Modifying Variables with
+<code>setvar</code></h3>
+<p>The <code>setvar</code> command creates, modifies, and deletes UEFI
+variables. To make a variable persistent across system reboots, it must
+include the non-volatile (<code>NV</code>) attribute.</p>
+<h4 id="variable-attributes">Variable Attributes</h4>
+<p>When creating or modifying variables, the following attribute flags
+are typically used:</p>
+<ul>
+<li><strong>NV</strong>: Non-Volatile (stores the variable in NVRAM
+across power cycles)</li>
+<li><strong>BS</strong>: Boot Service Access (accessible during
+pre-boot)</li>
+<li><strong>RT</strong>: Runtime Access (accessible by the operating
+system after <code>ExitBootServices</code>)</li>
+</ul>
+<h4 id="1-creating-or-modifying-a-variable">1. Creating or Modifying a
+Variable</h4>
+<p>To define a non-volatile variable accessible to both firmware and the
+OS, specify the name, GUID, attributes, and data payload.</p>
+<p><strong>Setting raw hexadecimal data:</strong></p>
+<pre class="text"><code>setvar MyTestVar -guid 12345678-ABCD-EF01-2345-6789ABCDEF01 -attr NV,BS,RT =0x01 0x02 0x03 0x04</code></pre>
+<p><strong>Setting ASCII string data:</strong></p>
+<pre class="text"><code>setvar CustomConfig -guid 12345678-ABCD-EF01-2345-6789ABCDEF01 -attr NV,BS,RT =&quot;Enabled&quot;</code></pre>
+<h4 id="2-modifying-variables-from-a-binary-file">2. Modifying Variables
+from a Binary File</h4>
+<p>If you have a binary payload saved on a drive, you can assign its
+contents directly to a variable:</p>
+<pre class="text"><code>setvar BootOrder -guid 8BE4DF61-93CA-11D2-AA0D-00E098032B8C -f FS0:\NewBootOrder.bin</code></pre>
+<h4 id="3-deleting-a-non-volatile-variable">3. Deleting a Non-Volatile
+Variable</h4>
+<p>In UEFI, a variable is deleted by setting its data length to zero
+while matching its exact name and GUID:</p>
+<pre class="text"><code>setvar MyTestVar -guid 12345678-ABCD-EF01-2345-6789ABCDEF01 =</code></pre>
+<p>Leaving the section after the equals sign (<code>=</code>) empty
+clears the entry from NVRAM.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/inspect-and-modify-uefi-variables-in-uefi-shell';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

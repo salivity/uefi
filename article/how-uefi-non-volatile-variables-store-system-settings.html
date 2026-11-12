@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How UEFI Non-Volatile Variables Store System Settings - uefi</title>
+    <meta name="description" content="Unified Extensible Firmware Interface (UEFI) non-volatile variables provide a standardized, persistent mechanism for the system firmware and operating systems to read, write, and maintain configuration data across reboots and power outages. By storing str">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-uefi-non-volatile-variables-store-system-settings">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How UEFI Non-Volatile Variables Store System Settings - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-uefi-non-volatile-variables-store-system-settings" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="Unified Extensible Firmware Interface (UEFI) non-volatile variables provide a standardized, persistent mechanism for the system firmware and operating systems to read, write, and maintain configuration data across reboots and power outages. By storing str" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-uefi-non-volatile-variables-store-system-settings">How UEFI
+Non-Volatile Variables Store System Settings</h1>
+<p>Unified Extensible Firmware Interface (UEFI) non-volatile variables
+provide a standardized, persistent mechanism for the system firmware and
+operating systems to read, write, and maintain configuration data across
+reboots and power outages. By storing structured key-value data directly
+in non-volatile memory—most commonly the motherboard's Serial Peripheral
+Interface (SPI) flash chip—UEFI ensures that critical settings, such as
+boot paths, hardware initialization profiles, and cryptographic keys,
+remain intact. This article explains how these variables are structured,
+accessed, and secured to govern modern system behavior.</p>
+<h3 id="architecture-and-data-structure">Architecture and Data
+Structure</h3>
+<p>A UEFI variable is identified not by a simple string alone, but by a
+combination of a globally unique identifier (GUID) and a null-terminated
+Unicode string name. This combination prevents naming collisions between
+standard specifications, hardware original equipment manufacturers
+(OEMs), and operating system vendors.</p>
+<p>Each variable consists of four main components:</p>
+<ul>
+<li><strong>Vendor GUID:</strong> A 128-bit identifier defining the
+namespace of the variable (e.g., the global UEFI namespace or an
+OEM-specific namespace).</li>
+<li><strong>Variable Name:</strong> A human-readable identifier
+specifying the setting, such as <code>BootOrder</code> or
+<code>SecureBoot</code>.</li>
+<li><strong>Attributes:</strong> A bitmask defining how and when the
+variable can be accessed and whether it persists across power
+cycles.</li>
+<li><strong>Data Payload:</strong> The binary data or structured payload
+representing the actual configuration state.</li>
+</ul>
+<h3 id="the-storage-medium">The Storage Medium</h3>
+<p>UEFI non-volatile variables reside in a dedicated section of
+Non-Volatile Random-Access Memory (NVRAM), typically carved out of the
+motherboard's SPI NOR flash memory alongside the firmware binary.
+Because NOR flash has finite write/erase cycles and must be erased in
+blocks, the firmware incorporates wear-leveling algorithms and
+garbage-collection routines to manage space efficiently and avoid
+premature hardware degradation.</p>
+<h3 id="access-via-uefi-runtime-services">Access via UEFI Runtime
+Services</h3>
+<p>The UEFI specification provides an abstraction layer known as Runtime
+Services, allowing both pre-boot firmware drivers and operating system
+kernels to interact with variables. The two primary API calls governing
+this behavior are:</p>
+<ul>
+<li><code>GetVariable()</code>: Retrieves the variable's payload, size,
+and access attributes using its name and GUID.</li>
+<li><code>SetVariable()</code>: Writes, updates, or deletes a variable.
+Passing a data size of zero to this function deletes the variable from
+NVRAM.</li>
+</ul>
+<p>Operating systems interface with these Runtime Services directly. In
+Linux, these interfaces are exposed through the <code>efivarfs</code>
+pseudo-filesystem (<code>/sys/firmware/efi/efivars/</code>), whereas
+Windows manages them via the Win32 APIs
+<code>GetFirmwareEnvironmentVariable</code> and
+<code>SetFirmwareEnvironmentVariable</code>.</p>
+<h3 id="attributes-governing-variable-lifecycles">Attributes Governing
+Variable Lifecycles</h3>
+<p>The behavior of each variable is dictated by specific bitmask
+attributes assigned upon creation:</p>
+<ul>
+<li><code>EFI_VARIABLE_NON_VOLATILE (NV)</code>: Instructs the system to
+preserve the variable in persistent storage. Without this flag, the
+variable is volatile and cleared upon reset.</li>
+<li><code>EFI_VARIABLE_BOOTSERVICE_ACCESS (BS)</code>: Makes the
+variable accessible during the pre-boot phase before the OS loader calls
+<code>ExitBootServices()</code>.</li>
+<li><code>EFI_VARIABLE_RUNTIME_ACCESS (RT)</code>: Extends accessibility
+into the operating system environment after the kernel has booted.</li>
+<li><code>EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS</code>:
+Enforces cryptographic signature verification before allowing
+modifications, preventing unauthorized tampering.</li>
+</ul>
+<h3 id="critical-system-roles">Critical System Roles</h3>
+<p>Non-volatile variables handle several essential system functions:</p>
+<ul>
+<li><strong>Boot Target Management:</strong> Variables such as
+<code>BootOrder</code> (defining sequence) and <code>Boot####</code>
+(defining distinct boot options containing device paths and partition
+UUIDs) instruct the system on which drive and EFI executable to
+load.</li>
+<li><strong>Platform Security:</strong> Secure Boot depends entirely on
+authenticated non-volatile variables to store the platform key
+(<code>PK</code>), key exchange keys (<code>KEK</code>), the authorized
+signature database (<code>db</code>), and the forbidden signature
+database (<code>dbx</code>).</li>
+<li><strong>OS-to-Firmware Handshakes:</strong> Operating systems write
+to specific variables to schedule diagnostic tests, initiate firmware
+capsule updates, or instruct the motherboard to reboot straight into the
+UEFI setup utility.</li>
+</ul></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-uefi-non-volatile-variables-store-system-settings';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>

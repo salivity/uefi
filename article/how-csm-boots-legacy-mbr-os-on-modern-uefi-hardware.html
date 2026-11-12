@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How CSM Boots Legacy MBR OS on Modern UEFI Hardware - uefi</title>
+    <meta name="description" content="The Compatibility Support Module (CSM) is an optional firmware subcomponent within modern Unified Extensible Firmware Interface (UEFI) systems that allows legacy operating systems designed for older BIOS architectures to execute on modern hardware. This a">
+    <link rel="canonical" href="https://salivity.github.io/uefi/article/how-csm-boots-legacy-mbr-os-on-modern-uefi-hardware">
+    <link rel="search" type="application/opensearchdescription+xml" title="uefi" href="/uefi/opensearch.xml">
+    <link rel="icon" href="/uefi/favicon.ico">
+    <link rel="stylesheet" href="/uefi/css/style.css">
+    <link media="print" rel="stylesheet" href="/uefi/css/print.css">
+    <script src="/uefi/js/fuse.min.js"></script>
+    <script src="/uefi/js/script.js"></script>
+    <script id="MathJax-script" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-chtml.min.js" defer></script>
+    <script src="/monetize/monetize.js"></script>
+    <script src="/social/social.js"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How CSM Boots Legacy MBR OS on Modern UEFI Hardware - uefi" />
+    <meta property="og:url" content="https://salivity.github.io/uefi/article/how-csm-boots-legacy-mbr-os-on-modern-uefi-hardware" />
+    <meta property="og:image" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:secure_url" content="https://salivity.github.io/uefi/images/open-graph/default.webp" />
+    <meta property="og:image:width" content="1120" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:description" content="The Compatibility Support Module (CSM) is an optional firmware subcomponent within modern Unified Extensible Firmware Interface (UEFI) systems that allows legacy operating systems designed for older BIOS architectures to execute on modern hardware. This a" />
+    <link rel="manifest" href="/uefi/pwa/manifest.json" />
+</head>
+<body>
+    <header>
+        <a href="/uefi/" aria-label="Go To Home Page" title="Go To Home Page" id="logo">
+            <span>salivity.github.io/</span><span>uefi</span>
+        </a>
+        <nav>
+            <ul class="header-links">
+                <li><a href="/uefi/search" title="Search" aria-label="Go To Search Page"><svg class="svg-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"></path></svg></a></li>
+                <li><a id="theme-toggle" title="Theme" href="javascript:void(0);" aria-label="Toggle Website Theme"></a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        
+    <div class="article-layout">
+        <aside id="profile-sidebar" class="profile-column" aria-label="Author Profile"></aside>
+        <div class="article-main-column">
+            <article><h1 id="how-csm-boots-legacy-mbr-os-on-modern-uefi-hardware">How CSM
+Boots Legacy MBR OS on Modern UEFI Hardware</h1>
+<p>The Compatibility Support Module (CSM) is an optional firmware
+subcomponent within modern Unified Extensible Firmware Interface (UEFI)
+systems that allows legacy operating systems designed for older BIOS
+architectures to execute on modern hardware. This article explains how
+the CSM functions as an emulation bridge, detailing how it translates
+modern firmware calls, restores legacy 16-bit interrupt services, and
+replicates the Master Boot Record (MBR) bootloader execution path.</p>
+<h2 id="the-architectural-gap-between-uefi-and-bios">The Architectural
+Gap Between UEFI and BIOS</h2>
+<p>Modern UEFI firmware executes in 32-bit or 64-bit mode, using native
+EFI drivers, a partition-agnostic file system driver (typically FAT32),
+and the GUID Partition Table (GPT) standard. Under native UEFI, the
+firmware does not execute boot sector code; instead, it locates and
+loads pre-compiled EFI executable binaries (such as <code>.efi</code>
+loaders) defined by NVRAM variables or fallback paths.</p>
+<p>In contrast, legacy operating systems—such as Windows 7 (32-bit),
+Windows XP, or older Linux distributions—rely on the traditional Basic
+Input/Output System (BIOS). These systems expect the processor to
+initialize in 16-bit Real Mode, utilize standard software interrupts
+(such as <code>INT 10h</code> for video and <code>INT 13h</code> for
+disk operations), and hand over execution to a 512-byte boot sector
+located at sector zero (LBA 0) of an MBR-partitioned drive.</p>
+<h2 id="how-the-compatibility-support-module-works">How the
+Compatibility Support Module Works</h2>
+<p>The CSM resolves these hardware and architectural discrepancies
+through several structured steps:</p>
+<h3 id="1-initializing-legacy-interrupt-vectors">1. Initializing Legacy
+Interrupt Vectors</h3>
+<p>During the platform initialization phase, if CSM is enabled in the
+firmware settings, the UEFI environment allocates a specific region of
+low physical memory (below the 1 MB mark) known as the Interrupt Vector
+Table (IVT) and the BIOS Data Area (BDA). The CSM populates the IVT with
+entry points pointing to legacy Interrupt Service Routines (ISRs). This
+ensures that calls to legacy software interrupts—like
+<code>INT 13h</code> for low-level disk reads and <code>INT 10h</code>
+for video display—can be captured and processed as expected by legacy
+bootloaders.</p>
+<h3 id="2-loading-legacy-option-roms">2. Loading Legacy Option ROMs</h3>
+<p>Modern hardware components, such as graphics cards and storage
+controllers, ship with UEFI-native drivers. When CSM is invoked, the
+firmware bypasses or complements these UEFI drivers by locating and
+executing legacy Option ROMs (OpROMs) embedded within the hardware or
+system firmware. These legacy OpROMs configure the hardware devices into
+operational states compatible with standard BIOS calls, such as
+initializing VGA text mode (80x25 characters) or setting storage
+controllers into legacy IDE/AHCI emulation modes.</p>
+<h3 id="3-transitioning-to-16-bit-execution">3. Transitioning to 16-bit
+Execution</h3>
+<p>Native UEFI executes in protected or long mode. To boot an MBR-based
+operating system, the CSM must configure the CPU to match the expected
+legacy state. It switches the processor execution environment into
+16-bit Real Mode (or creates an equivalent execution environment) with
+memory segments initialized to standard legacy defaults.</p>
+<h3 id="4-executing-the-mbr-boot-sector">4. Executing the MBR Boot
+Sector</h3>
+<p>Once the legacy environment and storage interrupts are ready, the CSM
+initiates the legacy boot process:</p>
+<ol type="1">
+<li><strong>Storage Interrogation:</strong> The CSM uses legacy disk
+routines to query connected storage devices for valid boot media.</li>
+<li><strong>Reading LBA 0:</strong> The firmware reads the first
+512-byte sector (the Master Boot Record) from the primary storage device
+into system memory at the fixed physical address
+<code>0x0000:0x7C00</code>.</li>
+<li><strong>Signature Verification:</strong> The CSM verifies that the
+final two bytes of the sector contain the legacy boot signature
+<code>0x55AA</code>.</li>
+<li><strong>Handoff:</strong> If valid, the processor jumps execution
+directly to memory address <code>0x7C00</code>.</li>
+</ol>
+<p>From this point forward, the legacy boot code inside the MBR takes
+control, reads the partition table, identifies the active partition,
+loads the operating system's secondary bootloader, and continues loading
+the OS relying on the interrupt services provided by the CSM.</p></article>
+        <div id='disqus_thread'></div>
+        <script>
+
+            var disqus_config = function () {
+                this.page.url =         'https://salivity.github.io/uefi/article/how-csm-boots-legacy-mbr-os-on-modern-uefi-hardware';  
+                //this.page.identifier =  PAGE_IDENTIFIER; 
+            };
+            
+            (function() {
+                var d = document, s = d.createElement('script');
+                s.src = 'https://salivity-github-io.disqus.com/embed.js';
+                s.setAttribute('data-timestamp', +new Date());
+                (d.head || d.body).appendChild(s);
+            })();
+        </script>
+    
+        </div>
+    </div>
+    
+    </main>
+    <footer>
+        <nav>
+            <ul class="social-links">
+            </ul>
+        </nav>
+        <nav>
+            <ul class="footer-links">
+                <li><a href="https://smvc.dev/contact">Contact</a></li>
+                <li><a href="/uefi/privacy-policy">Privacy Policy</a></li>
+                <li><a href="/uefi/terms-and-conditions">Terms and Conditions</a></li>
+            </ul>
+        </nav>
+        <div class="copyright">
+            Copyright &copy; <span id="current-year"></span>
+        </div>
+    </footer>
+</body>
+</html>
